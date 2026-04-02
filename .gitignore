@@ -17,15 +17,25 @@ coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Dependency directories
+vendor/
 
 # Go workspace file
 go.work
 go.work.sum
 
-# env file
+# Binary output directory
+bin/
+finterm
+
+# Configuration file with API keys
+config.yaml
+
+# Environment file
 .env
+
+# macOS
+.DS_Store
 
 # Editor/IDE
 # .idea/

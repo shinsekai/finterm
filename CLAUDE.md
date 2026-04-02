@@ -316,22 +316,23 @@ Subsequent values:
 This means the very first EMA value equals the first close price. Some implementations
 seed with SMA of the first `period` values — that will NOT match TradingView output.
 
-- Default periods: **9** (fast) and **21** (slow).
+- Default periods: **10** (fast) and **20** (slow).
 - Return error if fewer than `period` data points are provided.
 - All computations use **close prices of completed bars only** (see §5.0).
 
 ### 5.4 Trend Scoring
 
-A ticker is scored using the combination of RSI and EMA crossover.
+A ticker is scored using the EMA crossover.
 **All inputs are from the last closed bar** — never the current in-progress bar.
 
 | Signal     | Condition                                      |
 |------------|-------------------------------------------------|
-| **Bullish**| EMA(9) > EMA(21) AND RSI between 40–70          |
-| **Bearish**| EMA(9) < EMA(21) AND RSI below 40 OR above 80   |
-| **Neutral**| Everything else                                  |
+| **Bullish**| EMA(10) > EMA(20)                               |
+| **Bearish**| EMA(10) < EMA(20)                               |
 
 These thresholds are configurable via `config.yaml`.
+
+> **Note**: RSI is NOT used in trend scoring. RSI is used exclusively for valuation (§5.5).
 
 ### 5.5 Valuation (RSI-Based)
 
@@ -421,13 +422,8 @@ watchlist:
 
 trend:
   rsi_period: 14
-  ema_fast: 9
-  ema_slow: 21
-  scoring:
-    bullish_rsi_min: 40
-    bullish_rsi_max: 70
-    bearish_rsi_low: 40
-    bearish_rsi_high: 80
+  ema_fast: 10
+  ema_slow: 20
 
 valuation:
   rsi_period: 14

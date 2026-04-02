@@ -15,7 +15,7 @@
 **Description**: Create the Go module and the full directory tree as defined in `CLAUDE.md` §2.
 
 **Deliverables**:
-- `go.mod` with module path `github.com/owner/finterm` and Go 1.22+.
+- `go.mod` with module path `github.com/owner/finterm` and Go 1.26+.
 - All directories created with placeholder `.go` files where needed (to keep Go happy).
 - `cmd/finterm/main.go` with a minimal `func main()` that prints "finterm" and exits.
 - `Makefile` with targets: `build`, `run`, `test`, `lint`, `fmt`, `vet`, `clean`.
@@ -506,45 +506,46 @@ TestRemoteRSI_ResponseConversion
 
 ### Task 4.5 — Trend engine and scoring
 
-**Description**: Orchestrator that routes to the correct indicator path and computes composite trend signals.
+**Description**: Orchestrator that routes to the correct indicator path and computes trend signals via EMA crossover.
 
 **Deliverables**:
 - `internal/domain/trend/engine.go`:
-  - `Engine` struct holding: RSI indicator (remote + local), EMA indicator (remote + local), scoring config.
-  - `New(remoteFetcher, localDataFetcher, scoringCfg) *Engine` constructor.
+  - `Engine` struct holding: RSI indicator (remote + local), EMA indicator (remote + local), config.
+  - `New(remoteFetcher, localDataFetcher, cfg) *Engine` constructor.
   - `Analyze(ctx, symbol string, assetClass AssetClass) (*TrendResult, error)`:
     1. Based on `assetClass`, choose remote or local indicators.
-    2. Fetch RSI (period 14), EMA(9), EMA(21).
+    2. Fetch RSI (period 14), EMA(10), EMA(20).
     3. **Use only the last closed bar's values** — discard any in-progress bar data.
-    4. Pass latest closed-bar values to scoring.
+    4. Trend signal from EMA crossover only (§5.4). Valuation from RSI only (§5.5).
     5. Return `TrendResult`.
   - `TrendResult` struct: `Symbol`, `RSI float64`, `EMAFast float64`, `EMASlow float64`, `Signal TrendSignal`, `Valuation string`.
-  - `TrendSignal` type: `Bullish`, `Bearish`, `Neutral`.
+  - `TrendSignal` type: `Bullish`, `Bearish`.
 - `internal/domain/trend/scoring.go`:
-  - `Score(rsi, emaFast, emaSlow float64, cfg ScoringConfig) TrendSignal` — pure function.
-  - `ScoringConfig` struct with threshold fields from `CLAUDE.md` §5.4.
+  - `Score(emaFast, emaSlow float64) TrendSignal` — pure function. EMA crossover only.
+    - `EMA(10) > EMA(20)` → Bullish.
+    - `EMA(10) < EMA(20)` → Bearish.
 - `internal/domain/trend/engine_test.go` and `internal/domain/trend/scoring_test.go`.
 
 **Acceptance Criteria**:
 - [ ] Equity symbol routes to remote indicators.
 - [ ] Crypto symbol routes to local indicators.
-- [ ] Scoring matches the rules in `CLAUDE.md` §5.4 exactly.
-- [ ] All three signal types are reachable.
+- [ ] Scoring uses EMA crossover only — RSI is NOT used in trend signal.
+- [ ] RSI is passed through to `TrendResult` for valuation display but not for trend scoring.
+- [ ] Both signal types are reachable.
 - [ ] Engine propagates indicator errors without panicking.
 
 **Tests**:
 ```
-TestScore_Bullish
-TestScore_Bearish_LowRSI
-TestScore_Bearish_HighRSI
-TestScore_Neutral
-TestScore_BoundaryValues
+TestScore_Bullish_EMAFastAboveSlow
+TestScore_Bearish_EMAFastBelowSlow
+TestScore_BoundaryEqual
 TestEngine_EquityRoutesToRemote
 TestEngine_CryptoRoutesToLocal
 TestEngine_IndicatorError_Propagated
 TestEngine_FullAnalysis_Equity
 TestEngine_FullAnalysis_Crypto
 TestEngine_UsesClosedBarOnly          # Verify in-progress bar data is excluded
+TestEngine_RSINotUsedInTrendSignal    # Verify RSI value doesn't affect trend
 ```
 
 **Guidelines reference**: `CLAUDE.md` §5.0, §5.4.

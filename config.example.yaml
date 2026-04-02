@@ -1,0 +1,104 @@
+# Alpha Vantage API Configuration
+api:
+  # Your Alpha Vantage API key. Can also be set via FINTERM_AV_API_KEY environment variable.
+  # Environment variable takes precedence over this value.
+  key: ""
+
+  # Base URL for Alpha Vantage API. Do not change unless using a proxy or testing.
+  base_url: "https://www.alphavantage.co/query"
+
+  # Maximum requests per minute to send to Alpha Vantage.
+  # Premium tier allows 75/minute, so we use 70 to stay within limits.
+  rate_limit: 70
+
+  # HTTP timeout for each request.
+  timeout: 10s
+
+  # Maximum number of retry attempts for failed requests.
+  max_retries: 3
+
+# Watchlist of tickers to monitor.
+watchlist:
+  # Stock ticker symbols (NYSE, NASDAQ, etc.)
+  equities:
+    - AAPL
+    - MSFT
+    - GOOGL
+    - AMZN
+    - NVDA
+
+  # Cryptocurrency symbols (BTC, ETH, SOL, etc.)
+  crypto:
+    - BTC
+    - ETH
+    - SOL
+
+# Trend-following configuration
+trend:
+  # Lookback period for RSI calculation.
+  rsi_period: 14
+
+  # Fast EMA period for trend detection.
+  ema_fast: 9
+
+  # Slow EMA period for trend detection.
+  ema_slow: 21
+
+  # Scoring thresholds for trend classification.
+  scoring:
+    # Minimum RSI for bullish trend (with EMA fast > slow).
+    bullish_rsi_min: 40
+
+    # Maximum RSI for bullish trend (with EMA fast > slow).
+    bullish_rsi_max: 70
+
+    # Maximum RSI for bearish trend (with EMA fast < slow, below).
+    bearish_rsi_low: 40
+
+    # Minimum RSI for bearish trend (with EMA fast < slow, above).
+    bearish_rsi_high: 80
+
+# Valuation configuration based on RSI ranges.
+valuation:
+  # Lookback period for RSI calculation.
+  rsi_period: 14
+
+  # RSI below this value is considered oversold.
+  oversold: 30
+
+  # RSI below this value is considered undervalued.
+  undervalued: 45
+
+  # Lower bound of fair value range.
+  fair_low: 45
+
+  # Upper bound of fair value range.
+  fair_high: 55
+
+  # RSI above this value is considered overvalued.
+  overvalued: 70
+
+  # RSI above this value is considered overbought.
+  overbought: 70
+
+# Cache TTL settings for different data types.
+cache:
+  # Time to live for intraday quotes.
+  intraday_ttl: 60s
+
+  # Time to live for daily time series data.
+  daily_ttl: 1h
+
+  # Time to live for macroeconomic data (GDP, CPI, etc.).
+  macro_ttl: 6h
+
+  # Time to live for news sentiment data.
+  news_ttl: 5m
+
+  # Time to live for cryptocurrency OHLCV data.
+  crypto_ttl: 5m
+
+# Terminal theme configuration.
+theme:
+  # Visual style: "default", "minimal", or "colorblind".
+  style: "default"

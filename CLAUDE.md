@@ -16,7 +16,7 @@ and a sentiment-scored news feed — all powered by the Alpha Vantage API.
 
 ## 1. Language & Runtime
 
-- **Go 1.22+** (use the latest stable release).
+- **Go 1.26+** (use the latest stable release).
 - Target platforms: Linux, macOS, Windows (terminal-based, no GUI dependencies).
 - Module path: `github.com/<owner>/finterm` (update once repo is created).
 

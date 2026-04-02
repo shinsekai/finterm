@@ -1,0 +1,23 @@
+# Golangci-lint configuration for Finterm project (v2)
+# See CLAUDE.md §3.1 for details
+#
+# Note: gosimple linter was removed in golangci-lint v2 - its checks
+# are now handled by staticcheck and other default linters.
+
+version: "2"
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - gocyclo
+    - gocritic
+    - revive
+
+  settings:
+    gocyclo:
+      min-complexity: 15

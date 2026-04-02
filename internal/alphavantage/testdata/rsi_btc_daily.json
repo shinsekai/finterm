@@ -1,0 +1,25 @@
+{
+    "Meta Data": {
+        "1: Symbol": "BTC",
+        "2: Indicator": "Relative Strength Index (RSI)",
+        "3: Last Refreshed": "2024-04-02 20:00:00",
+        "4: Interval": "daily",
+        "5: Time Period": 14,
+        "6: Series Type": "close",
+        "7: Time Zone": "UTC"
+    },
+    "Technical Analysis: RSI": {
+        "2024-04-02": {
+            "RSI": "58.2345"
+        },
+        "2024-04-01": {
+            "RSI": "55.6789"
+        },
+        "2024-03-29": {
+            "RSI": "52.3456"
+        },
+        "2024-03-28": {
+            "RSI": "48.9012"
+        }
+    }
+}

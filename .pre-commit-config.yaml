@@ -1,0 +1,60 @@
+# Pre-commit hooks for Finterm project
+# See CLAUDE.md §9 for details
+
+repos:
+  - repo: local
+    hooks:
+      - id: claude-guidelines-check
+        name: CLAUDE.md compliance
+        entry: bash -c "echo 'Ensure code follows CLAUDE.md guidelines' && exit 0"
+        language: system
+        always_run: true
+        pass_filenames: false
+
+      - id: go-fmt
+        name: gofmt
+        entry: gofmt -l -d .
+        language: system
+        types: [go]
+
+      - id: go-vet
+        name: go vet
+        entry: go vet ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-test
+        name: go test
+        entry: go test ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-lint
+        name: golangci-lint
+        entry: golangci-lint run
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-vulncheck
+        name: govulncheck
+        entry: bash -c 'export PATH="$HOME/go/bin:$PATH" && cd "$(git rev-parse --show-toplevel)" && govulncheck ./...'
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: no-secrets
+        name: No secrets in code
+        entry: >-
+          bash -c "grep -rn 'apikey|api_key|secret' --include='*.go' |
+          grep -v '_test.go' |
+          grep -v 'os.Getenv' |
+          grep -v 'config\.' |
+          grep -v '// ' &&
+          echo 'FAIL: Possible secret in source' &&
+          exit 1 ||
+          exit 0"
+        language: system
+        pass_filenames: false

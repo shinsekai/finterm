@@ -1,0 +1,23 @@
+{
+    "name": "Real Gross Domestic Product",
+    "interval": "quarterly",
+    "unit": "billions of dollars",
+    "data": [
+        {
+            "date": "2023-10-01",
+            "value": "27610.2"
+        },
+        {
+            "date": "2023-07-01",
+            "value": "27434.8"
+        },
+        {
+            "date": "2023-04-01",
+            "value": "27110.3"
+        },
+        {
+            "date": "2023-01-01",
+            "value": "26813.6"
+        }
+    ]
+}

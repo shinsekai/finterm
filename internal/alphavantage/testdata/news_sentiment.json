@@ -1,0 +1,50 @@
+{
+    "feed": [
+        {
+            "title": "Apple Inc. announces quarterly earnings beating expectations",
+            "url": "https://example.com/news/apple-earnings",
+            "time_published": "20240402T143000",
+            "authors": [
+                "John Smith"
+            ],
+            "summary": "Apple reported strong quarterly earnings driven by iPhone sales and services revenue growth.",
+            "banner_image": "https://example.com/images/apple.jpg",
+            "source": "TechNews Daily",
+            "category_within": "Technology",
+            "topic": "Earnings",
+            "overall_sentiment_score": "0.345000",
+            "sentiment_label": "Somewhat-Bullish",
+            "ticker_sentiment": [
+                {
+                    "ticker": "AAPL",
+                    "relevance_score": "0.987654",
+                    "ticker_sentiment_score": "0.345000",
+                    "ticker_sentiment_label": "Somewhat-Bullish"
+                }
+            ]
+        },
+        {
+            "title": "Market volatility continues amid economic uncertainty",
+            "url": "https://example.com/news/market-volatility",
+            "time_published": "20240402T120000",
+            "authors": [
+                "Jane Doe"
+            ],
+            "summary": "Investors remain cautious as central banks signal potential policy changes.",
+            "banner_image": "https://example.com/images/market.jpg",
+            "source": "Financial Times",
+            "category_within": "Finance",
+            "topic": "Markets",
+            "overall_sentiment_score": "-0.123000",
+            "sentiment_label": "Somewhat-Bearish",
+            "ticker_sentiment": [
+                {
+                    "ticker": "SPY",
+                    "relevance_score": "0.876543",
+                    "ticker_sentiment_score": "-0.123000",
+                    "ticker_sentiment_label": "Somewhat-Bearish"
+                }
+            ]
+        }
+    ]
+}

@@ -52,11 +52,15 @@ type Engine interface {
 
 // QuoteClient defines the interface for fetching quote data.
 // This allows mocking in tests while the actual implementation uses alphavantage.Client.
+//
+//nolint:revive // type name stuttering is acceptable for package-scoped interfaces
 type QuoteClient interface {
 	GetGlobalQuote(ctx context.Context, symbol string) (*alphavantage.GlobalQuote, error)
 }
 
 // QuoteData contains all the data to display for a quote.
+//
+//nolint:revive // type name stuttering is acceptable for package-scoped types
 type QuoteData struct {
 	Quote      *alphavantage.GlobalQuote
 	Indicators *trenddomain.Result
@@ -177,6 +181,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleKeyMsg handles keyboard input messages.
+//
+//nolint:gocyclo // complexity is acceptable for handling all key messages
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEnter:
@@ -341,11 +347,15 @@ func (m Model) GetHeight() int {
 type RefreshMsg struct{}
 
 // QuoteResultMsg is a message when quote data is loaded.
+//
+//nolint:revive // type name stuttering is acceptable for package-scoped types
 type QuoteResultMsg struct {
 	Data *QuoteData
 }
 
 // QuoteErrorMsg is a message when an error occurs.
+//
+//nolint:revive // type name stuttering is acceptable for package-scoped types
 type QuoteErrorMsg struct {
 	Err error
 }

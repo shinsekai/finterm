@@ -8,7 +8,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/owner/finterm/internal/alphavantage"
 	"github.com/owner/finterm/internal/config"
+	"github.com/owner/finterm/internal/domain/trend"
+	"github.com/owner/finterm/internal/domain/trend/indicators"
 	"github.com/owner/finterm/internal/tui"
 )
 
@@ -28,11 +31,42 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Create Alpha Vantage client
+	avClient := alphavantage.New(alphavantage.Config{
+		Key:        cfg.API.Key,
+		BaseURL:    cfg.API.BaseURL,
+		RateLimit:  cfg.API.RateLimit,
+		Timeout:    cfg.API.Timeout,
+		MaxRetries: cfg.API.MaxRetries,
+	})
+
+	// Create asset class detector with crypto symbols
+	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
+
+	// Create remote indicators (for equities)
+	remoteRSI := indicators.NewRemoteRSI(avClient)
+	remoteEMA := indicators.NewRemoteEMA(avClient)
+
+	// Create local indicators (for crypto) - initialized with empty data
+	// Data will be loaded when crypto symbols are queried
+	localRSI := indicators.NewLocalRSI(nil)
+	localEMA := indicators.NewLocalEMA(nil)
+
+	// Create trend engine
+	trendEngine := trend.New(
+		remoteRSI,
+		remoteEMA,
+		localRSI,
+		localEMA,
+		cfg,
+		detector,
+	)
+
 	// Create theme
 	theme := tui.NewTheme(cfg.Theme.Style)
 
 	// Create and start the application
-	app := tui.NewApp(theme)
+	app := tui.NewApp(theme, avClient, trendEngine)
 	p := tea.NewProgram(app, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {

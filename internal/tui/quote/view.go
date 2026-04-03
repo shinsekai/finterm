@@ -320,10 +320,11 @@ func (v *View) renderQuoteBox() string {
 		// Trend signal
 		trendStyle := v.theme.Neutral()
 		trendSymbol := "─"
-		if indicators.Signal == trenddomain.Bullish {
+		switch indicators.Signal {
+		case trenddomain.Bullish:
 			trendStyle = v.theme.Bullish()
 			trendSymbol = "▲"
-		} else if indicators.Signal == trenddomain.Bearish {
+		case trenddomain.Bearish:
 			trendStyle = v.theme.Bearish()
 			trendSymbol = "▼"
 		}
@@ -389,10 +390,7 @@ func parseChange(changeStr, changePercentStr string) (float64, string) {
 	}
 
 	// Remove % sign if present
-	changePercent := changePercentStr
-	if strings.HasSuffix(changePercent, "%") {
-		changePercent = changePercent[:len(changePercent)-1]
-	}
+	changePercent := strings.TrimSuffix(changePercentStr, "%")
 
 	return change, changePercent
 }
@@ -408,15 +406,16 @@ func formatVolume(s string) string {
 		return s
 	}
 
-	if vol >= 1_000_000_000 {
+	switch {
+	case vol >= 1_000_000_000:
 		return fmt.Sprintf("%.2fB", vol/1_000_000_000)
-	} else if vol >= 1_000_000 {
+	case vol >= 1_000_000:
 		return fmt.Sprintf("%.2fM", vol/1_000_000)
-	} else if vol >= 1_000 {
+	case vol >= 1_000:
 		return fmt.Sprintf("%.2fK", vol/1_000)
+	default:
+		return fmt.Sprintf("%.0f", vol)
 	}
-
-	return fmt.Sprintf("%.0f", vol)
 }
 
 // formatFloat formats a float with specified decimal places.
@@ -441,7 +440,7 @@ func getRSIValuation(rsi float64) string {
 	}
 }
 
-// Render returns the view as a string.
+// View returns the view as a string.
 func (m Model) View() string {
 	return NewView(m).Render()
 }

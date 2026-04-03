@@ -19,7 +19,7 @@ type mockEngine struct {
 	err    error
 }
 
-func (m *mockEngine) AnalyzeWithSymbolDetection(ctx context.Context, symbol string) (*trenddomain.Result, error) {
+func (m *mockEngine) AnalyzeWithSymbolDetection(_ context.Context, _ string) (*trenddomain.Result, error) {
 	return m.result, m.err
 }
 
@@ -29,7 +29,7 @@ type mockClient struct {
 	err   error
 }
 
-func (m *mockClient) GetGlobalQuote(ctx context.Context, symbol string) (*alphavantage.GlobalQuote, error) {
+func (m *mockClient) GetGlobalQuote(_ context.Context, _ string) (*alphavantage.GlobalQuote, error) {
 	return m.quote, m.err
 }
 

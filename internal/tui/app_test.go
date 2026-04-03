@@ -1,7 +1,8 @@
-// Package tui provides the terminal user interface for finterm.
+// Package tui provides tests for terminal user interface.
 package tui
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -9,13 +10,38 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/owner/finterm/internal/alphavantage"
+	trenddomain "github.com/owner/finterm/internal/domain/trend"
 	"github.com/owner/finterm/internal/tui/trend"
 )
+
+// mockEngine is a mock implementation of trend.Engine for testing.
+type mockEngine struct{}
+
+func (m *mockEngine) AnalyzeWithSymbolDetection(_ context.Context, symbol string) (*trenddomain.Result, error) {
+	return &trenddomain.Result{
+		Symbol:  symbol,
+		RSI:     50,
+		EMAFast: 100,
+		EMASlow: 90,
+		Signal:  trenddomain.Bullish,
+	}, nil
+}
+
+// mockClient is a mock implementation of alphavantage.Client for testing.
+type mockClient struct{}
+
+func (m *mockClient) GetGlobalQuote(_ context.Context, symbol string) (*alphavantage.GlobalQuote, error) {
+	return &alphavantage.GlobalQuote{
+		Symbol: symbol,
+		Price:  "100.00",
+	}, nil
+}
 
 // TestApp_TabSwitching tests tab switching with number keys and Tab.
 func TestApp_TabSwitching(t *testing.T) {
 	theme := NewTheme("default")
-	app := NewApp(theme)
+	app := NewApp(theme, &mockClient{}, &mockEngine{})
 
 	tests := []struct {
 		name        string
@@ -84,7 +110,7 @@ func TestApp_TabSwitching(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Start with the specified initial tab
+			// Start with specified initial tab
 			app.activeTab = tt.initialTab
 
 			// Create key message
@@ -111,7 +137,7 @@ func TestApp_TabSwitching(t *testing.T) {
 // TestApp_QuitKey tests that q and Ctrl+C quit cleanly.
 func TestApp_QuitKey(t *testing.T) {
 	theme := NewTheme("default")
-	_ = NewApp(theme)
+	_ = NewApp(theme, &mockClient{}, &mockEngine{})
 
 	tests := []struct {
 		name  string
@@ -137,7 +163,7 @@ func TestApp_QuitKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := NewApp(theme) // Reset app state
+			app := NewApp(theme, &mockClient{}, &mockEngine{}) // Reset app state
 
 			// Create key message
 			msg := tea.KeyMsg{
@@ -162,7 +188,7 @@ func TestApp_QuitKey(t *testing.T) {
 // TestApp_HelpToggle tests that ? toggles help overlay.
 func TestApp_HelpToggle(t *testing.T) {
 	theme := NewTheme("default")
-	app := NewApp(theme)
+	app := NewApp(theme, &mockClient{}, &mockEngine{})
 
 	// Initially help should be hidden
 	assert.False(t, app.showHelp)
@@ -217,7 +243,7 @@ func TestApp_RefreshDelegation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := NewApp(theme)
+			app := NewApp(theme, &mockClient{}, &mockEngine{})
 			app.activeTab = tt.activeTab
 
 			// Press r to refresh
@@ -253,10 +279,10 @@ func TestApp_RefreshDelegation(t *testing.T) {
 	}
 }
 
-// TestApp_DefaultTab tests that the default tab is trend (first tab).
+// TestApp_DefaultTab tests that default tab is trend (first tab).
 func TestApp_DefaultTab(t *testing.T) {
 	theme := NewTheme("default")
-	app := NewApp(theme)
+	app := NewApp(theme, &mockClient{}, &mockEngine{})
 
 	assert.Equal(t, tabTrend, app.activeTab)
 	assert.Equal(t, "Trend", app.tabs[tabTrend].name)
@@ -265,9 +291,9 @@ func TestApp_DefaultTab(t *testing.T) {
 // TestApp_DelegateToChild tests that unknown keys are delegated to child model.
 func TestApp_DelegateToChild(t *testing.T) {
 	theme := NewTheme("default")
-	app := NewApp(theme)
+	app := NewApp(theme, &mockClient{}, &mockEngine{})
 
-	// Send a message that should be delegated to the child
+	// Send a message that should be delegated to child
 	msg := tea.KeyMsg{
 		Type:  tea.KeyRunes,
 		Runes: []rune("x"), // Unknown key
@@ -287,7 +313,7 @@ func TestApp_DelegateToChild(t *testing.T) {
 // TestApp_WindowSize tests that window size messages update dimensions.
 func TestApp_WindowSize(t *testing.T) {
 	theme := NewTheme("default")
-	app := NewApp(theme)
+	app := NewApp(theme, &mockClient{}, &mockEngine{})
 
 	msg := tea.WindowSizeMsg{
 		Width:  80,
@@ -304,10 +330,10 @@ func TestApp_WindowSize(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
-// TestApp_DataUpdateMsg tests that data update messages update the last update time.
+// TestApp_DataUpdateMsg tests that data update messages update last update time.
 func TestApp_DataUpdateMsg(t *testing.T) {
 	theme := NewTheme("default")
-	app := NewApp(theme)
+	app := NewApp(theme, &mockClient{}, &mockEngine{})
 
 	oldTime := app.lastUpdate
 	// Sleep to ensure time difference
@@ -326,7 +352,7 @@ func TestApp_DataUpdateMsg(t *testing.T) {
 // TestApp_ErrorUpdateMsg tests that error update messages increment error count.
 func TestApp_ErrorUpdateMsg(t *testing.T) {
 	theme := NewTheme("default")
-	app := NewApp(theme)
+	app := NewApp(theme, &mockClient{}, &mockEngine{})
 
 	oldCount := app.errorCount
 
@@ -343,7 +369,7 @@ func TestApp_ErrorUpdateMsg(t *testing.T) {
 // TestApp_ViewRenders tests that View() renders without crashing.
 func TestApp_ViewRenders(t *testing.T) {
 	theme := NewTheme("default")
-	app := NewApp(theme)
+	app := NewApp(theme, &mockClient{}, &mockEngine{})
 
 	// Test normal view
 	view := app.View()
@@ -366,7 +392,7 @@ func TestApp_ViewRenders(t *testing.T) {
 // TestApp_InvalidTabKey tests that invalid tab keys are delegated to child.
 func TestApp_InvalidTabKey(t *testing.T) {
 	theme := NewTheme("default")
-	app := NewApp(theme)
+	app := NewApp(theme, &mockClient{}, &mockEngine{})
 
 	// Press 5 (invalid tab key)
 	msg := tea.KeyMsg{

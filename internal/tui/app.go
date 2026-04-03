@@ -9,13 +9,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/owner/finterm/internal/alphavantage"
 	"github.com/owner/finterm/internal/tui/components"
 	"github.com/owner/finterm/internal/tui/macro"
 	"github.com/owner/finterm/internal/tui/news"
 	"github.com/owner/finterm/internal/tui/quote"
 	"github.com/owner/finterm/internal/tui/trend"
-	quotetrenddomain "github.com/owner/finterm/internal/domain/trend"
 )
 
 const (
@@ -45,7 +43,7 @@ type Model struct {
 }
 
 // NewApp creates a new application model with all child models initialized.
-func NewApp(theme *Theme, client *alphavantage.Client, trendEngine *quotetrenddomain.Engine) Model {
+func NewApp(theme *Theme, client quote.QuoteClient, trendEngine quote.Engine) Model {
 	// Create quote model and configure it with dependencies
 	quoteModel := quote.NewModel()
 	quoteModel.Configure(context.Background(), client, trendEngine)

@@ -2,13 +2,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/owner/finterm/internal/alphavantage"
+	"github.com/owner/finterm/internal/cache"
 	"github.com/owner/finterm/internal/config"
 	"github.com/owner/finterm/internal/domain/trend"
 	"github.com/owner/finterm/internal/domain/trend/indicators"
@@ -20,14 +25,16 @@ func main() {
 	cfgPath := getConfigPath()
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Using default config. Set FINTERM_AV_API_KEY environment variable or create config file.\n")
-		cfg = config.DefaultConfig()
+		fmt.Fprintf(os.Stderr, "Error loading config from %s: %v\n", cfgPath, err)
+		fmt.Fprintf(os.Stderr, "Please create a config file or set FINTERM_AV_API_KEY environment variable.\n")
+		os.Exit(1)
 	}
 
-	// Validate that we have at least some usable config
-	if err := validateConfig(cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "Config validation error: %v\n", err)
+	// Validate that we have a usable config with API key
+	if cfg.API.Key == "" {
+		fmt.Fprintln(os.Stderr, "Error: API key is required for data features.")
+		fmt.Fprintln(os.Stderr, "Set FINTERM_AV_API_KEY environment variable or configure api.key in config.yaml")
+		//nolint:gocritic // defer won't run after os.Exit, but that's fine for startup error
 		os.Exit(1)
 	}
 
@@ -39,6 +46,11 @@ func main() {
 		Timeout:    cfg.API.Timeout,
 		MaxRetries: cfg.API.MaxRetries,
 	})
+
+	// Create cache store
+	// Note: No defer Close() needed here since cache is in-memory
+	// and cleanup goroutine will be terminated when process exits
+	cacheStore := cache.New()
 
 	// Create asset class detector with crypto symbols
 	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
@@ -65,13 +77,55 @@ func main() {
 	// Create theme
 	theme := tui.NewTheme(cfg.Theme.Style)
 
-	// Create and start the application
-	app := tui.NewApp(theme, avClient, trendEngine)
-	p := tea.NewProgram(app, tea.WithAltScreen())
+	// Create the application with all dependencies wired
+	// The avClient implements all required interfaces: quote.QuoteClient, macro.Client, news.Client
+	app := tui.NewApp(
+		theme,
+		avClient, // quote.QuoteClient
+		avClient, // macro.Client
+		avClient, // news.Client
+		trendEngine,
+		cacheStore,
+		&cfg.Watchlist,
+		detector,
+	)
 
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error starting TUI: %v\n", err)
-		os.Exit(1)
+	// Setup signal handling for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start the TUI with alt screen and mouse support
+	p := tea.NewProgram(
+		app,
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
+		tea.WithContext(ctx),
+	)
+
+	// Run the program and handle signals
+	programDone := make(chan error, 1)
+	go func() {
+		_, err := p.Run()
+		programDone <- err
+	}()
+
+	// Wait for either program completion or signal
+	select {
+	case err := <-programDone:
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error running TUI: %v\n", err)
+			os.Exit(1)
+		}
+		// Normal exit - cancel context to clean up any background goroutines
+		cancel()
+
+	case sig := <-sigChan:
+		log.Printf("Received signal %v, shutting down gracefully...\n", sig)
+		p.Quit()
+		// Wait for program to finish cleanup
+		<-programDone
+		cancel()
 	}
 }
 
@@ -88,15 +142,4 @@ func getConfigPath() string {
 		return "config.yaml"
 	}
 	return filepath.Join(homeDir, ".config", "finterm", "config.yaml")
-}
-
-// validateConfig performs basic validation that we have enough config to run.
-func validateConfig(cfg *config.Config) error {
-	// In demo mode (without API key), we can still run the TUI
-	// Just warn that data won't be available
-	if cfg.API.Key == "" {
-		fmt.Fprintln(os.Stderr, "Warning: No API key configured. Data features will be unavailable.")
-		fmt.Fprintln(os.Stderr, "Set FINTERM_AV_API_KEY environment variable or configure api.key in config.yaml")
-	}
-	return nil
 }

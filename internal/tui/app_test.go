@@ -11,7 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/owner/finterm/internal/alphavantage"
+	"github.com/owner/finterm/internal/cache"
+	"github.com/owner/finterm/internal/config"
 	trenddomain "github.com/owner/finterm/internal/domain/trend"
+	"github.com/owner/finterm/internal/domain/trend/indicators"
 	"github.com/owner/finterm/internal/tui/trend"
 )
 
@@ -38,10 +41,64 @@ func (m *mockClient) GetGlobalQuote(_ context.Context, symbol string) (*alphavan
 	}, nil
 }
 
+// mockClient also implements macro.Client interface methods
+func (m *mockClient) GetRealGDP(_ context.Context, _ string) ([]alphavantage.MacroDataPoint, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetRealGDPPerCapita(_ context.Context) ([]alphavantage.MacroDataPoint, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetCPI(_ context.Context, _ string) ([]alphavantage.MacroDataPoint, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetInflation(_ context.Context) ([]alphavantage.MacroDataPoint, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetUnemployment(_ context.Context) ([]alphavantage.MacroDataPoint, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetNonfarmPayroll(_ context.Context) ([]alphavantage.MacroDataPoint, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetFedFundsRate(_ context.Context, _ string) ([]alphavantage.MacroDataPoint, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetTreasuryYield(_ context.Context, _, _ string) ([]alphavantage.MacroDataPoint, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetNewsSentiment(_ context.Context, _ alphavantage.NewsOpts) (*alphavantage.NewsSentiment, error) {
+	return &alphavantage.NewsSentiment{
+		Items: []alphavantage.NewsItem{},
+	}, nil
+}
+
+// newMockApp creates a new app for testing with all required mocks.
+func newMockApp(t *testing.T) Model {
+	theme := NewTheme("default")
+	cacheStore := cache.New()
+	t.Cleanup(func() { cacheStore.Close() })
+
+	watchlist := &config.WatchlistConfig{
+		Equities: []string{},
+		Crypto:   []string{},
+	}
+	detector := indicators.NewAssetClassDetector([]string{})
+
+	// mockClient implements all three client interfaces: quote.QuoteClient, macro.Client, news.Client
+	return NewApp(theme, &mockClient{}, &mockClient{}, &mockClient{}, &mockEngine{}, cacheStore, watchlist, detector)
+}
+
 // TestApp_TabSwitching tests tab switching with number keys and Tab.
 func TestApp_TabSwitching(t *testing.T) {
-	theme := NewTheme("default")
-	app := NewApp(theme, &mockClient{}, &mockEngine{})
+	app := newMockApp(t)
 
 	tests := []struct {
 		name        string
@@ -136,8 +193,7 @@ func TestApp_TabSwitching(t *testing.T) {
 
 // TestApp_QuitKey tests that q and Ctrl+C quit cleanly.
 func TestApp_QuitKey(t *testing.T) {
-	theme := NewTheme("default")
-	_ = NewApp(theme, &mockClient{}, &mockEngine{})
+	_ = newMockApp(t)
 
 	tests := []struct {
 		name  string
@@ -163,7 +219,7 @@ func TestApp_QuitKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := NewApp(theme, &mockClient{}, &mockEngine{}) // Reset app state
+			app := newMockApp(t) // Reset app state
 
 			// Create key message
 			msg := tea.KeyMsg{
@@ -187,8 +243,7 @@ func TestApp_QuitKey(t *testing.T) {
 
 // TestApp_HelpToggle tests that ? toggles help overlay.
 func TestApp_HelpToggle(t *testing.T) {
-	theme := NewTheme("default")
-	app := NewApp(theme, &mockClient{}, &mockEngine{})
+	app := newMockApp(t)
 
 	// Initially help should be hidden
 	assert.False(t, app.showHelp)
@@ -217,7 +272,6 @@ func TestApp_HelpToggle(t *testing.T) {
 
 // TestApp_RefreshDelegation tests that r triggers refresh on active view.
 func TestApp_RefreshDelegation(t *testing.T) {
-	theme := NewTheme("default")
 
 	tests := []struct {
 		name      string
@@ -243,7 +297,7 @@ func TestApp_RefreshDelegation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := NewApp(theme, &mockClient{}, &mockEngine{})
+			app := newMockApp(t)
 			app.activeTab = tt.activeTab
 
 			// Press r to refresh
@@ -281,8 +335,7 @@ func TestApp_RefreshDelegation(t *testing.T) {
 
 // TestApp_DefaultTab tests that default tab is trend (first tab).
 func TestApp_DefaultTab(t *testing.T) {
-	theme := NewTheme("default")
-	app := NewApp(theme, &mockClient{}, &mockEngine{})
+	app := newMockApp(t)
 
 	assert.Equal(t, tabTrend, app.activeTab)
 	assert.Equal(t, "Trend", app.tabs[tabTrend].name)
@@ -290,8 +343,7 @@ func TestApp_DefaultTab(t *testing.T) {
 
 // TestApp_DelegateToChild tests that unknown keys are delegated to child model.
 func TestApp_DelegateToChild(t *testing.T) {
-	theme := NewTheme("default")
-	app := NewApp(theme, &mockClient{}, &mockEngine{})
+	app := newMockApp(t)
 
 	// Send a message that should be delegated to child
 	msg := tea.KeyMsg{
@@ -312,9 +364,7 @@ func TestApp_DelegateToChild(t *testing.T) {
 
 // TestApp_WindowSize tests that window size messages update dimensions.
 func TestApp_WindowSize(t *testing.T) {
-	theme := NewTheme("default")
-	app := NewApp(theme, &mockClient{}, &mockEngine{})
-
+	app := newMockApp(t)
 	msg := tea.WindowSizeMsg{
 		Width:  80,
 		Height: 24,
@@ -332,8 +382,7 @@ func TestApp_WindowSize(t *testing.T) {
 
 // TestApp_DataUpdateMsg tests that data update messages update last update time.
 func TestApp_DataUpdateMsg(t *testing.T) {
-	theme := NewTheme("default")
-	app := NewApp(theme, &mockClient{}, &mockEngine{})
+	app := newMockApp(t)
 
 	oldTime := app.lastUpdate
 	// Sleep to ensure time difference
@@ -351,11 +400,8 @@ func TestApp_DataUpdateMsg(t *testing.T) {
 
 // TestApp_ErrorUpdateMsg tests that error update messages increment error count.
 func TestApp_ErrorUpdateMsg(t *testing.T) {
-	theme := NewTheme("default")
-	app := NewApp(theme, &mockClient{}, &mockEngine{})
-
+	app := newMockApp(t)
 	oldCount := app.errorCount
-
 	msg := ErrorUpdateMsg{Tab: tabTrend, Err: assert.AnError}
 	newModel, cmd := app.Update(msg)
 	var ok bool
@@ -368,12 +414,9 @@ func TestApp_ErrorUpdateMsg(t *testing.T) {
 
 // TestApp_ViewRenders tests that View() renders without crashing.
 func TestApp_ViewRenders(t *testing.T) {
-	theme := NewTheme("default")
-	app := NewApp(theme, &mockClient{}, &mockEngine{})
+	app := newMockApp(t)
 
-	// Test normal view
 	view := app.View()
-	assert.NotEmpty(t, view)
 	assert.Contains(t, view, "1. Trend")
 
 	// Test help view
@@ -391,8 +434,7 @@ func TestApp_ViewRenders(t *testing.T) {
 
 // TestApp_InvalidTabKey tests that invalid tab keys are delegated to child.
 func TestApp_InvalidTabKey(t *testing.T) {
-	theme := NewTheme("default")
-	app := NewApp(theme, &mockClient{}, &mockEngine{})
+	app := newMockApp(t)
 
 	// Press 5 (invalid tab key)
 	msg := tea.KeyMsg{

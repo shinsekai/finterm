@@ -9,6 +9,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/owner/finterm/internal/cache"
+	"github.com/owner/finterm/internal/config"
+	"github.com/owner/finterm/internal/domain/trend/indicators"
 	"github.com/owner/finterm/internal/tui/components"
 	"github.com/owner/finterm/internal/tui/macro"
 	"github.com/owner/finterm/internal/tui/news"
@@ -42,19 +45,41 @@ type Model struct {
 	width, height int
 }
 
-// NewApp creates a new application model with all child models initialized.
-func NewApp(theme *Theme, client quote.QuoteClient, trendEngine quote.Engine) Model {
-	// Create quote model and configure it with dependencies
+// NewApp creates a new application model with all child models initialized and configured.
+// All dependencies are injected and the models are configured before returning.
+func NewApp(
+	theme *Theme,
+	quoteClient quote.QuoteClient,
+	macroClient macro.Client,
+	newsClient news.Client,
+	trendEngine quote.Engine,
+	cacheStore *cache.Store,
+	watchlist *config.WatchlistConfig,
+	detector *indicators.AssetClassDetector,
+) Model {
+	// Create and configure trend model
+	trendModel := trend.NewModel()
+	trendModel.Configure(context.Background(), trendEngine, watchlist, detector)
+
+	// Create and configure quote model
 	quoteModel := quote.NewModel()
-	quoteModel.Configure(context.Background(), client, trendEngine)
+	quoteModel.Configure(context.Background(), quoteClient, trendEngine)
+
+	// Create and configure macro model
+	macroModel := macro.NewModel()
+	macroModel.Configure(context.Background(), macroClient, cacheStore)
+
+	// Create and configure news model
+	newsModel := news.NewModel()
+	newsModel.Configure(context.Background(), newsClient)
 
 	return Model{
 		theme: theme,
 		tabs: []tab{
-			{name: "Trend", model: trend.NewModel()},
+			{name: "Trend", model: trendModel},
 			{name: "Quote", model: quoteModel},
-			{name: "Macro", model: macro.NewModel()},
-			{name: "News", model: news.NewModel()},
+			{name: "Macro", model: macroModel},
+			{name: "News", model: newsModel},
 		},
 		activeTab:  tabTrend,
 		showHelp:   false,

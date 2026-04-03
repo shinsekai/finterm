@@ -271,9 +271,9 @@ func (v *View) renderArticle(article Article, isActive bool) string {
 
 	// Line 3: sentiment label + relevance
 	line3 := "              │ " +
-		v.theme.Muted().Render("Sentiment: ")+
-		sentimentStyle.Render(sentimentLabel)+
-		v.theme.Muted().Render(" │ Relevance: ")+
+		v.theme.Muted().Render("Sentiment: ") +
+		sentimentStyle.Render(sentimentLabel) +
+		v.theme.Muted().Render(" │ Relevance: ") +
 		v.theme.Muted().Render(fmt.Sprintf("%.2f", relevance))
 	lines = append(lines, line3)
 

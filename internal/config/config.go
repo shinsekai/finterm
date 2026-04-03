@@ -122,8 +122,8 @@ func DefaultConfig() *Config {
 	}
 }
 
-// Load reads and parses the configuration file at path, applies environment variable
-// overrides, and validates the configuration.
+// Load reads and parses configuration file at path, applies environment variable
+// overrides, and validates configuration.
 func Load(path string) (*Config, error) {
 	cfg := DefaultConfig()
 
@@ -150,115 +150,138 @@ func Load(path string) (*Config, error) {
 
 // Validate checks that all required fields are set and that all values are valid.
 func (c *Config) Validate() error {
-	if c.API.Key == "" {
+	if err := validateAPIConfig(c.API); err != nil {
+		return err
+	}
+	if err := validateWatchlistConfig(c.Watchlist); err != nil {
+		return err
+	}
+	if err := validateTrendConfig(c.Trend); err != nil {
+		return err
+	}
+	if err := validateValuationConfig(c.Valuation); err != nil {
+		return err
+	}
+	if err := validateCacheConfig(c.Cache); err != nil {
+		return err
+	}
+	if err := validateThemeConfig(c.Theme); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateAPIConfig validates the API configuration section.
+func validateAPIConfig(api APIConfig) error {
+	if api.Key == "" {
 		return fmt.Errorf("API key is required (set api.key in config.yaml or FINTERM_AV_API_KEY env var)")
 	}
-
-	if c.API.BaseURL == "" {
+	if api.BaseURL == "" {
 		return fmt.Errorf("api.base_url is required")
 	}
-
-	if c.API.RateLimit <= 0 {
-		return fmt.Errorf("api.rate_limit must be positive, got %d", c.API.RateLimit)
+	if api.RateLimit <= 0 {
+		return fmt.Errorf("api.rate_limit must be positive, got %d", api.RateLimit)
 	}
-
-	if c.API.Timeout <= 0 {
-		return fmt.Errorf("api.timeout must be positive, got %v", c.API.Timeout)
+	if api.Timeout <= 0 {
+		return fmt.Errorf("api.timeout must be positive, got %v", api.Timeout)
 	}
-
-	if c.API.MaxRetries < 0 {
-		return fmt.Errorf("api.max_retries must be non-negative, got %d", c.API.MaxRetries)
+	if api.MaxRetries < 0 {
+		return fmt.Errorf("api.max_retries must be non-negative, got %d", api.MaxRetries)
 	}
+	return nil
+}
 
-	// Validate tickers
-	for _, ticker := range c.Watchlist.Equities {
+// validateWatchlistConfig validates the watchlist configuration section.
+func validateWatchlistConfig(watchlist WatchlistConfig) error {
+	for _, ticker := range watchlist.Equities {
 		if err := validateTicker(ticker); err != nil {
 			return fmt.Errorf("watchlist.equities: invalid ticker %q: %w", ticker, err)
 		}
 	}
-
-	for _, ticker := range c.Watchlist.Crypto {
+	for _, ticker := range watchlist.Crypto {
 		if err := validateTicker(ticker); err != nil {
 			return fmt.Errorf("watchlist.crypto: invalid ticker %q: %w", ticker, err)
 		}
 	}
+	return nil
+}
 
-	// Validate trend config
-	if c.Trend.RSIPeriod <= 0 {
-		return fmt.Errorf("trend.rsi_period must be positive, got %d", c.Trend.RSIPeriod)
+// validateTrendConfig validates the trend configuration section.
+func validateTrendConfig(trend TrendConfig) error {
+	if trend.RSIPeriod <= 0 {
+		return fmt.Errorf("trend.rsi_period must be positive, got %d", trend.RSIPeriod)
+	}
+	if trend.EMAFast <= 0 {
+		return fmt.Errorf("trend.ema_fast must be positive, got %d", trend.EMAFast)
+	}
+	if trend.EMASlow <= 0 {
+		return fmt.Errorf("trend.ema_slow must be positive, got %d", trend.EMASlow)
+	}
+	if trend.EMAFast >= trend.EMASlow {
+		return fmt.Errorf("trend.ema_fast (%d) must be less than ema_slow (%d)", trend.EMAFast, trend.EMASlow)
+	}
+	return nil
+}
+
+// validateValuationConfig validates the valuation configuration section.
+func validateValuationConfig(valuation ValuationConfig) error {
+	if valuation.RSIPeriod <= 0 {
+		return fmt.Errorf("valuation.rsi_period must be positive, got %d", valuation.RSIPeriod)
 	}
 
-	if c.Trend.EMAFast <= 0 {
-		return fmt.Errorf("trend.ema_fast must be positive, got %d", c.Trend.EMAFast)
+	// Validate RSI thresholds (must be 0-100)
+	rsiThresholds := []struct {
+		name  string
+		value int
+	}{
+		{"valuation.oversold", valuation.Oversold},
+		{"valuation.undervalued", valuation.Undervalued},
+		{"valuation.fair_low", valuation.FairLow},
+		{"valuation.fair_high", valuation.FairHigh},
+		{"valuation.overvalued", valuation.Overvalued},
+		{"valuation.overbought", valuation.Overbought},
 	}
 
-	if c.Trend.EMASlow <= 0 {
-		return fmt.Errorf("trend.ema_slow must be positive, got %d", c.Trend.EMASlow)
-	}
-
-	if c.Trend.EMAFast >= c.Trend.EMASlow {
-		return fmt.Errorf("trend.ema_fast (%d) must be less than ema_slow (%d)", c.Trend.EMAFast, c.Trend.EMASlow)
-	}
-
-	// Validate valuation config
-	if c.Valuation.RSIPeriod <= 0 {
-		return fmt.Errorf("valuation.rsi_period must be positive, got %d", c.Valuation.RSIPeriod)
-	}
-
-	if c.Valuation.Oversold < 0 || c.Valuation.Oversold > 100 {
-		return fmt.Errorf("valuation.oversold must be between 0 and 100, got %d", c.Valuation.Oversold)
-	}
-
-	if c.Valuation.Undervalued < 0 || c.Valuation.Undervalued > 100 {
-		return fmt.Errorf("valuation.undervalued must be between 0 and 100, got %d", c.Valuation.Undervalued)
-	}
-
-	if c.Valuation.FairLow < 0 || c.Valuation.FairLow > 100 {
-		return fmt.Errorf("valuation.fair_low must be between 0 and 100, got %d", c.Valuation.FairLow)
-	}
-
-	if c.Valuation.FairHigh < 0 || c.Valuation.FairHigh > 100 {
-		return fmt.Errorf("valuation.fair_high must be between 0 and 100, got %d", c.Valuation.FairHigh)
-	}
-
-	if c.Valuation.Overvalued < 0 || c.Valuation.Overvalued > 100 {
-		return fmt.Errorf("valuation.overvalued must be between 0 and 100, got %d", c.Valuation.Overvalued)
-	}
-
-	if c.Valuation.Overbought < 0 || c.Valuation.Overbought > 100 {
-		return fmt.Errorf("valuation.overbought must be between 0 and 100, got %d", c.Valuation.Overbought)
-	}
-
-	// Validate cache TTLs
-	if c.Cache.IntradayTTL <= 0 {
-		return fmt.Errorf("cache.intraday_ttl must be positive, got %v", c.Cache.IntradayTTL)
-	}
-
-	if c.Cache.DailyTTL <= 0 {
-		return fmt.Errorf("cache.daily_ttl must be positive, got %v", c.Cache.DailyTTL)
-	}
-
-	if c.Cache.MacroTTL <= 0 {
-		return fmt.Errorf("cache.macro_ttl must be positive, got %v", c.Cache.MacroTTL)
-	}
-
-	if c.Cache.NewsTTL <= 0 {
-		return fmt.Errorf("cache.news_ttl must be positive, got %v", c.Cache.NewsTTL)
-	}
-
-	if c.Cache.CryptoTTL <= 0 {
-		return fmt.Errorf("cache.crypto_ttl must be positive, got %v", c.Cache.CryptoTTL)
-	}
-
-	// Validate theme
-	switch c.Theme.Style {
-	case "", "default", "minimal", "colorblind":
-		// Valid
-	default:
-		return fmt.Errorf("theme.style must be one of: default, minimal, colorblind, got %q", c.Theme.Style)
+	for _, threshold := range rsiThresholds {
+		if threshold.value < 0 || threshold.value > 100 {
+			return fmt.Errorf("%s must be between 0 and 100, got %d", threshold.name, threshold.value)
+		}
 	}
 
 	return nil
+}
+
+// validateCacheConfig validates the cache configuration section.
+func validateCacheConfig(cache CacheConfig) error {
+	ttlFields := []struct {
+		name  string
+		value time.Duration
+	}{
+		{"cache.intraday_ttl", cache.IntradayTTL},
+		{"cache.daily_ttl", cache.DailyTTL},
+		{"cache.macro_ttl", cache.MacroTTL},
+		{"cache.news_ttl", cache.NewsTTL},
+		{"cache.crypto_ttl", cache.CryptoTTL},
+	}
+
+	for _, field := range ttlFields {
+		if field.value <= 0 {
+			return fmt.Errorf("%s must be positive, got %v", field.name, field.value)
+		}
+	}
+
+	return nil
+}
+
+// validateThemeConfig validates the theme configuration section.
+func validateThemeConfig(theme ThemeConfig) error {
+	switch theme.Style {
+	case "", "default", "minimal", "colorblind":
+		// Valid
+		return nil
+	default:
+		return fmt.Errorf("theme.style must be one of: default, minimal, colorblind, got %q", theme.Style)
+	}
 }
 
 // validateTicker checks that a ticker symbol is valid (alphanumeric, dots, dashes, max 10 chars).

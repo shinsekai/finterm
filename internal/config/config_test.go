@@ -186,8 +186,10 @@ func TestLoad_EnvVarOverride(t *testing.T) {
 			origEnv, origSet := os.LookupEnv(envAPIKey)
 			t.Cleanup(func() {
 				if origSet {
+					//nolint:errcheck // Best-effort restoration, error is acceptable
 					os.Setenv(envAPIKey, origEnv)
 				} else {
+					//nolint:errcheck // Best-effort restoration, error is acceptable
 					os.Unsetenv(envAPIKey)
 				}
 			})

@@ -2,17 +2,20 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/owner/finterm/internal/alphavantage"
 	"github.com/owner/finterm/internal/tui/components"
 	"github.com/owner/finterm/internal/tui/macro"
 	"github.com/owner/finterm/internal/tui/news"
 	"github.com/owner/finterm/internal/tui/quote"
 	"github.com/owner/finterm/internal/tui/trend"
+	quotetrenddomain "github.com/owner/finterm/internal/domain/trend"
 )
 
 const (
@@ -42,12 +45,16 @@ type Model struct {
 }
 
 // NewApp creates a new application model with all child models initialized.
-func NewApp(theme *Theme) Model {
+func NewApp(theme *Theme, client *alphavantage.Client, trendEngine *quotetrenddomain.Engine) Model {
+	// Create quote model and configure it with dependencies
+	quoteModel := quote.NewModel()
+	quoteModel.Configure(context.Background(), client, trendEngine)
+
 	return Model{
 		theme: theme,
 		tabs: []tab{
 			{name: "Trend", model: trend.NewModel()},
-			{name: "Quote", model: quote.NewModel()},
+			{name: "Quote", model: quoteModel},
 			{name: "Macro", model: macro.NewModel()},
 			{name: "News", model: news.NewModel()},
 		},

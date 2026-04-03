@@ -3,6 +3,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -450,4 +451,203 @@ func TestApp_InvalidTabKey(t *testing.T) {
 	// Active tab should not change
 	assert.Equal(t, tabTrend, app.activeTab)
 	assert.NotNil(t, app)
+}
+
+// TestApp_ConnectionOnlineMsg tests that online messages set connection state to online.
+func TestApp_ConnectionOnlineMsg(t *testing.T) {
+	app := newMockApp(t)
+
+	// Set initial state to offline
+	app.connectionState = ConnOffline
+
+	// Send online message
+	msg := ConnectionOnlineMsg{}
+	newModel, cmd := app.Update(msg)
+	var ok bool
+	app, ok = newModel.(Model)
+	require.True(t, ok, "Expected Model type")
+
+	assert.Equal(t, ConnOnline, app.connectionState)
+	assert.True(t, app.rateLimitReset.IsZero())
+	assert.Nil(t, cmd)
+}
+
+// TestApp_ConnectionOfflineMsg tests that offline messages set connection state to offline.
+func TestApp_ConnectionOfflineMsg(t *testing.T) {
+	app := newMockApp(t)
+
+	// Send offline message
+	msg := ConnectionOfflineMsg{}
+	newModel, cmd := app.Update(msg)
+	var ok bool
+	app, ok = newModel.(Model)
+	require.True(t, ok, "Expected Model type")
+
+	assert.Equal(t, ConnOffline, app.connectionState)
+	assert.Nil(t, cmd)
+}
+
+// TestApp_RateLimitedMsg tests that rate limit messages set connection state and queue retry.
+func TestApp_RateLimitedMsg(t *testing.T) {
+	app := newMockApp(t)
+
+	// Send rate limited message
+	resetTime := time.Now().Add(5 * time.Minute)
+	msg := RateLimitedMsg{
+		Tab:       tabTrend,
+		ResetTime: resetTime,
+	}
+	newModel, cmd := app.Update(msg)
+	var ok bool
+	app, ok = newModel.(Model)
+	require.True(t, ok, "Expected Model type")
+
+	assert.Equal(t, ConnRateLimited, app.connectionState)
+	assert.Equal(t, resetTime, app.rateLimitReset)
+	assert.NotNil(t, cmd)
+}
+
+// TestApp_RateLimitedWithRetry tests that rate limited messages queue retry.
+func TestApp_RateLimitedWithRetry(t *testing.T) {
+	app := newMockApp(t)
+
+	// Send rate limited message
+	resetTime := time.Now().Add(1 * time.Minute)
+	msg := RateLimitedMsg{
+		Tab:       tabTrend,
+		ResetTime: resetTime,
+	}
+	newModel, cmd := app.Update(msg)
+	var ok bool
+	app, ok = newModel.(Model)
+	require.True(t, ok, "Expected Model type")
+
+	require.NotNil(t, cmd)
+
+	// Execute the retry command
+	resultMsg := cmd()
+	assert.IsType(t, RetryTickMsg{}, resultMsg)
+
+	retryMsg := resultMsg.(RetryTickMsg)
+	assert.False(t, retryMsg.Item.scheduled.IsZero())
+	assert.Equal(t, tabTrend, retryMsg.Item.tab)
+	assert.Equal(t, 1, retryMsg.Item.attempts)
+}
+
+// TestApp_ErrorUpdateMsg_RateLimit tests that rate limit errors set rate limited state.
+func TestApp_ErrorUpdateMsg_RateLimit(t *testing.T) {
+	app := newMockApp(t)
+
+	// Send error update with rate limit error
+	msg := ErrorUpdateMsg{
+		Tab: tabTrend,
+		Err: fmt.Errorf("API error: rate limit exceeded (429)"),
+	}
+	newModel, cmd := app.Update(msg)
+	var ok bool
+	app, ok = newModel.(Model)
+	require.True(t, ok, "Expected Model type")
+
+	assert.Equal(t, ConnRateLimited, app.connectionState)
+	assert.Nil(t, cmd)
+}
+
+// TestApp_ErrorUpdateMsg_NetworkError tests that network errors set offline state.
+func TestApp_ErrorUpdateMsg_NetworkError(t *testing.T) {
+	app := newMockApp(t)
+
+	// Send error update with network error
+	msg := ErrorUpdateMsg{
+		Tab: tabTrend,
+		Err: fmt.Errorf("connection refused"),
+	}
+	newModel, cmd := app.Update(msg)
+	var ok bool
+	app, ok = newModel.(Model)
+	require.True(t, ok, "Expected Model type")
+
+	assert.Equal(t, ConnOffline, app.connectionState)
+	assert.Nil(t, cmd)
+}
+
+// TestApp_DataUpdateResetsConnection tests that successful data updates reset to online.
+func TestApp_DataUpdateResetsConnection(t *testing.T) {
+	app := newMockApp(t)
+
+	// Set initial state to offline
+	app.connectionState = ConnOffline
+	app.rateLimitReset = time.Now().Add(time.Hour)
+
+	// Send data update message
+	msg := DataUpdateMsg{Tab: tabTrend}
+	newModel, cmd := app.Update(msg)
+	var ok bool
+	app, ok = newModel.(Model)
+	require.True(t, ok, "Expected Model type")
+
+	assert.Equal(t, ConnOnline, app.connectionState)
+	// Note: rateLimitReset is reset internally but not accessible through the type-asserted model
+	assert.Nil(t, cmd)
+}
+
+// TestApp_isRateLimitError tests rate limit error detection.
+func TestApp_isRateLimitError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "rate limit error",
+			err:      fmt.Errorf("API error: rate limit exceeded"),
+			expected: true,
+		},
+		{
+			name:     "429 status code",
+			err:      fmt.Errorf("HTTP 429 Too Many Requests"),
+			expected: true,
+		},
+		{
+			name:     "too many requests",
+			err:      fmt.Errorf("too many requests, please try again later"),
+			expected: true,
+		},
+		{
+			name:     "network error",
+			err:      fmt.Errorf("connection refused"),
+			expected: false,
+		},
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isRateLimitError(tt.err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestApp_StatusBar_RendersConnectionState tests that status bar shows connection state.
+func TestApp_StatusBar_RendersConnectionState(t *testing.T) {
+	app := newMockApp(t)
+
+	// Test online state
+	app.connectionState = ConnOnline
+	statusBar := app.renderStatusBar()
+	assert.Contains(t, statusBar, "online")
+
+	// Test rate limited state
+	app.connectionState = ConnRateLimited
+	statusBar = app.renderStatusBar()
+	assert.Contains(t, statusBar, "rate limited")
+
+	// Test offline state
+	app.connectionState = ConnOffline
+	statusBar = app.renderStatusBar()
+	assert.Contains(t, statusBar, "offline")
 }

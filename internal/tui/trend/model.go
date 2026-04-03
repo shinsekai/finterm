@@ -26,6 +26,8 @@ const (
 	StateLoading State = iota
 	// StateLoaded is when data has been successfully loaded.
 	StateLoaded
+	// StateCached is when data is loaded from cache (offline mode).
+	StateCached
 	// StateError is when there was an error loading data.
 	StateError
 )
@@ -37,6 +39,8 @@ func (s State) String() string {
 		return "Loading"
 	case StateLoaded:
 		return "Loaded"
+	case StateCached:
+		return "Cached"
 	case StateError:
 		return "Error"
 	default:

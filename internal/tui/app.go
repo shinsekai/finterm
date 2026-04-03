@@ -2,6 +2,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -42,12 +43,16 @@ type Model struct {
 }
 
 // NewApp creates a new application model with all child models initialized.
-func NewApp(theme *Theme) Model {
+func NewApp(theme *Theme, client quote.QuoteClient, trendEngine quote.Engine) Model {
+	// Create quote model and configure it with dependencies
+	quoteModel := quote.NewModel()
+	quoteModel.Configure(context.Background(), client, trendEngine)
+
 	return Model{
 		theme: theme,
 		tabs: []tab{
 			{name: "Trend", model: trend.NewModel()},
-			{name: "Quote", model: quote.NewModel()},
+			{name: "Quote", model: quoteModel},
 			{name: "Macro", model: macro.NewModel()},
 			{name: "News", model: news.NewModel()},
 		},

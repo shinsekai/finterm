@@ -2,23 +2,130 @@
 package quote
 
 import (
+	"context"
+	"fmt"
+	"regexp"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/owner/finterm/internal/alphavantage"
+	trenddomain "github.com/owner/finterm/internal/domain/trend"
 )
+
+// State represents the model state.
+type State int
+
+const (
+	// StateIdle is when waiting for user input.
+	StateIdle State = iota
+	// StateLoading is when fetching quote data.
+	StateLoading
+	// StateLoaded is when quote data has been loaded.
+	StateLoaded
+	// StateError is when an error occurred.
+	StateError
+)
+
+// String returns the string representation of the State.
+func (s State) String() string {
+	switch s {
+	case StateIdle:
+		return "Idle"
+	case StateLoading:
+		return "Loading"
+	case StateLoaded:
+		return "Loaded"
+	case StateError:
+		return "Error"
+	default:
+		return "Unknown"
+	}
+}
+
+// Engine defines the interface for trend analysis engines.
+// This allows mocking in tests while the actual implementation uses trenddomain.Engine.
+type Engine interface {
+	AnalyzeWithSymbolDetection(ctx context.Context, symbol string) (*trenddomain.Result, error)
+}
+
+// QuoteClient defines the interface for fetching quote data.
+// This allows mocking in tests while the actual implementation uses alphavantage.Client.
+//
+//nolint:revive // type name stuttering is acceptable for package-scoped interfaces
+type QuoteClient interface {
+	GetGlobalQuote(ctx context.Context, symbol string) (*alphavantage.GlobalQuote, error)
+}
+
+// QuoteData contains all the data to display for a quote.
+//
+//nolint:revive // type name stuttering is acceptable for package-scoped types
+type QuoteData struct {
+	Quote      *alphavantage.GlobalQuote
+	Indicators *trenddomain.Result
+}
 
 // Model represents the quote view model.
 type Model struct {
-	loading bool
-	data    string // Placeholder for quote data
-	err     error
+	// engine performs trend analysis for symbols.
+	engine Engine
+	// client fetches quote data from Alpha Vantage.
+	client QuoteClient
+	// ctx is the context for async operations.
+	ctx context.Context
+	// cancel cancels the context.
+	cancel context.CancelFunc
+
+	// state is the current model state.
+	state State
+	// textInput handles ticker symbol input.
+	textInput textinput.Model
+	// lookupHistory stores the last 10 ticker symbols looked up.
+	lookupHistory []string
+	// historyIndex is the current position in lookup history (-1 if not navigating).
+	historyIndex int
+	// maxHistorySize is the maximum number of entries in lookup history.
+	maxHistorySize int
+
+	// quoteData contains the loaded quote and indicators.
+	quoteData *QuoteData
+	// err contains any error that occurred.
+	err error
+
+	// width and height are the terminal dimensions.
+	width, height int
 }
 
 // NewModel creates a new quote model.
 func NewModel() Model {
+	ti := textinput.New()
+	ti.Placeholder = "Enter ticker symbol (e.g., AAPL)"
+	ti.CharLimit = 10
+	ti.Focus()
+
 	return Model{
-		loading: false,
-		data:    "",
-		err:     nil,
+		state:          StateIdle,
+		textInput:      ti,
+		lookupHistory:  []string{},
+		historyIndex:   -1,
+		maxHistorySize: 10,
+		width:          80,
+		height:         24,
 	}
+}
+
+// Configure sets up the model with dependencies.
+// This is called by the main app to inject dependencies.
+func (m *Model) Configure(
+	ctx context.Context,
+	client QuoteClient,
+	engine Engine,
+) *Model {
+	m.client = client
+	m.engine = engine
+	m.ctx, m.cancel = context.WithCancel(ctx)
+	return m
 }
 
 // Init initializes the quote model and returns an initial command.
@@ -29,57 +136,226 @@ func (m Model) Init() tea.Cmd {
 // Update handles messages and updates the model state.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case RefreshMsg:
-		// Handle refresh request
-		m.loading = true
-		return m, m.loadDataCmd()
-	case DataLoadedMsg:
-		// Handle data loaded
-		m.loading = false
-		m.data = msg.Data
+	case tea.KeyMsg:
+		return m.handleKeyMsg(msg)
+
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
 		return m, nil
-	case ErrorMsg:
-		// Handle error
-		m.loading = false
+
+	case RefreshMsg:
+		// Refresh current ticker if we have one
+		if m.quoteData != nil && m.quoteData.Quote != nil {
+			symbol := m.quoteData.Quote.Symbol
+			return m, m.fetchQuoteCmd(symbol)
+		}
+		return m, nil
+
+	case QuoteResultMsg:
+		m.state = StateLoaded
+		m.quoteData = msg.Data
+		m.err = nil
+
+		// Add to lookup history if this is a new lookup (not from history navigation)
+		if m.historyIndex == -1 && msg.Data.Quote != nil {
+			m.addToHistory(msg.Data.Quote.Symbol)
+		}
+		m.historyIndex = -1 // Reset history index
+
+		return m, nil
+
+	case QuoteErrorMsg:
+		m.state = StateError
 		m.err = msg.Err
 		return m, nil
-	default:
-		// Delegate to default handling
-		return m, nil
 	}
+
+	// Delegate text input updates when in idle state
+	if m.state == StateIdle {
+		var cmd tea.Cmd
+		m.textInput, cmd = m.textInput.Update(msg)
+		return m, cmd
+	}
+
+	return m, nil
 }
 
-// View renders the quote view.
-func (m Model) View() string {
-	if m.loading {
-		return "Loading quote data...\n"
+// handleKeyMsg handles keyboard input messages.
+//
+//nolint:gocyclo // complexity is acceptable for handling all key messages
+func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEnter:
+		// Submit ticker and fetch quote
+		if m.state == StateIdle {
+			ticker := strings.TrimSpace(m.textInput.Value())
+			if ticker == "" {
+				return m, nil
+			}
+
+			// Validate ticker format
+			if err := validateTicker(ticker); err != nil {
+				m.state = StateError
+				m.err = err
+				return m, nil
+			}
+
+			m.state = StateLoading
+			return m, m.fetchQuoteCmd(ticker)
+		}
+
+	case tea.KeyUp:
+		// Navigate backward through history
+		if m.state == StateIdle && len(m.lookupHistory) > 0 {
+			m.historyIndex++
+			if m.historyIndex >= len(m.lookupHistory) {
+				m.historyIndex = len(m.lookupHistory) - 1
+			}
+			m.textInput.SetValue(m.lookupHistory[len(m.lookupHistory)-1-m.historyIndex])
+			return m, nil
+		}
+
+	case tea.KeyDown:
+		// Navigate forward through history
+		if m.state == StateIdle && m.historyIndex >= 0 {
+			m.historyIndex--
+			if m.historyIndex < 0 {
+				m.historyIndex = -1
+				m.textInput.SetValue("") // Clear input when going past history
+			} else {
+				m.textInput.SetValue(m.lookupHistory[len(m.lookupHistory)-1-m.historyIndex])
+			}
+			return m, nil
+		}
+
+	case tea.KeyEsc:
+		// Clear input and reset history navigation
+		if m.state == StateIdle {
+			m.textInput.SetValue("")
+			m.historyIndex = -1
+			return m, nil
+		}
+
+	case tea.KeyRunes:
+		// Reset history index when typing
+		if m.state == StateIdle && len(msg.Runes) > 0 {
+			m.historyIndex = -1
+		}
 	}
-	if m.err != nil {
-		return "Error loading quote data\n"
-	}
-	if m.data == "" {
-		return "Quote view - Press 'r' to refresh\n"
-	}
-	return m.data
+
+	// Delegate to text input
+	var cmd tea.Cmd
+	m.textInput, cmd = m.textInput.Update(msg)
+	return m, cmd
 }
 
-// loadDataCmd returns a command to load quote data.
-func (m Model) loadDataCmd() tea.Cmd {
+// fetchQuoteCmd returns a command to fetch quote data for a symbol.
+func (m Model) fetchQuoteCmd(symbol string) tea.Cmd {
 	return func() tea.Msg {
-		// Placeholder: in real implementation, fetch data from domain layer
-		return DataLoadedMsg{Data: "Quote data loaded"}
+		symbol = strings.ToUpper(symbol)
+
+		// Fetch global quote
+		quote, err := m.client.GetGlobalQuote(m.ctx, symbol)
+		if err != nil {
+			return QuoteErrorMsg{Err: fmt.Errorf("fetching quote for %s: %w", symbol, err)}
+		}
+
+		// Fetch indicators using trend engine
+		indicators, err := m.engine.AnalyzeWithSymbolDetection(m.ctx, symbol)
+		if err != nil {
+			return QuoteErrorMsg{Err: fmt.Errorf("fetching indicators for %s: %w", symbol, err)}
+		}
+
+		return QuoteResultMsg{
+			Data: &QuoteData{
+				Quote:      quote,
+				Indicators: indicators,
+			},
+		}
 	}
+}
+
+// addToHistory adds a symbol to the lookup history, maintaining max size.
+func (m *Model) addToHistory(symbol string) {
+	symbol = strings.ToUpper(symbol)
+	// Check if it's already the last entry
+	if len(m.lookupHistory) > 0 && m.lookupHistory[len(m.lookupHistory)-1] == symbol {
+		return
+	}
+
+	m.lookupHistory = append(m.lookupHistory, symbol)
+	// Trim history if it exceeds max size
+	if len(m.lookupHistory) > m.maxHistorySize {
+		m.lookupHistory = m.lookupHistory[len(m.lookupHistory)-m.maxHistorySize:]
+	}
+}
+
+// validateTicker validates that a ticker symbol is valid.
+func validateTicker(ticker string) error {
+	if ticker == "" {
+		return fmt.Errorf("ticker cannot be empty")
+	}
+
+	if len(ticker) > 10 {
+		return fmt.Errorf("ticker exceeds maximum length of 10 characters (got %d)", len(ticker))
+	}
+
+	// Allow: A-Z, a-z, 0-9, dots, dashes
+	matched, err := regexp.MatchString(`^[A-Za-z0-9.-]+$`, ticker)
+	if err != nil {
+		return fmt.Errorf("validation error: %w", err)
+	}
+
+	if !matched {
+		return fmt.Errorf("ticker contains invalid characters (only alphanumeric, dot, and dash allowed)")
+	}
+
+	return nil
+}
+
+// GetState returns the current state.
+func (m Model) GetState() State {
+	return m.state
+}
+
+// GetTextInput returns the text input model.
+func (m Model) GetTextInput() textinput.Model {
+	return m.textInput
+}
+
+// GetQuoteData returns the loaded quote data.
+func (m Model) GetQuoteData() *QuoteData {
+	return m.quoteData
+}
+
+// GetError returns the current error.
+func (m Model) GetError() error {
+	return m.err
+}
+
+// GetWidth returns the current width.
+func (m Model) GetWidth() int {
+	return m.width
+}
+
+// GetHeight returns the current height.
+func (m Model) GetHeight() int {
+	return m.height
 }
 
 // RefreshMsg is a message to refresh the quote data.
 type RefreshMsg struct{}
 
-// DataLoadedMsg is a message when quote data is loaded.
-type DataLoadedMsg struct {
-	Data string
+// QuoteResultMsg is a message when quote data is loaded.
+//
+//nolint:revive // type name stuttering is acceptable for package-scoped types
+type QuoteResultMsg struct {
+	Data *QuoteData
 }
 
-// ErrorMsg is a message when an error occurs.
-type ErrorMsg struct {
+// QuoteErrorMsg is a message when an error occurs.
+//
+//nolint:revive // type name stuttering is acceptable for package-scoped types
+type QuoteErrorMsg struct {
 	Err error
 }

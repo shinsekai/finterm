@@ -415,9 +415,7 @@ func TestHelpOverlay_Dismiss(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			overlay := NewHelpOverlay(globalBindings, viewBindings)
 
-			var cmd tea.Cmd
-			var model tea.Model = overlay
-			model, cmd = overlay.Update(tt.keyMsg)
+			model, cmd := overlay.Update(tt.keyMsg)
 
 			// Check that model is still a HelpOverlay
 			if _, ok := model.(*HelpOverlay); !ok {
@@ -528,8 +526,7 @@ func TestHelpOverlay_WindowSize(t *testing.T) {
 
 	// Send window size message
 	msg := tea.WindowSizeMsg{Width: 100, Height: 30}
-	var model tea.Model = overlay
-	model, _ = overlay.Update(msg)
+	model, _ := overlay.Update(msg)
 	updatedOverlay := model.(*HelpOverlay)
 
 	if updatedOverlay.width != 100 {

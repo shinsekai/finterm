@@ -179,14 +179,12 @@ func TestApp_TabSwitching(t *testing.T) {
 			}
 
 			// Update model
-			var cmd tea.Cmd
 			newModel, cmd := app.Update(msg)
-			_ = newModel.(Model)
-			ok := true
+			updatedApp, ok := newModel.(Model)
 			require.True(t, ok, "Expected Model type")
 
 			// Assert active tab is as expected
-			assert.Equal(t, tt.expectedTab, app.activeTab)
+			assert.Equal(t, tt.expectedTab, updatedApp.activeTab)
 			// No command should be returned for tab switching
 			assert.Nil(t, cmd)
 		})
@@ -231,12 +229,11 @@ func TestApp_QuitKey(t *testing.T) {
 
 			// Update model
 			newModel, cmd := app.Update(msg)
-			_ = newModel.(Model)
-			ok := true
+			updatedApp, ok := newModel.(Model)
 			require.True(t, ok, "Expected Model type")
 
 			// Assert quit flag is set
-			assert.True(t, app.quit)
+			assert.True(t, updatedApp.quit)
 			// Quit command should be returned
 			assert.NotNil(t, cmd)
 		})
@@ -255,21 +252,19 @@ func TestApp_HelpToggle(t *testing.T) {
 		Type:  tea.KeyRunes,
 		Runes: []rune("?"),
 	}
-	var cmd tea.Cmd
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.NotNil(t, app.helpOverlay)
+	assert.NotNil(t, updatedApp.helpOverlay)
 	assert.Nil(t, cmd)
 
 	// Dismiss help with Esc
 	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
-	newModel, _ = app.Update(escMsg)
-	app = newModel.(Model)
+	newModel, _ = updatedApp.Update(escMsg)
+	finalApp := newModel.(Model)
 
-	assert.Nil(t, app.helpOverlay)
+	assert.Nil(t, finalApp.helpOverlay)
 }
 
 // TestApp_RefreshDelegation tests that r triggers refresh on active view.
@@ -308,8 +303,7 @@ func TestApp_RefreshDelegation(t *testing.T) {
 				Runes: []rune("r"),
 			}
 			newModel, cmd := app.Update(msg)
-			_ = newModel.(Model)
-			ok := true
+			_, ok := newModel.(Model)
 			require.True(t, ok, "Expected Model type")
 
 			// Command should be returned
@@ -354,14 +348,13 @@ func TestApp_DelegateToChild(t *testing.T) {
 	}
 
 	newModel, _ := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
 	// The message should have been delegated
 	// In a real implementation, the child model would handle this
 	// For now, we just verify no crash occurred
-	assert.NotNil(t, app)
+	assert.NotNil(t, updatedApp)
 }
 
 // TestApp_WindowSize tests that window size messages update dimensions.
@@ -373,12 +366,11 @@ func TestApp_WindowSize(t *testing.T) {
 	}
 
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.Equal(t, 80, app.width)
-	assert.Equal(t, 24, app.height)
+	assert.Equal(t, 80, updatedApp.width)
+	assert.Equal(t, 24, updatedApp.height)
 	assert.Nil(t, cmd)
 }
 
@@ -392,11 +384,10 @@ func TestApp_DataUpdateMsg(t *testing.T) {
 
 	msg := DataUpdateMsg{Tab: tabTrend}
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.True(t, app.lastUpdate.After(oldTime))
+	assert.True(t, updatedApp.lastUpdate.After(oldTime))
 	assert.Nil(t, cmd)
 }
 
@@ -406,11 +397,10 @@ func TestApp_ErrorUpdateMsg(t *testing.T) {
 	oldCount := app.errorCount
 	msg := ErrorUpdateMsg{Tab: tabTrend, Err: assert.AnError}
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.Equal(t, oldCount+1, app.errorCount)
+	assert.Equal(t, oldCount+1, updatedApp.errorCount)
 	assert.Nil(t, cmd)
 }
 
@@ -424,8 +414,7 @@ func TestApp_ViewRenders(t *testing.T) {
 	// Test help view
 	overlay := components.NewHelpOverlay(globalBindings, nil)
 	// Initialize dimensions via WindowSizeMsg
-	var overlayModel tea.Model = overlay
-	overlayModel, _ = overlay.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	overlayModel, _ := overlay.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	app.helpOverlay = overlayModel.(*components.HelpOverlay)
 	view = app.View()
 	assert.NotEmpty(t, view)
@@ -449,13 +438,12 @@ func TestApp_InvalidTabKey(t *testing.T) {
 	}
 
 	newModel, _ := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
 	// Active tab should not change
-	assert.Equal(t, tabTrend, app.activeTab)
-	assert.NotNil(t, app)
+	assert.Equal(t, tabTrend, updatedApp.activeTab)
+	assert.NotNil(t, updatedApp)
 }
 
 // TestApp_ConnectionOnlineMsg tests that online messages set connection state to online.
@@ -468,12 +456,11 @@ func TestApp_ConnectionOnlineMsg(t *testing.T) {
 	// Send online message
 	msg := ConnectionOnlineMsg{}
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.Equal(t, ConnOnline, app.connectionState)
-	assert.True(t, app.rateLimitReset.IsZero())
+	assert.Equal(t, ConnOnline, updatedApp.connectionState)
+	assert.True(t, updatedApp.rateLimitReset.IsZero())
 	assert.Nil(t, cmd)
 }
 
@@ -484,11 +471,10 @@ func TestApp_ConnectionOfflineMsg(t *testing.T) {
 	// Send offline message
 	msg := ConnectionOfflineMsg{}
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.Equal(t, ConnOffline, app.connectionState)
+	assert.Equal(t, ConnOffline, updatedApp.connectionState)
 	assert.Nil(t, cmd)
 }
 
@@ -503,12 +489,11 @@ func TestApp_RateLimitedMsg(t *testing.T) {
 		ResetTime: resetTime,
 	}
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.Equal(t, ConnRateLimited, app.connectionState)
-	assert.Equal(t, resetTime, app.rateLimitReset)
+	assert.Equal(t, ConnRateLimited, updatedApp.connectionState)
+	assert.Equal(t, resetTime, updatedApp.rateLimitReset)
 	assert.NotNil(t, cmd)
 }
 
@@ -523,8 +508,7 @@ func TestApp_RateLimitedWithRetry(t *testing.T) {
 		ResetTime: resetTime,
 	}
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	_, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
 	require.NotNil(t, cmd)
@@ -549,11 +533,10 @@ func TestApp_ErrorUpdateMsg_RateLimit(t *testing.T) {
 		Err: fmt.Errorf("API error: rate limit exceeded (429)"),
 	}
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.Equal(t, ConnRateLimited, app.connectionState)
+	assert.Equal(t, ConnRateLimited, updatedApp.connectionState)
 	assert.Nil(t, cmd)
 }
 
@@ -567,11 +550,10 @@ func TestApp_ErrorUpdateMsg_NetworkError(t *testing.T) {
 		Err: fmt.Errorf("connection refused"),
 	}
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.Equal(t, ConnOffline, app.connectionState)
+	assert.Equal(t, ConnOffline, updatedApp.connectionState)
 	assert.Nil(t, cmd)
 }
 
@@ -586,11 +568,10 @@ func TestApp_DataUpdateResetsConnection(t *testing.T) {
 	// Send data update message
 	msg := DataUpdateMsg{Tab: tabTrend}
 	newModel, cmd := app.Update(msg)
-	_ = newModel.(Model)
-	ok := true
+	updatedApp, ok := newModel.(Model)
 	require.True(t, ok, "Expected Model type")
 
-	assert.Equal(t, ConnOnline, app.connectionState)
+	assert.Equal(t, ConnOnline, updatedApp.connectionState)
 	// Note: rateLimitReset is reset internally but not accessible through the type-asserted model
 	assert.Nil(t, cmd)
 }

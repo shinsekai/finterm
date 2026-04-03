@@ -303,9 +303,7 @@ func (m Model) showHelpOverlay() (Model, tea.Cmd) {
 		WithTitle(m.tabs[m.activeTab].name + " Help")
 
 	// Initialize overlay dimensions
-	var overlay tea.Model = m.helpOverlay
-	var cmd tea.Cmd
-	overlay, cmd = m.helpOverlay.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+	overlay, cmd := m.helpOverlay.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	m.helpOverlay = overlay.(*components.HelpOverlay)
 
 	return m, cmd

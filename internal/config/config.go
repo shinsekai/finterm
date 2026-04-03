@@ -123,18 +123,21 @@ func DefaultConfig() *Config {
 }
 
 // Load reads and parses configuration file at path, applies environment variable
-// overrides, and validates configuration.
+// overrides, and validates configuration. The config file is optional; if it doesn't
+// exist, defaults are used. Validation will fail only if required values (like API key)
+// are missing from both the config file and environment variables.
 func Load(path string) (*Config, error) {
 	cfg := DefaultConfig()
 
+	// Try to read config file, but don't fail if it doesn't exist
 	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("reading config file: %w", err)
+	if err == nil {
+		// File exists, parse it
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("parsing config YAML: %w", err)
+		}
 	}
-
-	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("parsing config YAML: %w", err)
-	}
+	// If file doesn't exist, continue with defaults (os.IsNotExist(err))
 
 	// Apply environment variable overrides
 	if key := os.Getenv(envAPIKey); key != "" {

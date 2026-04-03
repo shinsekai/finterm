@@ -19,74 +19,86 @@ type palette struct {
 	// Status colors
 	error, warning, success, info lipgloss.Color
 
+	// Connection state colors
+	connOnline, connRateLimited, connOffline lipgloss.Color
+
 	// Table colors
 	tableHeader, tableBody, tableBorder lipgloss.Color
 }
 
 // defaultPalette provides the standard colorful theme.
 var defaultPalette = palette{
-	primary:     lipgloss.Color("#7D56F4"),
-	primaryDark: lipgloss.Color("#5C3FD6"),
-	secondary:   lipgloss.Color("#FA7921"),
-	bullish:     lipgloss.Color("#50FA7B"),
-	bearish:     lipgloss.Color("#FF5555"),
-	neutral:     lipgloss.Color("#F1FA8C"),
-	foreground:  lipgloss.Color("#F8F8F2"),
-	background:  lipgloss.Color("#282A36"),
-	muted:       lipgloss.Color("#6272A4"),
-	border:      lipgloss.Color("#44475A"),
-	header:      lipgloss.Color("#BD93F9"),
-	error:       lipgloss.Color("#FF5555"),
-	warning:     lipgloss.Color("#F1FA8C"),
-	success:     lipgloss.Color("#50FA7B"),
-	info:        lipgloss.Color("#8BE9FD"),
-	tableHeader: lipgloss.Color("#BD93F9"),
-	tableBody:   lipgloss.Color("#F8F8F2"),
-	tableBorder: lipgloss.Color("#44475A"),
+	primary:         lipgloss.Color("#7D56F4"),
+	primaryDark:     lipgloss.Color("#5C3FD6"),
+	secondary:       lipgloss.Color("#FA7921"),
+	bullish:         lipgloss.Color("#50FA7B"),
+	bearish:         lipgloss.Color("#FF5555"),
+	neutral:         lipgloss.Color("#F1FA8C"),
+	foreground:      lipgloss.Color("#F8F8F2"),
+	background:      lipgloss.Color("#282A36"),
+	muted:           lipgloss.Color("#6272A4"),
+	border:          lipgloss.Color("#44475A"),
+	header:          lipgloss.Color("#BD93F9"),
+	error:           lipgloss.Color("#FF5555"),
+	warning:         lipgloss.Color("#F1FA8C"),
+	success:         lipgloss.Color("#50FA7B"),
+	info:            lipgloss.Color("#8BE9FD"),
+	connOnline:      lipgloss.Color("#50FA7B"),
+	connRateLimited: lipgloss.Color("#F1FA8C"),
+	connOffline:     lipgloss.Color("#FF5555"),
+	tableHeader:     lipgloss.Color("#BD93F9"),
+	tableBody:       lipgloss.Color("#F8F8F2"),
+	tableBorder:     lipgloss.Color("#44475A"),
 }
 
 // minimalPalette provides a minimal black-and-white theme.
 var minimalPalette = palette{
-	primary:     lipgloss.Color("#FFFFFF"),
-	primaryDark: lipgloss.Color("#CCCCCC"),
-	secondary:   lipgloss.Color("#AAAAAA"),
-	bullish:     lipgloss.Color("#FFFFFF"),
-	bearish:     lipgloss.Color("#AAAAAA"),
-	neutral:     lipgloss.Color("#666666"),
-	foreground:  lipgloss.Color("#FFFFFF"),
-	background:  lipgloss.Color("#000000"),
-	muted:       lipgloss.Color("#888888"),
-	border:      lipgloss.Color("#333333"),
-	header:      lipgloss.Color("#FFFFFF"),
-	error:       lipgloss.Color("#FFFFFF"),
-	warning:     lipgloss.Color("#AAAAAA"),
-	success:     lipgloss.Color("#FFFFFF"),
-	info:        lipgloss.Color("#AAAAAA"),
-	tableHeader: lipgloss.Color("#FFFFFF"),
-	tableBody:   lipgloss.Color("#FFFFFF"),
-	tableBorder: lipgloss.Color("#333333"),
+	primary:         lipgloss.Color("#FFFFFF"),
+	primaryDark:     lipgloss.Color("#CCCCCC"),
+	secondary:       lipgloss.Color("#AAAAAA"),
+	bullish:         lipgloss.Color("#FFFFFF"),
+	bearish:         lipgloss.Color("#AAAAAA"),
+	neutral:         lipgloss.Color("#666666"),
+	foreground:      lipgloss.Color("#FFFFFF"),
+	background:      lipgloss.Color("#000000"),
+	muted:           lipgloss.Color("#888888"),
+	border:          lipgloss.Color("#333333"),
+	header:          lipgloss.Color("#FFFFFF"),
+	error:           lipgloss.Color("#FFFFFF"),
+	warning:         lipgloss.Color("#AAAAAA"),
+	success:         lipgloss.Color("#FFFFFF"),
+	info:            lipgloss.Color("#AAAAAA"),
+	connOnline:      lipgloss.Color("#FFFFFF"),
+	connRateLimited: lipgloss.Color("#AAAAAA"),
+	connOffline:     lipgloss.Color("#888888"),
+	tableHeader:     lipgloss.Color("#FFFFFF"),
+	tableBody:       lipgloss.Color("#FFFFFF"),
+	tableBorder:     lipgloss.Color("#333333"),
 }
 
 // colorblindPalette provides a theme optimized for colorblind users.
 var colorblindPalette = palette{
-	primary:     lipgloss.Color("#4D90FE"),
-	primaryDark: lipgloss.Color("#3367D6"),
-	secondary:   lipgloss.Color("#F09300"),
-	bullish:     lipgloss.Color("#00C853"),
-	bearish:     lipgloss.Color("#D50000"),
-	neutral:     lipgloss.Color("#FFB300"),
-	foreground:  lipgloss.Color("#202124"),
-	background:  lipgloss.Color("#FFFFFF"),
-	muted:       lipgloss.Color("#5F6368"),
-	border:      lipgloss.Color("#DADCE0"),
-	header:      lipgloss.Color("#4D90FE"),
-	error:       lipgloss.Color("#D50000"),
-	warning:     lipgloss.Color("#FFB300"),
-	success:     lipgloss.Color("#00C853"),
-	info:        lipgloss.Color("#4D90FE"),
-	tableHeader: lipgloss.Color("#4D90FE"),
-	tableBody:   lipgloss.Color("#202124"),
-	tableBorder: lipgloss.Color("#DADCE0"),
+	primary:         lipgloss.Color("#4D90FE"),
+	primaryDark:     lipgloss.Color("#3367D6"),
+	secondary:       lipgloss.Color("#F09300"),
+	bullish:         lipgloss.Color("#00C853"),
+	bearish:         lipgloss.Color("#D50000"),
+	neutral:         lipgloss.Color("#FFB300"),
+	foreground:      lipgloss.Color("#202124"),
+	background:      lipgloss.Color("#FFFFFF"),
+	muted:           lipgloss.Color("#5F6368"),
+	border:          lipgloss.Color("#DADCE0"),
+	header:          lipgloss.Color("#4D90FE"),
+	error:           lipgloss.Color("#D50000"),
+	warning:         lipgloss.Color("#FFB300"),
+	success:         lipgloss.Color("#00C853"),
+	info:            lipgloss.Color("#4D90FE"),
+	connOnline:      lipgloss.Color("#00C853"),
+	connRateLimited: lipgloss.Color("#FFB300"),
+	connOffline:     lipgloss.Color("#D50000"),
+	tableHeader:     lipgloss.Color("#4D90FE"),
+	tableBody:       lipgloss.Color("#202124"),
+	tableBorder:     lipgloss.Color("#DADCE0"),
 }
 
 // Style definitions for UI elements.
@@ -108,6 +120,9 @@ type styles struct {
 
 	// Spinner styles
 	spinner, spinnerText lipgloss.Style
+
+	// Connection state styles
+	statusOnline, statusRateLimited, statusOffline lipgloss.Style
 
 	// General styles
 	title, subtitle, muted lipgloss.Style
@@ -239,6 +254,19 @@ func (t *Theme) buildStyles() {
 	t.styles.spinnerText = lipgloss.NewStyle().
 		Foreground(t.palette.muted)
 
+	// Connection state styles
+	t.styles.statusOnline = lipgloss.NewStyle().
+		Foreground(t.palette.connOnline).
+		Bold(true)
+
+	t.styles.statusRateLimited = lipgloss.NewStyle().
+		Foreground(t.palette.connRateLimited).
+		Bold(true)
+
+	t.styles.statusOffline = lipgloss.NewStyle().
+		Foreground(t.palette.connOffline).
+		Bold(true)
+
 	// General styles
 	t.styles.title = lipgloss.NewStyle().
 		Foreground(t.palette.header).
@@ -362,6 +390,21 @@ func (t *Theme) Subtitle() lipgloss.Style {
 // Muted returns the muted text style.
 func (t *Theme) Muted() lipgloss.Style {
 	return t.styles.muted
+}
+
+// StatusOnline returns the online status style.
+func (t *Theme) StatusOnline() lipgloss.Style {
+	return t.styles.statusOnline
+}
+
+// StatusRateLimited returns the rate limited status style.
+func (t *Theme) StatusRateLimited() lipgloss.Style {
+	return t.styles.statusRateLimited
+}
+
+// StatusOffline returns the offline status style.
+func (t *Theme) StatusOffline() lipgloss.Style {
+	return t.styles.statusOffline
 }
 
 // Foreground returns the foreground color.

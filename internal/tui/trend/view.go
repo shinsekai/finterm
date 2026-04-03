@@ -177,6 +177,8 @@ func (v *View) buildRowCells(row RowData) []components.Cell {
 		return v.buildLoadingCells(row)
 	case StateLoaded:
 		return v.buildLoadedCells(row)
+	case StateCached:
+		return v.buildCachedCells(row)
 	case StateError:
 		return v.buildErrorCells(row)
 	default:
@@ -231,7 +233,44 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 		{Text: valuationStyle.Render(result.Valuation)},
 	}
 }
+// buildCachedCells builds cells for a cached row with offline indicator.
+func (v *View) buildCachedCells(row RowData) []components.Cell {
+	result := row.Result
 
+	// Color-code signal
+	var signalStyle lipgloss.Style
+	switch result.Signal {
+	case trenddomain.Bullish:
+		signalStyle = v.theme.Bullish()
+	case trenddomain.Bearish:
+		signalStyle = v.theme.Bearish()
+	default:
+		signalStyle = v.theme.Neutral()
+	}
+
+	// Color-code valuation
+	var valuationStyle lipgloss.Style
+	switch result.Valuation {
+	case "Oversold", "Undervalued":
+		valuationStyle = v.theme.Bullish()
+	case "Overvalued", "Overbought":
+		valuationStyle = v.theme.Bearish()
+	default:
+		valuationStyle = v.theme.TableRow()
+	}
+
+	// Add "offline" badge to symbol
+	symbolWithBadge := result.Symbol + " " + v.theme.Muted().Render("[offline]")
+
+	return []components.Cell{
+			{Text: symbolWithBadge},
+			{Text: signalStyle.Render(result.Signal.String())},
+			{Text: FormatValue(result.RSI, 2)},
+			{Text: FormatValue(result.EMAFast, 4)},
+			{Text: FormatValue(result.EMASlow, 4)},
+			{Text: valuationStyle.Render(result.Valuation)},
+		}
+}
 // buildErrorCells builds cells for an error row.
 func (v *View) buildErrorCells(row RowData) []components.Cell {
 	errorText := "Error"

@@ -18,6 +18,7 @@ type Store struct {
 type cacheEntry struct {
 	value      interface{}
 	expiryTime time.Time
+	cachedAt   time.Time
 }
 
 // New creates and returns a new cache Store with a background cleanup goroutine.
@@ -67,6 +68,7 @@ func (s *Store) Set(key string, value interface{}, ttl time.Duration) {
 	s.items[key] = &cacheEntry{
 		value:      value,
 		expiryTime: time.Now().Add(ttl),
+		cachedAt:   time.Now(),
 	}
 }
 
@@ -101,6 +103,59 @@ func (s *Store) Len() int {
 		}
 	}
 	return count
+}
+
+// GetMetadata returns metadata about a cached entry without retrieving the value.
+// Returns the cached timestamp and true if the key exists and has not expired.
+// Returns zero time and false if the key does not exist or has expired.
+func (s *Store) GetMetadata(key string) (time.Time, bool) {
+	s.mu.RLock()
+	entry, exists := s.items[key]
+	s.mu.RUnlock()
+
+	if !exists {
+		return time.Time{}, false
+	}
+
+	if time.Now().After(entry.expiryTime) {
+		// Lazy expiration: remove expired entry on access
+		s.Delete(key)
+		return time.Time{}, false
+	}
+
+	return entry.cachedAt, true
+}
+
+// IsStale checks if a cached entry is older than the given staleness threshold.
+// Returns true if the entry doesn't exist or is stale.
+// Returns false if the entry exists and is fresh (not stale).
+func (s *Store) IsStale(key string, stalenessThreshold time.Duration) bool {
+	cachedAt, exists := s.GetMetadata(key)
+	if !exists {
+		return true
+	}
+	return time.Since(cachedAt) > stalenessThreshold
+}
+
+// GetWithMetadata returns both the cached value and its metadata (cached time).
+// Returns the value, cached time, and true if the key exists and has not expired.
+// Returns nil values and false if the key does not exist or has expired.
+func (s *Store) GetWithMetadata(key string) (interface{}, time.Time, bool) {
+	s.mu.RLock()
+	entry, exists := s.items[key]
+	s.mu.RUnlock()
+
+	if !exists {
+		return nil, time.Time{}, false
+	}
+
+	if time.Now().After(entry.expiryTime) {
+		// Lazy expiration: remove expired entry on access
+		s.Delete(key)
+		return nil, time.Time{}, false
+	}
+
+	return entry.value, entry.cachedAt, true
 }
 
 // cleanup runs in a background goroutine and removes expired entries periodically.

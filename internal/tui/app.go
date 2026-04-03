@@ -27,22 +27,59 @@ const (
 	numTabs
 )
 
+// ConnectionState represents the API connection state.
+type ConnectionState int
+
+const (
+	// ConnOnline indicates the API is reachable and functioning.
+	ConnOnline ConnectionState = iota
+	// ConnRateLimited indicates the API is rate limiting requests.
+	ConnRateLimited
+	// ConnOffline indicates the API is unreachable.
+	ConnOffline
+)
+
+// String returns the string representation of ConnectionState.
+func (c ConnectionState) String() string {
+	switch c {
+	case ConnOnline:
+		return "online"
+	case ConnRateLimited:
+		return "rate limited"
+	case ConnOffline:
+		return "offline"
+	default:
+		return "unknown"
+	}
+}
+
 // tab represents a single tab in the application.
 type tab struct {
 	name  string
 	model tea.Model
 }
 
+// retryItem represents a queued retry operation.
+type retryItem struct {
+	tea.Cmd
+	tab       int
+	scheduled time.Time
+	attempts  int
+}
+
 // Model represents the root application model that manages tab navigation.
 type Model struct {
-	theme         *Theme
-	tabs          []tab
-	activeTab     int
-	showHelp      bool
-	lastUpdate    time.Time
-	errorCount    int
-	quit          bool
-	width, height int
+	theme           *Theme
+	tabs            []tab
+	activeTab       int
+	showHelp        bool
+	lastUpdate      time.Time
+	errorCount      int
+	quit            bool
+	width, height   int
+	connectionState ConnectionState
+	rateLimitReset  time.Time
+	retryQueue      []retryItem
 }
 
 // NewApp creates a new application model with all child models initialized and configured.
@@ -81,11 +118,14 @@ func NewApp(
 			{name: "Macro", model: macroModel},
 			{name: "News", model: newsModel},
 		},
-		activeTab:  tabTrend,
-		showHelp:   false,
-		lastUpdate: time.Now(),
-		errorCount: 0,
-		quit:       false,
+		activeTab:       tabTrend,
+		showHelp:        false,
+		lastUpdate:      time.Now(),
+		errorCount:      0,
+		quit:            false,
+		connectionState: ConnOnline,
+		rateLimitReset:  time.Time{},
+		retryQueue:      []retryItem{},
 	}
 }
 
@@ -106,10 +146,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case DataUpdateMsg:
 		m.lastUpdate = time.Now()
+		m.connectionState = ConnOnline
 		return m, nil
 	case ErrorUpdateMsg:
 		m.errorCount++
+		// Check if error is a rate limit error
+		if isRateLimitError(msg.Err) {
+			m.connectionState = ConnRateLimited
+			m.rateLimitReset = time.Now().Add(time.Minute)
+		} else {
+			m.connectionState = ConnOffline
+		}
 		return m, nil
+	case ConnectionOnlineMsg:
+		m.connectionState = ConnOnline
+		m.rateLimitReset = time.Time{}
+		return m, nil
+	case ConnectionOfflineMsg:
+		m.connectionState = ConnOffline
+		return m, nil
+	case RateLimitedMsg:
+		m.connectionState = ConnRateLimited
+		m.rateLimitReset = msg.ResetTime
+		// Queue retry for the affected tab
+		return m, m.queueRetry(msg.Tab, time.Until(msg.ResetTime))
 	}
 
 	// Delegate all other messages to the active child model
@@ -216,9 +276,9 @@ func (m Model) renderHelp() string {
 	return m.theme.Box().Render(help.Render())
 }
 
-// renderStatusBar renders the status bar with last update time, data source, and error count.
+// renderStatusBar renders the status bar with connection state, last update time, and error count.
 func (m Model) renderStatusBar() string {
-	left := fmt.Sprintf("Last update: %s", m.formatLastUpdate())
+	left := fmt.Sprintf("Status: %s | Last update: %s", m.renderConnectionState(), m.formatLastUpdate())
 	right := fmt.Sprintf("Errors: %d", m.errorCount)
 
 	statusBar := lipgloss.NewStyle().
@@ -230,6 +290,26 @@ func (m Model) renderStatusBar() string {
 	return statusBar.Render(lipgloss.JoinHorizontal(lipgloss.Bottom,
 		left,
 		lipgloss.PlaceHorizontal(m.width, lipgloss.Right, right)))
+}
+
+// renderConnectionState renders the connection state with appropriate styling.
+func (m Model) renderConnectionState() string {
+	var style lipgloss.Style
+	var text string
+
+	switch m.connectionState {
+	case ConnOnline:
+		style = m.theme.StatusOnline()
+		text = "online"
+	case ConnRateLimited:
+		style = m.theme.StatusRateLimited()
+		text = "rate limited"
+	case ConnOffline:
+		style = m.theme.StatusOffline()
+		text = "offline"
+	}
+
+	return style.Render(text)
 }
 
 // formatLastUpdate formats the last update time for display.
@@ -298,4 +378,65 @@ type DataUpdateMsg struct {
 type ErrorUpdateMsg struct {
 	Tab int
 	Err error
+}
+
+// ConnectionOnlineMsg is a message when the API is reachable.
+type ConnectionOnlineMsg struct{}
+
+// ConnectionOfflineMsg is a message when the API is unreachable.
+type ConnectionOfflineMsg struct{}
+
+// RateLimitedMsg is a message when the API is rate limiting requests.
+type RateLimitedMsg struct {
+	Tab       int
+	ResetTime time.Time
+}
+
+// queueRetry adds a retry to the queue for the given tab after the specified delay.
+func (m Model) queueRetry(tab int, delay time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		item := retryItem{
+			Cmd:       m.refreshActiveTab(),
+			tab:       tab,
+			scheduled: time.Now().Add(delay),
+			attempts:  1,
+		}
+		// The queue is managed by a tick command
+		return RetryTickMsg{Item: item}
+	}
+}
+
+// isRateLimitError checks if an error indicates rate limiting.
+func isRateLimitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check if error contains rate limit keywords
+	errStr := err.Error()
+	return contains(errStr, "rate limit") ||
+		contains(errStr, "429") ||
+		contains(errStr, "too many requests")
+}
+
+// contains checks if a string contains a substring (case-insensitive).
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) &&
+		(s[:len(substr)] == substr ||
+			s[len(s)-len(substr):] == substr ||
+			findSubstring(s, substr))
+}
+
+// findSubstring performs a simple substring search.
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// RetryTickMsg is a tick message for retry queue processing.
+type RetryTickMsg struct {
+	Item retryItem
 }

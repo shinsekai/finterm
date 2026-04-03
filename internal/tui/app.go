@@ -27,6 +27,15 @@ const (
 	numTabs
 )
 
+// globalBindings are keyboard bindings available in all views.
+var globalBindings = []components.Binding{
+	{Key: "1-4", Description: "Switch tab"},
+	{Key: "Tab", Description: "Cycle tabs"},
+	{Key: "r", Description: "Refresh"},
+	{Key: "?", Description: "Toggle help"},
+	{Key: "q / Ctrl+C", Description: "Quit"},
+}
+
 // ConnectionState represents the API connection state.
 type ConnectionState int
 
@@ -72,7 +81,7 @@ type Model struct {
 	theme           *Theme
 	tabs            []tab
 	activeTab       int
-	showHelp        bool
+	helpOverlay     *components.HelpOverlay
 	lastUpdate      time.Time
 	errorCount      int
 	quit            bool
@@ -119,7 +128,7 @@ func NewApp(
 			{name: "News", model: newsModel},
 		},
 		activeTab:       tabTrend,
-		showHelp:        false,
+		helpOverlay:     nil,
 		lastUpdate:      time.Now(),
 		errorCount:      0,
 		quit:            false,
@@ -139,10 +148,35 @@ func (m Model) Init() tea.Cmd {
 // Update handles messages and updates the application state.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case components.HelpDismissedMsg:
+		// Dismiss help overlay
+		m.helpOverlay = nil
+		return m, nil
+
 	case tea.KeyMsg:
+		// If help overlay is visible, only handle overlay keys
+		if m.helpOverlay != nil {
+			overlay, cmd := m.helpOverlay.Update(msg)
+			// If overlay returned a command (dismissal), execute it inline
+			if cmd != nil {
+				cmdMsg := cmd()
+				if _, ok := cmdMsg.(components.HelpDismissedMsg); ok {
+					m.helpOverlay = nil
+					return m, nil
+				}
+			}
+			m.helpOverlay = overlay.(*components.HelpOverlay)
+			return m, cmd
+		}
 		return m.handleKeyMsg(msg)
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		// Update overlay dimensions if visible
+		if m.helpOverlay != nil {
+			overlay, cmd := m.helpOverlay.Update(msg)
+			m.helpOverlay = overlay.(*components.HelpOverlay)
+			return m, cmd
+		}
 		return m, nil
 	case DataUpdateMsg:
 		m.lastUpdate = time.Now()
@@ -188,9 +222,9 @@ func (m Model) View() string {
 	content += m.renderTabBar()
 	content += "\n"
 
-	// Render active child view
-	if m.showHelp {
-		content += m.renderHelp()
+	// Render help overlay if visible, otherwise render active child view
+	if m.helpOverlay != nil {
+		content += m.helpOverlay.View()
 	} else {
 		content += m.tabs[m.activeTab].model.View()
 	}
@@ -215,8 +249,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "?":
-			m.showHelp = !m.showHelp
-			return m, nil
+			return m.showHelpOverlay()
 
 		case "r":
 			return m, m.refreshActiveTab()
@@ -260,20 +293,30 @@ func (m Model) renderTabBar() string {
 	return m.theme.TabBar().Render(lipgloss.JoinHorizontal(lipgloss.Top, tabs...))
 }
 
-// renderHelp renders the help overlay.
-func (m Model) renderHelp() string {
-	help := components.NewHelp().
-		WithTitle("Help").
-		WithBindings([]components.Binding{
-			{Key: "1-4", Description: "Switch tab"},
-			{Key: "Tab", Description: "Cycle tabs"},
-			{Key: "r", Description: "Refresh"},
-			{Key: "?", Description: "Toggle help"},
-			{Key: "q / Ctrl+C", Description: "Quit"},
-		}).
-		WithColumns(2)
+// showHelpOverlay shows the help overlay with context-sensitive bindings.
+func (m Model) showHelpOverlay() (Model, tea.Cmd) {
+	// Get view-specific bindings from the active tab
+	viewBindings := m.getViewBindings()
 
-	return m.theme.Box().Render(help.Render())
+	// Create and show the help overlay
+	m.helpOverlay = components.NewHelpOverlay(globalBindings, viewBindings).
+		WithTitle(m.tabs[m.activeTab].name + " Help")
+
+	// Initialize overlay dimensions
+	var overlay tea.Model = m.helpOverlay
+	var cmd tea.Cmd
+	overlay, cmd = m.helpOverlay.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+	m.helpOverlay = overlay.(*components.HelpOverlay)
+
+	return m, cmd
+}
+
+// getViewBindings returns the key bindings for the currently active view.
+func (m Model) getViewBindings() []components.Binding {
+	if provider, ok := m.tabs[m.activeTab].model.(components.KeyBindingsProvider); ok {
+		return provider.KeyBindings()
+	}
+	return nil
 }
 
 // renderStatusBar renders the status bar with connection state, last update time, and error count.

@@ -10,6 +10,7 @@ import (
 
 	"github.com/owner/finterm/internal/alphavantage"
 	"github.com/owner/finterm/internal/cache"
+	"github.com/owner/finterm/internal/tui/components"
 )
 
 // PanelState represents the loading state of a data panel.
@@ -671,6 +672,13 @@ func (m Model) GetLastUpdate() time.Time {
 // GetTTL returns the data TTL.
 func (m Model) GetTTL() time.Duration {
 	return m.ttl
+}
+
+// KeyBindings returns the keyboard bindings for the macro view.
+func (m Model) KeyBindings() []components.KeyBinding {
+	return []components.KeyBinding{
+		{Key: "r", Description: "Refresh all panels"},
+	}
 }
 
 // IsDataStale returns true if any panel data is older than TTL.

@@ -3,6 +3,7 @@ package components
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -349,4 +350,202 @@ func TestHelp_MaxWidth(t *testing.T) {
 	if result == "" {
 		t.Error("Render should work with MaxWidth set")
 	}
+}
+
+// TestHelpOverlay_Render tests that the help overlay renders correctly.
+func TestHelpOverlay_Render(t *testing.T) {
+	globalBindings := []KeyBinding{
+		{Key: "q", Description: "Quit"},
+		{Key: "?", Description: "Help"},
+	}
+	viewBindings := []KeyBinding{
+		{Key: "r", Description: "Refresh"},
+		{Key: "↑", Description: "Move up"},
+	}
+
+	overlay := NewHelpOverlay(globalBindings, viewBindings)
+	overlay.width = 80
+	overlay.height = 24
+
+	rendered := overlay.View()
+
+	if rendered == "" {
+		t.Error("Render should not return empty string")
+	}
+
+	// Check that global bindings are present
+	if !containsString(rendered, "q") || !containsString(rendered, "Quit") {
+		t.Error("Global bindings should be present in rendered output")
+	}
+
+	// Check that view bindings are present
+	if !containsString(rendered, "r") || !containsString(rendered, "Refresh") {
+		t.Error("View bindings should be present in rendered output")
+	}
+}
+
+// TestHelpOverlay_Dismiss tests that the overlay can be dismissed with Esc or ?.
+func TestHelpOverlay_Dismiss(t *testing.T) {
+	globalBindings := []KeyBinding{{Key: "q", Description: "Quit"}}
+	viewBindings := []KeyBinding{{Key: "r", Description: "Refresh"}}
+
+	tests := []struct {
+		name    string
+		keyMsg  tea.KeyMsg
+		wantMsg bool
+	}{
+		{
+			name:    "Esc key dismisses",
+			keyMsg:  tea.KeyMsg{Type: tea.KeyEsc},
+			wantMsg: true,
+		},
+		{
+			name:    "? key dismisses",
+			keyMsg:  tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}},
+			wantMsg: true,
+		},
+		{
+			name:    "other key does not dismiss",
+			keyMsg:  tea.KeyMsg{Type: tea.KeyUp},
+			wantMsg: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			overlay := NewHelpOverlay(globalBindings, viewBindings)
+
+			var cmd tea.Cmd
+			var model tea.Model = overlay
+			model, cmd = overlay.Update(tt.keyMsg)
+
+			// Check that model is still a HelpOverlay
+			if _, ok := model.(*HelpOverlay); !ok {
+				t.Error("Model should remain HelpOverlay after key press")
+			}
+
+			// Check if a command was returned (which would be the dismissal message)
+			gotMsg := cmd != nil
+			if gotMsg != tt.wantMsg {
+				t.Errorf("Got message: %v, want: %v", gotMsg, tt.wantMsg)
+			}
+
+			// If command exists, verify it returns HelpDismissedMsg
+			if cmd != nil {
+				msg := cmd()
+				if _, ok := msg.(HelpDismissedMsg); !ok {
+					t.Errorf("Command should return HelpDismissedMsg, got: %T", msg)
+				}
+			}
+		})
+	}
+}
+
+// TestHelpOverlay_ContextSensitive tests that view-specific bindings are displayed.
+func TestHelpOverlay_ContextSensitive(t *testing.T) {
+	globalBindings := []KeyBinding{
+		{Key: "1-4", Description: "Switch tab"},
+		{Key: "q", Description: "Quit"},
+	}
+
+	tests := []struct {
+		name         string
+		viewBindings []KeyBinding
+		expectKey    string
+		expectDesc   string
+	}{
+		{
+			name:         "trend view bindings",
+			viewBindings: []KeyBinding{{Key: "r", Description: "Refresh tickers"}, {Key: "↑", Description: "Move up"}},
+			expectKey:    "r",
+			expectDesc:   "Refresh tickers",
+		},
+		{
+			name:         "quote view bindings",
+			viewBindings: []KeyBinding{{Key: "Enter", Description: "Fetch quote"}},
+			expectKey:    "Enter",
+			expectDesc:   "Fetch quote",
+		},
+		{
+			name:         "empty view bindings",
+			viewBindings: []KeyBinding{},
+			expectKey:    "",
+			expectDesc:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			overlay := NewHelpOverlay(globalBindings, tt.viewBindings)
+			overlay.width = 80
+			overlay.height = 24
+
+			rendered := overlay.View()
+
+			// Global bindings should always be present
+			if !containsString(rendered, "Switch tab") {
+				t.Error("Global bindings should always be present")
+			}
+
+			// View-specific bindings should be present if provided
+			if tt.expectKey != "" && tt.expectDesc != "" {
+				if !containsString(rendered, tt.expectKey) || !containsString(rendered, tt.expectDesc) {
+					t.Errorf("View binding %s: %s should be present", tt.expectKey, tt.expectDesc)
+				}
+			}
+		})
+	}
+}
+
+// TestHelpOverlay_UpdateBindings tests updating bindings.
+func TestHelpOverlay_UpdateBindings(t *testing.T) {
+	globalBindings := []KeyBinding{{Key: "q", Description: "Quit"}}
+	viewBindings := []KeyBinding{{Key: "r", Description: "Refresh"}}
+
+	overlay := NewHelpOverlay(globalBindings, viewBindings)
+
+	// Update view bindings
+	newViewBindings := []KeyBinding{{Key: "f", Description: "Filter"}}
+	overlay.UpdateBindings(newViewBindings)
+
+	// Verify bindings were updated by checking rendered output
+	overlay.width = 80
+	overlay.height = 24
+	rendered := overlay.View()
+
+	// Old view binding should not be present (or at least new one should be)
+	if !containsString(rendered, "f") || !containsString(rendered, "Filter") {
+		t.Error("Updated view bindings should be present in rendered output")
+	}
+}
+
+// TestHelpOverlay_WindowSize tests handling window size messages.
+func TestHelpOverlay_WindowSize(t *testing.T) {
+	globalBindings := []KeyBinding{{Key: "q", Description: "Quit"}}
+	viewBindings := []KeyBinding{{Key: "r", Description: "Refresh"}}
+
+	overlay := NewHelpOverlay(globalBindings, viewBindings)
+
+	// Send window size message
+	msg := tea.WindowSizeMsg{Width: 100, Height: 30}
+	var model tea.Model = overlay
+	model, _ = overlay.Update(msg)
+	updatedOverlay := model.(*HelpOverlay)
+
+	if updatedOverlay.width != 100 {
+		t.Errorf("Width = %v, want 100", updatedOverlay.width)
+	}
+	if updatedOverlay.height != 30 {
+		t.Errorf("Height = %v, want 30", updatedOverlay.height)
+	}
+}
+
+// containsString checks if a string contains a substring.
+func containsString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

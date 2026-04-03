@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/owner/finterm/internal/alphavantage"
+	"github.com/owner/finterm/internal/tui/components"
 )
 
 // Filter represents the news filter type.
@@ -578,6 +579,18 @@ func (m Model) GetViewportHeight() int {
 // GetScrollOffset returns the scroll offset.
 func (m Model) GetScrollOffset() int {
 	return m.scrollOffset
+}
+
+// KeyBindings returns the keyboard bindings for the news view.
+func (m Model) KeyBindings() []components.KeyBinding {
+	return []components.KeyBinding{
+		{Key: "↑/k", Description: "Previous article"},
+		{Key: "↓/j", Description: "Next article"},
+		{Key: "Enter", Description: "Open article URL"},
+		{Key: "f", Description: "Cycle filter"},
+		{Key: "s", Description: "Cycle sort"},
+		{Key: "r", Description: "Refresh news"},
+	}
 }
 
 // View renders the news view.

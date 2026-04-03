@@ -12,6 +12,7 @@ import (
 
 	"github.com/owner/finterm/internal/alphavantage"
 	trenddomain "github.com/owner/finterm/internal/domain/trend"
+	"github.com/owner/finterm/internal/tui/components"
 )
 
 // State represents the model state.
@@ -341,6 +342,17 @@ func (m Model) GetWidth() int {
 // GetHeight returns the current height.
 func (m Model) GetHeight() int {
 	return m.height
+}
+
+// KeyBindings returns the keyboard bindings for the quote view.
+func (m Model) KeyBindings() []components.KeyBinding {
+	return []components.KeyBinding{
+		{Key: "Enter", Description: "Fetch quote"},
+		{Key: "↑", Description: "Previous in history"},
+		{Key: "↓", Description: "Next in history"},
+		{Key: "Esc", Description: "Clear input"},
+		{Key: "r", Description: "Refresh ticker"},
+	}
 }
 
 // RefreshMsg is a message to refresh the quote data.

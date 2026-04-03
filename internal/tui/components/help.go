@@ -4,6 +4,7 @@ package components
 import (
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -347,4 +348,167 @@ func RenderHelpWithGroups(groups []KeyGroup, titleStyle, keyStyle, descStyle lip
 	}
 
 	return builder.String()
+}
+
+// KeyBinding represents a keyboard binding for use with HelpOverlay.
+// Alias for Binding to match the task specification.
+type KeyBinding = Binding
+
+// KeyBindingsProvider is an interface for types that can provide key bindings.
+// Views implement this to return their specific keyboard shortcuts.
+type KeyBindingsProvider interface {
+	KeyBindings() []KeyBinding
+}
+
+// HelpDismissedMsg is a message sent when the help overlay is dismissed.
+type HelpDismissedMsg struct{}
+
+// HelpOverlay is a Bubbletea model that displays a centered help overlay.
+// It shows global bindings and view-specific bindings, and blocks input
+// to the underlying view while visible.
+type HelpOverlay struct {
+	// globalBindings are bindings available in all views.
+	globalBindings []KeyBinding
+	// viewBindings are bindings specific to the current view.
+	viewBindings []KeyBinding
+	// title is the overlay title.
+	title string
+	// width and height are the terminal dimensions.
+	width, height int
+	// boxStyle is the style for the overlay box.
+	boxStyle lipgloss.Style
+	// titleStyle is the style for the overlay title.
+	titleStyle lipgloss.Style
+}
+
+// NewHelpOverlay creates a new help overlay with the given bindings.
+func NewHelpOverlay(global, view []KeyBinding) *HelpOverlay {
+	return &HelpOverlay{
+		globalBindings: global,
+		viewBindings:   view,
+		title:          "Key Bindings",
+		width:          80,
+		height:         24,
+		boxStyle: lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("#44475A")).
+			Background(lipgloss.Color("#282A36")).
+			Padding(1, 2),
+		titleStyle: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#BD93F9")).
+			Bold(true),
+	}
+}
+
+// Init initializes the help overlay.
+func (m *HelpOverlay) Init() tea.Cmd {
+	return nil
+}
+
+// Update handles messages for the help overlay.
+func (m *HelpOverlay) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		// Dismiss on ? or Esc
+		if msg.Type == tea.KeyEsc {
+			return m, func() tea.Msg { return HelpDismissedMsg{} }
+		}
+		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && msg.Runes[0] == '?' {
+			return m, func() tea.Msg { return HelpDismissedMsg{} }
+		}
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+	}
+
+	return m, nil
+}
+
+// View renders the help overlay as a centered panel.
+func (m *HelpOverlay) View() string {
+	// Combine global and view bindings
+	allBindings := make([]KeyBinding, 0, len(m.globalBindings)+len(m.viewBindings))
+	allBindings = append(allBindings, m.globalBindings...)
+	if len(m.viewBindings) > 0 {
+		allBindings = append(allBindings, viewSeparator)
+		allBindings = append(allBindings, m.viewBindings...)
+	}
+
+	// Create help component with all bindings
+	help := NewHelp().
+		WithTitle(m.title).
+		WithBindings(allBindings).
+		WithColumns(2).
+		WithTitleStyle(m.titleStyle)
+
+	content := help.Render()
+
+	// Center the overlay
+	overlayWidth := lipgloss.Width(content) + 4 // +4 for padding
+	if overlayWidth < 40 {
+		overlayWidth = 40
+	}
+
+	// Limit width to fit within terminal
+	maxWidth := m.width - 4
+	if overlayWidth > maxWidth {
+		overlayWidth = maxWidth
+	}
+
+	// Wrap content to fit
+	wrappedContent := lipgloss.NewStyle().
+		Width(overlayWidth - 4).
+		Render(content)
+
+	// Apply box style
+	overlay := m.boxStyle.Width(overlayWidth).Render(wrappedContent)
+
+	// Center vertically and horizontally
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		overlay,
+	)
+}
+
+// UpdateBindings updates the view-specific bindings.
+func (m *HelpOverlay) UpdateBindings(view []KeyBinding) *HelpOverlay {
+	m.viewBindings = view
+	return m
+}
+
+// UpdateGlobalBindings updates the global bindings.
+func (m *HelpOverlay) UpdateGlobalBindings(global []KeyBinding) *HelpOverlay {
+	m.globalBindings = global
+	return m
+}
+
+// WithTitle sets the overlay title.
+func (m *HelpOverlay) WithTitle(title string) *HelpOverlay {
+	m.title = title
+	return m
+}
+
+// WithBoxStyle sets the box style.
+func (m *HelpOverlay) WithBoxStyle(style lipgloss.Style) *HelpOverlay {
+	m.boxStyle = style
+	return m
+}
+
+// WithTitleStyle sets the title style.
+func (m *HelpOverlay) WithTitleStyle(style lipgloss.Style) *HelpOverlay {
+	m.titleStyle = style
+	return m
+}
+
+// viewSeparator is a separator between global and view bindings.
+var viewSeparator = KeyBinding{
+	Key:         "────────",
+	Description: "View-specific",
+	KeyStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A")),
+	DescStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A")),
 }

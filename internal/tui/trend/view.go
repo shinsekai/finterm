@@ -233,6 +233,7 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 		{Text: valuationStyle.Render(result.Valuation)},
 	}
 }
+
 // buildCachedCells builds cells for a cached row with offline indicator.
 func (v *View) buildCachedCells(row RowData) []components.Cell {
 	result := row.Result
@@ -263,14 +264,15 @@ func (v *View) buildCachedCells(row RowData) []components.Cell {
 	symbolWithBadge := result.Symbol + " " + v.theme.Muted().Render("[offline]")
 
 	return []components.Cell{
-			{Text: symbolWithBadge},
-			{Text: signalStyle.Render(result.Signal.String())},
-			{Text: FormatValue(result.RSI, 2)},
-			{Text: FormatValue(result.EMAFast, 4)},
-			{Text: FormatValue(result.EMASlow, 4)},
-			{Text: valuationStyle.Render(result.Valuation)},
-		}
+		{Text: symbolWithBadge},
+		{Text: signalStyle.Render(result.Signal.String())},
+		{Text: FormatValue(result.RSI, 2)},
+		{Text: FormatValue(result.EMAFast, 4)},
+		{Text: FormatValue(result.EMASlow, 4)},
+		{Text: valuationStyle.Render(result.Valuation)},
+	}
 }
+
 // buildErrorCells builds cells for an error row.
 func (v *View) buildErrorCells(row RowData) []components.Cell {
 	errorText := "Error"

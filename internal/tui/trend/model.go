@@ -10,6 +10,7 @@ import (
 	"github.com/owner/finterm/internal/config"
 	trenddomain "github.com/owner/finterm/internal/domain/trend"
 	"github.com/owner/finterm/internal/domain/trend/indicators"
+	"github.com/owner/finterm/internal/tui/components"
 )
 
 // Engine defines the interface for trend analysis engines.
@@ -313,6 +314,15 @@ func (m Model) GetWidth() int {
 // GetHeight returns the current height.
 func (m Model) GetHeight() int {
 	return m.height
+}
+
+// KeyBindings returns the keyboard bindings for the trend view.
+func (m Model) KeyBindings() []components.KeyBinding {
+	return []components.KeyBinding{
+		{Key: "↑", Description: "Move up"},
+		{Key: "↓", Description: "Move down"},
+		{Key: "r", Description: "Refresh all tickers"},
+	}
 }
 
 // RefreshMsg is a message to refresh all trend data.

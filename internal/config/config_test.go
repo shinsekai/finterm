@@ -47,11 +47,6 @@ trend:
   rsi_period: 10
   ema_fast: 5
   ema_slow: 15
-  scoring:
-    bullish_rsi_min: 30
-    bullish_rsi_max: 60
-    bearish_rsi_low: 30
-    bearish_rsi_high: 70
 
 valuation:
   rsi_period: 10
@@ -84,10 +79,6 @@ theme:
 				cfg.Trend.RSIPeriod = 10
 				cfg.Trend.EMAFast = 5
 				cfg.Trend.EMASlow = 15
-				cfg.Trend.Scoring.BullishRSIMin = 30
-				cfg.Trend.Scoring.BullishRSIMax = 60
-				cfg.Trend.Scoring.BearishRSILow = 30
-				cfg.Trend.Scoring.BearishRSIHigh = 70
 				cfg.Valuation.RSIPeriod = 10
 				cfg.Valuation.Oversold = 20
 				cfg.Valuation.Undervalued = 40

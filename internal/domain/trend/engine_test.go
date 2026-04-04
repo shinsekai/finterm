@@ -342,8 +342,8 @@ func TestEngine_RSINotUsedInTrendSignal(t *testing.T) {
 			// Use period-aware mock to return different values for fast/slow EMA periods
 			remoteEMA := &mockIndicator{
 				periodToValue: map[int]float64{
-					9:  tt.emaFast, // Fast EMA period
-					21: tt.emaSlow, // Slow EMA period
+					10: tt.emaFast, // Fast EMA period
+					20: tt.emaSlow, // Slow EMA period
 				},
 			}
 

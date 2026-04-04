@@ -41,18 +41,9 @@ type WatchlistConfig struct {
 
 // TrendConfig holds trend-following configuration.
 type TrendConfig struct {
-	RSIPeriod int          `yaml:"rsi_period"`
-	EMAFast   int          `yaml:"ema_fast"`
-	EMASlow   int          `yaml:"ema_slow"`
-	Scoring   TrendScoring `yaml:"scoring"`
-}
-
-// TrendScoring holds trend scoring thresholds.
-type TrendScoring struct {
-	BullishRSIMin  int `yaml:"bullish_rsi_min"`
-	BullishRSIMax  int `yaml:"bullish_rsi_max"`
-	BearishRSILow  int `yaml:"bearish_rsi_low"`
-	BearishRSIHigh int `yaml:"bearish_rsi_high"`
+	RSIPeriod int `yaml:"rsi_period"`
+	EMAFast   int `yaml:"ema_fast"`
+	EMASlow   int `yaml:"ema_slow"`
 }
 
 // ValuationConfig holds valuation configuration.
@@ -89,16 +80,14 @@ func DefaultConfig() *Config {
 			Timeout:    10 * time.Second,
 			MaxRetries: 3,
 		},
+		Watchlist: WatchlistConfig{
+			Equities: []string{"AAPL", "MSFT", "GOOGL", "AMZN", "NVDA"},
+			Crypto:   []string{"BTC", "ETH", "SOL"},
+		},
 		Trend: TrendConfig{
 			RSIPeriod: 14,
-			EMAFast:   9,
-			EMASlow:   21,
-			Scoring: TrendScoring{
-				BullishRSIMin:  40,
-				BullishRSIMax:  70,
-				BearishRSILow:  40,
-				BearishRSIHigh: 80,
-			},
+			EMAFast:   10,
+			EMASlow:   20,
 		},
 		Valuation: ValuationConfig{
 			RSIPeriod:   14,

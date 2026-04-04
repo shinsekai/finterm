@@ -109,7 +109,7 @@ func NewApp(
 
 	// Create and configure quote model
 	quoteModel := quote.NewModel()
-	quoteModel.Configure(context.Background(), quoteClient, trendEngine)
+	quoteModel.Configure(context.Background(), quoteClient, trendEngine, detector)
 
 	// Create and configure macro model
 	macroModel := macro.NewModel()

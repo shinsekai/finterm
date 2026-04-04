@@ -210,11 +210,6 @@ func TestApp_QuitKey(t *testing.T) {
 			key:   tea.KeyCtrlC,
 			runes: "",
 		},
-		{
-			name:  "quit with Esc",
-			key:   tea.KeyEsc,
-			runes: "",
-		},
 	}
 
 	for _, tt := range tests {

@@ -342,7 +342,8 @@ func (v *View) writeChangeField(content *strings.Builder, change float64, change
 // writeIndicators writes the technical indicators section.
 func (v *View) writeIndicators(content *strings.Builder, indicators *trenddomain.Result, lastTradingDay string) {
 	rsiValuation := getRSIValuation(indicators.RSI)
-	fmt.Fprintf(content, "  RSI(%d):     %s  — %s\n", 14, formatFloat(indicators.RSI, 1), rsiValuation)
+	valuationStyle := v.getValuationStyle(rsiValuation)
+	fmt.Fprintf(content, "  RSI(%d):     %s  — %s\n", 14, formatFloat(indicators.RSI, 1), valuationStyle.Render(rsiValuation))
 	fmt.Fprintf(content, "  EMA(10):     %s\n", formatFloat(indicators.EMAFast, 2))
 	fmt.Fprintf(content, "  EMA(20):     %s\n", formatFloat(indicators.EMASlow, 2))
 	v.writeTrendSignal(content, indicators)
@@ -368,6 +369,18 @@ func (v *View) getTrendStyleAndSymbol(signal trenddomain.Signal) (lipgloss.Style
 		return v.theme.Bearish(), "▼"
 	default:
 		return v.theme.Neutral(), "─"
+	}
+}
+
+// getValuationStyle returns the style for an RSI valuation label.
+func (v *View) getValuationStyle(valuation string) lipgloss.Style {
+	switch valuation {
+	case "Oversold", "Undervalued":
+		return v.theme.Bullish()
+	case "Overbought", "Overvalued":
+		return v.theme.Bearish()
+	default:
+		return v.theme.Neutral()
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -394,8 +395,16 @@ func (m Model) fetchCryptoAsQuote(symbol string) (*alphavantage.GlobalQuote, err
 }
 
 // findLatestTwoDates finds the two most recent dates from a time series map.
+// Skips today's date to ensure we only use completed (closed) bars.
 func findLatestTwoDates[V any](ts map[string]V) (latest, prev string) {
+	// Get today's date in UTC to skip the in-progress bar
+	today := time.Now().UTC().Format("2006-01-02")
+
 	for date := range ts {
+		// Skip today's in-progress bar (bar-close-only rule)
+		if date >= today {
+			continue
+		}
 		if date > latest {
 			prev = latest
 			latest = date

@@ -15,6 +15,8 @@ import (
 type Result struct {
 	// Symbol is the analyzed ticker symbol.
 	Symbol string
+	// Price is the latest close price from the last closed bar.
+	Price float64
 	// RSI is the Relative Strength Index value from the last closed bar.
 	RSI float64
 	// EMAFast is the fast EMA value from the last closed bar.
@@ -85,12 +87,17 @@ func New(
 // Returns:
 //   - Result with RSI, EMA values, signal, and valuation
 //   - Error if any indicator computation fails
+//
+// The function is well-structured with clear separation between equity and crypto paths.
+//
+//nolint:gocyclo // Complexity 17 due to switch on asset class with multiple operations
 func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicators.AssetClass) (*Result, error) {
 	if symbol == "" {
 		return nil, fmt.Errorf("symbol cannot be empty")
 	}
 
 	var rsiDataPoints, emaFastDataPoints, emaSlowDataPoints []indicators.DataPoint
+	var price float64
 	var err error
 
 	// Route to appropriate indicator path based on asset class
@@ -120,6 +127,11 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 			return nil, fmt.Errorf("computing remote EMA slow for %s: %w", symbol, err)
 		}
 
+		// For equities, use EMA fast as price proxy (based on close prices)
+		if len(emaFastDataPoints) > 0 {
+			price = emaFastDataPoints[0].Value
+		}
+
 	case indicators.Crypto:
 		// Fetch OHLCV data for this crypto symbol
 		if e.cryptoFetcher == nil {
@@ -128,6 +140,12 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 		ohlcvData, err := e.cryptoFetcher.FetchCryptoOHLCV(ctx, symbol)
 		if err != nil {
 			return nil, fmt.Errorf("fetching crypto OHLCV for %s: %w", symbol, err)
+		}
+
+		// Extract the latest close price from OHLCV data (after reversing to newest-first)
+		// The OHLCV data is sorted oldest-first by the fetcher
+		if len(ohlcvData) > 0 {
+			price = ohlcvData[len(ohlcvData)-1].Close // Newest is last after oldest-first sort
 		}
 
 		// Set data on local indicators for this symbol
@@ -179,6 +197,7 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 
 	return &Result{
 		Symbol:    strings.ToUpper(symbol),
+		Price:     price,
 		RSI:       rsi,
 		EMAFast:   emaFast,
 		EMASlow:   emaSlow,

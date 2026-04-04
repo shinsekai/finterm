@@ -100,5 +100,10 @@ func (e *LocalEMA) ComputeFromOHLCV(period int, useInProgress bool) ([]DataPoint
 		}
 	}
 
+	// Reverse to return newest-first (consistent with remote indicators)
+	for i, j := 0, len(emaValues)-1; i < j; i, j = i+1, j-1 {
+		emaValues[i], emaValues[j] = emaValues[j], emaValues[i]
+	}
+
 	return emaValues, nil
 }

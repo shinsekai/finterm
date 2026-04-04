@@ -57,7 +57,10 @@ func TestLocalRSI_MatchesTradingView(t *testing.T) {
 			t.Errorf("RSI value %d (%f) out of bounds [0, 100]", i, dp.Value)
 		}
 		// The first RSI value (i=0) is at data[period], subsequent values are at data[period+i]
-		expectedDate := data[period+i].Date
+		// Result is newest-first, so we need to map to the original data in reverse
+		resultLen := len(result)
+		expectedIndex := period + (resultLen - 1 - i)
+		expectedDate := data[expectedIndex].Date
 		if !dp.Date.Equal(expectedDate) {
 			t.Errorf("Date mismatch at index %d: expected %v, got %v", i, expectedDate, dp.Date)
 		}
@@ -391,9 +394,11 @@ func TestLocalRSI_SinglePeriod(t *testing.T) {
 	// RS = 0.684, RSI = 40.625
 
 	expectedRSIs := []float64{100, 50, 25, 62.5, 81.25, 40.625}
-	for i, expected := range expectedRSIs {
-		if !almostEqual(result[i].Value, expected) {
-			t.Errorf("RSI at index %d: expected %f, got %f", i, expected, result[i].Value)
+	// Result is newest-first, so we need to reverse the expected order
+	for i := range expectedRSIs {
+		expectedIndex := len(expectedRSIs) - 1 - i
+		if !almostEqual(result[i].Value, expectedRSIs[expectedIndex]) {
+			t.Errorf("RSI at index %d: expected %f, got %f", i, expectedRSIs[expectedIndex], result[i].Value)
 		}
 	}
 }

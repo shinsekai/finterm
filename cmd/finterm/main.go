@@ -19,6 +19,7 @@ import (
 	"github.com/owner/finterm/internal/domain/trend"
 	"github.com/owner/finterm/internal/domain/trend/indicators"
 	"github.com/owner/finterm/internal/tui"
+	"time"
 )
 
 func main() {
@@ -157,15 +158,24 @@ type cryptoFetcherAdapter struct {
 
 // FetchCryptoOHLCV fetches and converts crypto daily OHLCV data to domain types.
 // The returned slice is sorted oldest-first as required by local indicators.
+// Excludes today's in-progress bar (bar-close-only rule).
 func (a *cryptoFetcherAdapter) FetchCryptoOHLCV(ctx context.Context, symbol string) ([]indicators.OHLCV, error) {
 	data, err := a.client.GetCryptoDaily(ctx, symbol, "USD")
 	if err != nil {
 		return nil, err
 	}
 
+	// Get today's date in UTC to skip the in-progress bar
+	today := time.Now().UTC().Format("2006-01-02")
+
 	// Convert to OHLCV slice
 	ohlcvSlice := make([]indicators.OHLCV, 0, len(data.TimeSeries))
 	for dateStr, entry := range data.TimeSeries {
+		// Skip today's in-progress bar (bar-close-only rule)
+		if dateStr >= today {
+			continue
+		}
+
 		date, err := alphavantage.ParseDate(dateStr)
 		if err != nil {
 			continue

@@ -2,6 +2,7 @@
 package trend
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -112,8 +113,15 @@ func (v *View) buildColumns() []components.Column {
 		},
 		{
 			Title:       "Signal",
-			Width:       10,
+			Width:       15,
 			Alignment:   components.AlignLeft,
+			Style:       v.theme.TableRow(),
+			HeaderStyle: v.theme.TableHeader(),
+		},
+		{
+			Title:       "Price",
+			Width:       14,
+			Alignment:   components.AlignRight,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
 		},
@@ -196,6 +204,7 @@ func (v *View) buildLoadingCells(row RowData) []components.Cell {
 		{Text: "-"},
 		{Text: "-"},
 		{Text: "-"},
+		{Text: "-"},
 	}
 }
 
@@ -228,9 +237,10 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: result.Symbol},
 		{Text: signalStyle.Render(result.Signal.String())},
+		{Text: formatPrice(result.Price)},
 		{Text: FormatValue(result.RSI, 2)},
-		{Text: FormatValue(result.EMAFast, 4)},
-		{Text: FormatValue(result.EMASlow, 4)},
+		{Text: FormatValue(result.EMAFast, 2)},
+		{Text: FormatValue(result.EMASlow, 2)},
 		{Text: valuationStyle.Render(result.Valuation)},
 	}
 }
@@ -267,9 +277,10 @@ func (v *View) buildCachedCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: symbolWithBadge},
 		{Text: signalStyle.Render(result.Signal.String())},
+		{Text: formatPrice(result.Price)},
 		{Text: FormatValue(result.RSI, 2)},
-		{Text: FormatValue(result.EMAFast, 4)},
-		{Text: FormatValue(result.EMASlow, 4)},
+		{Text: FormatValue(result.EMAFast, 2)},
+		{Text: FormatValue(result.EMASlow, 2)},
 		{Text: valuationStyle.Render(result.Valuation)},
 	}
 }
@@ -279,19 +290,17 @@ func (v *View) buildErrorCells(row RowData) []components.Cell {
 	errorText := "Error"
 	if row.Error != nil {
 		errorText = row.Error.Error()
-		// Truncate long error messages
-		if len(errorText) > 20 {
-			errorText = errorText[:17] + "..."
-		}
+		// Show full error text (no truncation)
 	}
 
 	return []components.Cell{
 		{Text: row.Symbol},
 		{Text: v.theme.Error().Render(errorText)},
-		{Text: "-"},
-		{Text: "-"},
-		{Text: "-"},
-		{Text: "-"},
+		{Text: "--"},
+		{Text: "--"},
+		{Text: "--"},
+		{Text: "--"},
+		{Text: "--"},
 	}
 }
 
@@ -300,10 +309,11 @@ func (v *View) buildUnknownCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
 		{Text: v.theme.Muted().Render("Unknown")},
-		{Text: "-"},
-		{Text: "-"},
-		{Text: "-"},
-		{Text: "-"},
+		{Text: "--"},
+		{Text: "--"},
+		{Text: "--"},
+		{Text: "--"},
+		{Text: "--"},
 	}
 }
 
@@ -370,4 +380,39 @@ func (d *defaultTheme) Foreground() lipgloss.Color {
 
 func (d *defaultTheme) Background() lipgloss.Color {
 	return lipgloss.Color("#282A36")
+}
+
+// formatPrice formats a price value with comma separators and 2 decimal places.
+// For prices < 1, shows more decimals; for prices >= 1000, adds comma separators.
+func formatPrice(price float64) string {
+	if price == 0 {
+		return "--"
+	}
+
+	// For very small prices (crypto fractions), show more precision
+	if price < 1 {
+		return fmt.Sprintf("%.6f", price)
+	}
+
+	// For normal prices, format with 2 decimal places
+	intPart := int64(price)
+	fracPart := price - float64(intPart)
+
+	// Format integer part with commas
+	str := fmt.Sprintf("%d", intPart)
+	n := len(str)
+	if n > 3 {
+		var result []byte
+		for i, c := range str {
+			if i > 0 && (n-i)%3 == 0 {
+				result = append(result, ',')
+			}
+			result = append(result, byte(c))
+		}
+		str = string(result)
+	}
+
+	// Add fractional part
+	fracStr := fmt.Sprintf("%.2f", fracPart)
+	return str + fracStr[1:] // Remove leading "0"
 }

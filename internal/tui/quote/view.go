@@ -3,6 +3,7 @@ package quote
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -284,7 +285,7 @@ func (v *View) buildQuoteContent(quote *alphavantage.GlobalQuote, indicators *tr
 	var content strings.Builder
 
 	// Parse quote values
-	price := parsePrice(quote.Price)
+	price, _ := strconv.ParseFloat(quote.Price, 64)
 	change, changePercent := parseChange(quote.Change, quote.ChangePercent)
 
 	// Determine change color
@@ -297,13 +298,13 @@ func (v *View) buildQuoteContent(quote *alphavantage.GlobalQuote, indicators *tr
 	}
 
 	// Basic quote fields
-	v.writeQuoteField(&content, "  Price:       ", "$"+price, "")
+	v.writeQuoteField(&content, "  Price:       ", "$"+formatPrice(quote.Price), "")
 	v.writeChangeField(&content, change, changePercent, changeStyle)
-	v.writeQuoteField(&content, "  Open:        ", "$"+quote.Open, quote.Open)
-	v.writeQuoteField(&content, "  High:        ", "$"+quote.High, quote.High)
-	v.writeQuoteField(&content, "  Low:         ", "$"+quote.Low, quote.Low)
-	v.writeQuoteField(&content, "  Volume:      ", formatVolume(quote.Volume), quote.Volume)
-	v.writeQuoteField(&content, "  Prev Close:  ", "$"+quote.PreviousClose, quote.PreviousClose)
+	v.writeQuoteField(&content, "  Open:        ", "$"+formatPrice(quote.Open), quote.Open)
+	v.writeQuoteField(&content, "  High:        ", "$"+formatPrice(quote.High), quote.High)
+	v.writeQuoteField(&content, "  Low:         ", "$"+formatPrice(quote.Low), quote.Low)
+	v.writeQuoteField(&content, "  Volume:      ", formatVolume(quote.Volume, quote.Symbol, price), quote.Volume)
+	v.writeQuoteField(&content, "  Prev Close:  ", "$"+formatPrice(quote.PreviousClose), quote.PreviousClose)
 
 	// Indicators section
 	if indicators != nil {
@@ -335,7 +336,12 @@ func (v *View) writeQuoteField(content *strings.Builder, label, value, condition
 
 // writeChangeField writes the change field with appropriate styling.
 func (v *View) writeChangeField(content *strings.Builder, change float64, changePercent string, style lipgloss.Style) {
-	changeText := fmt.Sprintf("%s (%s)", formatFloat(change, 2), changePercent)
+	// Format: -$14.26 (-0.02%)
+	sign := ""
+	if change < 0 {
+		sign = "-"
+	}
+	changeText := fmt.Sprintf("%s$%s (%s)", sign, humanizeFloat(math.Abs(change), 2), formatPercent(changePercent))
 	fmt.Fprintf(content, "  Change:      %s\n", style.Render(changeText))
 }
 
@@ -344,8 +350,8 @@ func (v *View) writeIndicators(content *strings.Builder, indicators *trenddomain
 	rsiValuation := getRSIValuation(indicators.RSI)
 	valuationStyle := v.getValuationStyle(rsiValuation)
 	fmt.Fprintf(content, "  RSI(%d):     %s  — %s\n", 14, formatFloat(indicators.RSI, 1), valuationStyle.Render(rsiValuation))
-	fmt.Fprintf(content, "  EMA(10):     %s\n", formatFloat(indicators.EMAFast, 2))
-	fmt.Fprintf(content, "  EMA(20):     %s\n", formatFloat(indicators.EMASlow, 2))
+	fmt.Fprintf(content, "  EMA(10):     $%s\n", humanizeFloat(indicators.EMAFast, 2))
+	fmt.Fprintf(content, "  EMA(20):     $%s\n", humanizeFloat(indicators.EMASlow, 2))
 	v.writeTrendSignal(content, indicators)
 
 	if lastTradingDay != "" {
@@ -450,14 +456,6 @@ func (v *View) renderShortcuts() string {
 	return result
 }
 
-// parsePrice parses a price string, returns "--" if empty.
-func parsePrice(s string) string {
-	if s == "" {
-		return "--"
-	}
-	return s
-}
-
 // parseChange parses the change and change percent, returns values.
 func parseChange(changeStr, changePercentStr string) (float64, string) {
 	if changeStr == "" {
@@ -478,16 +476,28 @@ func parseChange(changeStr, changePercentStr string) (float64, string) {
 }
 
 // formatVolume formats a volume number with thousands separators.
-func formatVolume(s string) string {
-	if s == "" {
+// For crypto, also displays USD volume.
+func formatVolume(volumeStr, symbol string, price float64) string {
+	if volumeStr == "" {
 		return "--"
 	}
 
-	vol, err := strconv.ParseFloat(s, 64)
+	vol, err := strconv.ParseFloat(volumeStr, 64)
 	if err != nil {
-		return s
+		return volumeStr
 	}
 
+	// Check if this is crypto (common crypto symbols)
+	isCrypto := symbol == "BTC" || symbol == "ETH" || symbol == "SOL" ||
+		symbol == "XRP" || symbol == "ADA" || symbol == "DOGE" || symbol == "AVAX"
+
+	if isCrypto {
+		// Display crypto volume with native units and USD value
+		usdVol := vol * price
+		return fmt.Sprintf("%.2f %s ($%s)", vol, symbol, humanizeFloat(usdVol, 0))
+	}
+
+	// For stocks, format with traditional volume notation
 	switch {
 	case vol >= 1_000_000_000:
 		return fmt.Sprintf("%.2fB", vol/1_000_000_000)
@@ -504,6 +514,59 @@ func formatVolume(s string) string {
 func formatFloat(f float64, decimals int) string {
 	format := fmt.Sprintf("%%.%df", decimals)
 	return fmt.Sprintf(format, f)
+}
+
+// formatPrice formats a price string with 2 decimal places and comma separators.
+func formatPrice(s string) string {
+	if s == "" {
+		return "--"
+	}
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return s
+	}
+	return "$" + humanizeFloat(val, 2)
+}
+
+// humanizeFloat formats a float with comma separators and specified decimal places.
+func humanizeFloat(val float64, decimals int) string {
+	// Format with commas: 66959.98 → "66,959.98"
+	intPart := int64(val)
+	fracPart := val - float64(intPart)
+
+	// Format integer part with commas
+	str := fmt.Sprintf("%d", intPart)
+	n := len(str)
+	if n > 3 {
+		var result []byte
+		for i, c := range str {
+			if i > 0 && (n-i)%3 == 0 {
+				result = append(result, ',')
+			}
+			result = append(result, byte(c))
+		}
+		str = string(result)
+	}
+
+	if decimals > 0 {
+		fracStr := fmt.Sprintf("%.*f", decimals, fracPart)
+		return str + fracStr[1:] // Remove leading "0"
+	}
+	return str
+}
+
+// formatPercent formats a percentage string with 2 decimal places.
+func formatPercent(s string) string {
+	if s == "" {
+		return "--"
+	}
+	// Remove % sign, parse, reformat with 2 decimals
+	clean := strings.TrimSuffix(s, "%")
+	pct, err := strconv.ParseFloat(clean, 64)
+	if err != nil {
+		return s
+	}
+	return fmt.Sprintf("%.2f%%", pct)
 }
 
 // getRSIValuation returns the valuation label for an RSI value.

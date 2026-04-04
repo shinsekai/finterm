@@ -171,7 +171,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKeyMsg(msg)
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		// Update overlay dimensions if visible
+
+		// Propagate adjusted size to all child models
+		childMsg := tea.WindowSizeMsg{
+			Width:  msg.Width,
+			Height: msg.Height - 4, // Reserve for tab bar + status bar
+		}
+		for i := range m.tabs {
+			m.tabs[i].model, _ = m.tabs[i].model.Update(childMsg)
+		}
+
 		if m.helpOverlay != nil {
 			overlay, cmd := m.helpOverlay.Update(msg)
 			m.helpOverlay = overlay.(*components.HelpOverlay)
@@ -216,23 +225,37 @@ func (m Model) View() string {
 		return "Goodbye!"
 	}
 
-	var content string
-
-	// Render tab bar
-	content += m.renderTabBar()
-	content += "\n"
-
-	// Render help overlay if visible, otherwise render active child view
-	if m.helpOverlay != nil {
-		content += m.helpOverlay.View()
-	} else {
-		content += m.tabs[m.activeTab].model.View()
+	// Calculate available heights
+	tabBarHeight := 2    // tab bar + newline
+	statusBarHeight := 2 // status bar + newline
+	contentHeight := m.height - tabBarHeight - statusBarHeight
+	if contentHeight < 1 {
+		contentHeight = 1
 	}
 
-	// Render status bar
-	content += "\n" + m.renderStatusBar()
+	// Render tab bar
+	tabBar := m.renderTabBar()
 
-	return content
+	// Render content (help or active child)
+	var content string
+	if m.helpOverlay != nil {
+		content = m.helpOverlay.View()
+	} else {
+		content = m.tabs[m.activeTab].model.View()
+	}
+
+	// Constrain content height using lipgloss
+	contentStyle := lipgloss.NewStyle().
+		Width(m.width).
+		Height(contentHeight).
+		MaxHeight(contentHeight)
+	content = contentStyle.Render(content)
+
+	// Render status bar
+	statusBar := m.renderStatusBar()
+
+	// Join vertically
+	return lipgloss.JoinVertical(lipgloss.Left, tabBar, content, statusBar)
 }
 
 // handleKeyMsg handles keyboard input messages.

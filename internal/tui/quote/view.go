@@ -460,10 +460,8 @@ func parseChange(changeStr, changePercentStr string) (float64, string) {
 		return change, "--"
 	}
 
-	// Remove % sign if present
-	changePercent := strings.TrimSuffix(changePercentStr, "%")
-
-	return change, changePercent
+	// Keep % sign for display
+	return change, changePercentStr
 }
 
 // formatVolume formats a volume number with thousands separators.

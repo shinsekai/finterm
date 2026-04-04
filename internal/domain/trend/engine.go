@@ -27,6 +27,11 @@ type Result struct {
 	Valuation string
 }
 
+// CryptoDataFetcher fetches OHLCV data for cryptocurrency symbols.
+type CryptoDataFetcher interface {
+	FetchCryptoOHLCV(ctx context.Context, symbol string) ([]indicators.OHLCV, error)
+}
+
 // Engine orchestrates trend analysis by routing to the correct indicator path.
 // It supports both remote API computation (equities) and local computation (crypto).
 type Engine struct {
@@ -42,24 +47,29 @@ type Engine struct {
 	cfg *config.Config
 	// detector is used to determine asset class for a given symbol.
 	detector *indicators.AssetClassDetector
+	// cryptoFetcher fetches OHLCV data for crypto symbols.
+	cryptoFetcher CryptoDataFetcher
 }
 
 // New creates a new Engine with the provided indicators and configuration.
 // The detector determines asset class from the symbol and routes to the correct indicator path.
+// The cryptoFetcher provides OHLCV data for crypto symbols when needed.
 func New(
 	remoteRSI, remoteEMA indicators.Indicator,
 	localRSI *indicators.LocalRSI,
 	localEMA *indicators.LocalEMA,
 	cfg *config.Config,
 	detector *indicators.AssetClassDetector,
+	cryptoFetcher CryptoDataFetcher,
 ) *Engine {
 	return &Engine{
-		remoteRSI: remoteRSI,
-		remoteEMA: remoteEMA,
-		localRSI:  localRSI,
-		localEMA:  localEMA,
-		cfg:       cfg,
-		detector:  detector,
+		remoteRSI:     remoteRSI,
+		remoteEMA:     remoteEMA,
+		localRSI:      localRSI,
+		localEMA:      localEMA,
+		cfg:           cfg,
+		detector:      detector,
+		cryptoFetcher: cryptoFetcher,
 	}
 }
 
@@ -111,7 +121,20 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 		}
 
 	case indicators.Crypto:
-		// Local computation uses pre-loaded OHLCV data
+		// Fetch OHLCV data for this crypto symbol
+		if e.cryptoFetcher == nil {
+			return nil, fmt.Errorf("crypto data fetcher not configured for %s", symbol)
+		}
+		ohlcvData, err := e.cryptoFetcher.FetchCryptoOHLCV(ctx, symbol)
+		if err != nil {
+			return nil, fmt.Errorf("fetching crypto OHLCV for %s: %w", symbol, err)
+		}
+
+		// Set data on local indicators for this symbol
+		e.localRSI.SetData(ohlcvData)
+		e.localEMA.SetData(ohlcvData)
+
+		// Now compute using the fetched data
 		rsiDataPoints, err = e.localRSI.ComputeFromOHLCV(e.cfg.Trend.RSIPeriod, false) // useInProgress=false
 		if err != nil {
 			return nil, fmt.Errorf("computing local RSI for %s: %w", symbol, err)

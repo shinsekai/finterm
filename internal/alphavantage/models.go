@@ -71,12 +71,11 @@ type CryptoMetadata struct {
 
 // CryptoEntry contains OHLCV data for a cryptocurrency entry.
 type CryptoEntry struct {
-	OpenMarket  string `json:"1a. open (USD)"`
-	HighMarket  string `json:"2a. high (USD)"`
-	LowMarket   string `json:"3a. low (USD)"`
-	CloseMarket string `json:"4a. close (USD)"`
-	Volume      string `json:"5. volume"`
-	MarketCap   string `json:"6. market cap (USD)"`
+	Open   string `json:"1. open"`
+	High   string `json:"2. high"`
+	Low    string `json:"3. low"`
+	Close  string `json:"4. close"`
+	Volume string `json:"5. volume"`
 }
 
 // CryptoIntraday represents intraday time series data for a cryptocurrency.

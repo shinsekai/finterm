@@ -105,12 +105,11 @@ func TestParseCryptoDaily(t *testing.T) {
 		got  string
 		want string
 	}{
-		{"open", entry.OpenMarket, "67234.50000000"},
-		{"high", entry.HighMarket, "68123.40000000"},
-		{"low", entry.LowMarket, "66890.10000000"},
-		{"close", entry.CloseMarket, "67987.20000000"},
+		{"open", entry.Open, "67234.50000000"},
+		{"high", entry.High, "68123.40000000"},
+		{"low", entry.Low, "66890.10000000"},
+		{"close", entry.Close, "67987.20000000"},
 		{"volume", entry.Volume, "28456.78900000"},
-		{"market cap", entry.MarketCap, "1332456789000.00000000"},
 	}
 
 	for _, tt := range tests {

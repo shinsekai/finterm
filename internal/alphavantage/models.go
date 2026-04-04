@@ -131,6 +131,12 @@ type TickerSentiment struct {
 	TickerSentimentLabel string      `json:"ticker_sentiment_label"`
 }
 
+// TopicItem represents a topic associated with a news article.
+type TopicItem struct {
+	Topic          string `json:"topic"`
+	RelevanceScore string `json:"relevance_score"`
+}
+
 // NewsItem contains a single news article with sentiment analysis.
 type NewsItem struct {
 	Title                 string            `json:"title"`
@@ -141,9 +147,9 @@ type NewsItem struct {
 	BannerImage           string            `json:"banner_image"`
 	Source                string            `json:"source"`
 	CategoryWithin        string            `json:"category_within"`
-	Topic                 string            `json:"topic"`
+	Topics                []TopicItem       `json:"topics"`
 	OverallSentimentScore json.Number       `json:"overall_sentiment_score"`
-	SentimentLabel        string            `json:"sentiment_label"`
+	SentimentLabel        string            `json:"overall_sentiment_label"`
 	Tickers               []TickerSentiment `json:"ticker_sentiment"`
 }
 

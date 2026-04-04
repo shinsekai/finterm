@@ -193,12 +193,11 @@ func parseCryptoTimeSeries(raw interface{}) map[string]CryptoEntry {
 		}
 
 		result[timestamp] = CryptoEntry{
-			OpenMarket:  getStringField(entryMap, "1a. open (USD)"),
-			HighMarket:  getStringField(entryMap, "2a. high (USD)"),
-			LowMarket:   getStringField(entryMap, "3a. low (USD)"),
-			CloseMarket: getStringField(entryMap, "4a. close (USD)"),
-			Volume:      getStringField(entryMap, "5. volume"),
-			MarketCap:   getStringField(entryMap, "6. market cap (USD)"),
+			Open:   getStringField(entryMap, "1. open"),
+			High:   getStringField(entryMap, "2. high"),
+			Low:    getStringField(entryMap, "3. low"),
+			Close:  getStringField(entryMap, "4. close"),
+			Volume: getStringField(entryMap, "5. volume"),
 		}
 	}
 

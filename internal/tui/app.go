@@ -238,9 +238,18 @@ func (m Model) View() string {
 // handleKeyMsg handles keyboard input messages.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
-	case tea.KeyCtrlC, tea.KeyEsc:
+	case tea.KeyCtrlC:
 		m.quit = true
 		return m, tea.Quit
+
+	case tea.KeyEsc:
+		// Dismiss help overlay if visible, otherwise delegate to child
+		if m.helpOverlay != nil {
+			m.helpOverlay = nil
+			return m, nil
+		}
+		// Delegate ESC to active child model (e.g., clear input in quote view)
+		return m.delegateToChild(msg)
 
 	case tea.KeyRunes:
 		switch string(msg.Runes) {

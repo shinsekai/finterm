@@ -555,8 +555,8 @@ func TestQuoteModel_Getters(t *testing.T) {
 	}
 }
 
-// TestQuoteModel_ResultDisplay_CannotRetryInErrorState verifies that Enter does nothing in error state.
-func TestQuoteModel_ResultDisplay_CannotRetryInErrorState(t *testing.T) {
+// TestQuoteModel_ResultDisplay_CanRetryInErrorState verifies that Enter works in error state.
+func TestQuoteModel_ResultDisplay_CanRetryInErrorState(t *testing.T) {
 	model := NewModel()
 	model.Configure(context.Background(), &mockClient{}, &mockEngine{})
 
@@ -573,19 +573,19 @@ func TestQuoteModel_ResultDisplay_CannotRetryInErrorState(t *testing.T) {
 	model.state = StateError
 	model.err = errors.New("network error")
 
-	// Press Enter in error state - should do nothing (only works in StateIdle)
+	// Press Enter in error state - should retry and transition to Loading
 	msg2 := tea.KeyMsg{Type: tea.KeyEnter}
 	newModel, cmd := model.Update(msg2)
 	model = newModel.(Model)
 
-	// Should still be in error state
-	if model.state != StateError {
-		t.Errorf("Expected state %v, got %v", StateError, model.state)
+	// Should transition to Loading state
+	if model.state != StateLoading {
+		t.Errorf("Expected state %v, got %v", StateLoading, model.state)
 	}
 
-	// No command should be returned
-	if cmd != nil {
-		t.Error("Expected no command to be returned")
+	// A command should be returned to fetch the quote
+	if cmd == nil {
+		t.Error("Expected a command to be returned for retry")
 	}
 }
 

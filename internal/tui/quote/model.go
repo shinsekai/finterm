@@ -163,6 +163,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.historyIndex = -1 // Reset history index
 
+		// Clear and re-focus input for next query
+		m.textInput.SetValue("")
+		m.textInput.Focus()
+
 		return m, nil
 
 	case QuoteErrorMsg:
@@ -171,14 +175,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Delegate text input updates when in idle state
-	if m.state == StateIdle {
-		var cmd tea.Cmd
-		m.textInput, cmd = m.textInput.Update(msg)
-		return m, cmd
-	}
-
-	return m, nil
+	// Delegate text input updates - always allow typing regardless of state
+	var cmd tea.Cmd
+	m.textInput, cmd = m.textInput.Update(msg)
+	return m, cmd
 }
 
 // handleKeyMsg handles keyboard input messages.
@@ -187,8 +187,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEnter:
-		// Submit ticker and fetch quote
-		if m.state == StateIdle {
+		// Submit ticker and fetch quote (from idle, loaded, or error state)
+		if m.state == StateIdle || m.state == StateLoaded || m.state == StateError {
 			ticker := strings.TrimSpace(m.textInput.Value())
 			if ticker == "" {
 				return m, nil
@@ -230,12 +230,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyEsc:
-		// Clear input and reset history navigation
-		if m.state == StateIdle {
-			m.textInput.SetValue("")
-			m.historyIndex = -1
-			return m, nil
-		}
+		// Clear input and reset to idle from any state
+		m.textInput.SetValue("")
+		m.textInput.Focus()
+		m.historyIndex = -1
+		m.state = StateIdle
+		m.quoteData = nil
+		m.err = nil
+		return m, nil
 
 	case tea.KeyRunes:
 		// Reset history index when typing

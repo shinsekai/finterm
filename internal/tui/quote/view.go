@@ -194,9 +194,24 @@ func (v *View) renderLoaded() string {
 	content += v.theme.Title().Render("QUOTE LOOKUP")
 	content += "\n\n"
 
-	// Current ticker display
-	tickerText := fmt.Sprintf("Enter ticker: %s", v.model.textInput.Value())
-	content += tickerText
+	// Help text
+	helpText := "Enter another ticker symbol (e.g., AAPL, BTC, ETH)"
+	content += v.theme.Help().Render(helpText)
+	content += "\n\n"
+
+	// Text input - show interactive input for next query
+	inputStyle := lipgloss.NewStyle().
+		Foreground(v.theme.Foreground()).
+		Background(v.theme.Background()).
+		Padding(0, 1).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#5C3FD6"))
+
+	content += inputStyle.Render(v.model.textInput.View())
+	content += "\n"
+
+	// Keyboard shortcuts
+	content += v.theme.Muted().Render(v.renderShortcuts())
 	content += "\n\n"
 
 	// Quote data box
@@ -222,9 +237,24 @@ func (v *View) renderError() string {
 	content += v.theme.Muted().Render(errorText)
 	content += "\n\n"
 
-	// Retry hint
-	retryHint := "Press Enter to try again or Esc to clear input"
-	content += v.theme.Help().Render(retryHint)
+	// Help text
+	helpText := "Press Enter to try again or Esc to clear input"
+	content += v.theme.Help().Render(helpText)
+	content += "\n\n"
+
+	// Text input - show interactive input for retry
+	inputStyle := lipgloss.NewStyle().
+		Foreground(v.theme.Foreground()).
+		Background(v.theme.Background()).
+		Padding(0, 1).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#5C3FD6"))
+
+	content += inputStyle.Render(v.model.textInput.View())
+	content += "\n"
+
+	// Keyboard shortcuts
+	content += v.theme.Muted().Render(v.renderShortcuts())
 
 	return content
 }

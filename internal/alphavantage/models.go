@@ -3,6 +3,7 @@
 package alphavantage
 
 import (
+	"encoding/json"
 	"strconv"
 	"time"
 )
@@ -125,10 +126,10 @@ type NewsSentiment struct {
 
 // TickerSentiment contains sentiment data for a specific ticker within a news article.
 type TickerSentiment struct {
-	Ticker               string `json:"ticker"`
-	RelevanceScore       string `json:"relevance_score"`
-	TickerSentimentScore string `json:"ticker_sentiment_score"`
-	TickerSentimentLabel string `json:"ticker_sentiment_label"`
+	Ticker               string      `json:"ticker"`
+	RelevanceScore       json.Number `json:"relevance_score"`
+	TickerSentimentScore json.Number `json:"ticker_sentiment_score"`
+	TickerSentimentLabel string      `json:"ticker_sentiment_label"`
 }
 
 // NewsItem contains a single news article with sentiment analysis.
@@ -142,7 +143,7 @@ type NewsItem struct {
 	Source                string            `json:"source"`
 	CategoryWithin        string            `json:"category_within"`
 	Topic                 string            `json:"topic"`
-	OverallSentimentScore string            `json:"overall_sentiment_score"`
+	OverallSentimentScore json.Number       `json:"overall_sentiment_score"`
 	SentimentLabel        string            `json:"sentiment_label"`
 	Tickers               []TickerSentiment `json:"ticker_sentiment"`
 }

@@ -432,7 +432,7 @@ func TestGetNewsSentiment_ArticleParsing(t *testing.T) {
 		{"source", item.Source, "Financial Times"},
 		{"topic", item.Topic, "financial_markets"},
 		{"category_within", item.CategoryWithin, "markets"},
-		{"overall_sentiment_score", item.OverallSentimentScore, "-0.123456"},
+		{"overall_sentiment_score", string(item.OverallSentimentScore), "-0.123456"},
 		{"sentiment_label", item.SentimentLabel, "Bearish"},
 		{"banner_image", item.BannerImage, "https://images.example.com/markets-banner.jpg"},
 		{"summary", item.Summary, "A detailed look at current market conditions, sector performance, and investor sentiment across global markets."},
@@ -479,10 +479,10 @@ func TestGetNewsSentiment_ArticleParsing(t *testing.T) {
 			if ts.Ticker != tt.ticker {
 				t.Errorf("ticker: got %q, want %q", ts.Ticker, tt.ticker)
 			}
-			if ts.RelevanceScore != tt.relevanceScore {
+			if string(ts.RelevanceScore) != tt.relevanceScore {
 				t.Errorf("relevance_score: got %q, want %q", ts.RelevanceScore, tt.relevanceScore)
 			}
-			if ts.TickerSentimentScore != tt.tickerSentimentScore {
+			if string(ts.TickerSentimentScore) != tt.tickerSentimentScore {
 				t.Errorf("ticker_sentiment_score: got %q, want %q", ts.TickerSentimentScore, tt.tickerSentimentScore)
 			}
 			if ts.TickerSentimentLabel != tt.tickerSentimentLabel {

@@ -441,8 +441,8 @@ func convertToArticle(item alphavantage.NewsItem) Article {
 	relevantTickers := 0
 
 	for _, ticker := range item.Tickers {
-		relevance, _ := alphavantage.ParseFloat(ticker.RelevanceScore)
-		sentiment, _ := alphavantage.ParseFloat(ticker.TickerSentimentScore)
+		relevance, _ := alphavantage.ParseFloat(string(ticker.RelevanceScore))
+		sentiment, _ := alphavantage.ParseFloat(string(ticker.TickerSentimentScore))
 
 		// Only count relevant tickers (relevance > 0.5)
 		if relevance > 0.5 {
@@ -459,7 +459,7 @@ func convertToArticle(item alphavantage.NewsItem) Article {
 		article.SentimentScore = totalSentiment / float64(relevantTickers)
 	} else {
 		// Fallback to overall sentiment if no relevant tickers
-		sentiment, _ := alphavantage.ParseFloat(item.OverallSentimentScore)
+		sentiment, _ := alphavantage.ParseFloat(string(item.OverallSentimentScore))
 		article.RelevanceScore = 0.5
 		article.SentimentScore = sentiment
 	}

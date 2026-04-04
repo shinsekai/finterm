@@ -124,6 +124,11 @@ func (r *LocalRSI) ComputeFromOHLCV(period int, useInProgress bool) ([]DataPoint
 		})
 	}
 
+	// Reverse to return newest-first (consistent with remote indicators)
+	for i, j := 0, len(rsiValues)-1; i < j; i, j = i+1, j-1 {
+		rsiValues[i], rsiValues[j] = rsiValues[j], rsiValues[i]
+	}
+
 	return rsiValues, nil
 }
 

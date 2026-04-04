@@ -129,8 +129,8 @@ func TestTrendModel_View_LoadedState(t *testing.T) {
 	assert.Contains(t, rendered, "AAPL", "View should contain AAPL symbol")
 	assert.Contains(t, rendered, "Bullish", "View should contain bullish signal")
 	assert.Contains(t, rendered, "50.50", "View should contain RSI value")
-	assert.Contains(t, rendered, "150.2500", "View should contain EMA fast value")
-	assert.Contains(t, rendered, "145.7500", "View should contain EMA slow value")
+	assert.Contains(t, rendered, "150.25", "View should contain EMA fast value")
+	assert.Contains(t, rendered, "145.75", "View should contain EMA slow value")
 }
 
 // TestTrendModel_View_MixedState verifies rendering with mixed loading/loaded/error states.

@@ -62,12 +62,15 @@ func TestLocalEMA_MatchesTradingView(t *testing.T) {
 	}
 
 	// Verify each EMA value
+	// Result is returned newest-first, so we need to compare in reverse order
+	n := len(result)
 	for i, dp := range result {
-		if !almostEqual(dp.Value, expectedEMAs[i]) {
-			t.Errorf("EMA at index %d: expected %f, got %f", i, expectedEMAs[i], dp.Value)
+		expectedIndex := n - 1 - i
+		if !almostEqual(dp.Value, expectedEMAs[expectedIndex]) {
+			t.Errorf("EMA at index %d: expected %f, got %f", i, expectedEMAs[expectedIndex], dp.Value)
 		}
-		// Verify dates match
-		expectedDate := data[i].Date
+		// Verify dates match (newest-first vs oldest-first)
+		expectedDate := data[expectedIndex].Date
 		if !dp.Date.Equal(expectedDate) {
 			t.Errorf("Date mismatch at index %d: expected %v, got %v", i, expectedDate, dp.Date)
 		}
@@ -105,8 +108,10 @@ func TestLocalEMA_SeedWithFirstValue(t *testing.T) {
 	// First EMA value should be the first close price, NOT the SMA
 	// SMA of first 10 prices = (100+90+...+10)/10 = 55
 	// But TradingView seeds with the first value = 100
-	if !almostEqual(result[0].Value, prices[0]) {
-		t.Errorf("First EMA should be first close price (%f), not SMA (55), got %f", prices[0], result[0].Value)
+	// Result is returned newest-first, so the first result is the last computed value
+	// The last computed value should be prices[0] (the first input value)
+	if !almostEqual(result[len(result)-1].Value, prices[0]) {
+		t.Errorf("Last EMA should be first close price (%f), not SMA (55), got %f", prices[0], result[len(result)-1].Value)
 	}
 
 	// Calculate SMA of first period values to verify they differ
@@ -116,8 +121,8 @@ func TestLocalEMA_SeedWithFirstValue(t *testing.T) {
 	}
 	sma := sum / float64(min(period, len(prices)-1))
 
-	if almostEqual(result[0].Value, sma) {
-		t.Errorf("First EMA should NOT equal SMA (%f) - TradingView seeds with first value, not SMA", sma)
+	if almostEqual(result[len(result)-1].Value, sma) {
+		t.Errorf("Last EMA should NOT equal SMA (%f) - TradingView seeds with first value, not SMA", sma)
 	}
 }
 
@@ -226,9 +231,12 @@ func TestLocalEMA_Period1(t *testing.T) {
 	}
 
 	// With period=1, alpha=1, so EMA should equal close price at each bar
+	// Result is returned newest-first, so we need to compare in reverse order
+	n := len(result)
 	for i, dp := range result {
-		if !almostEqual(dp.Value, prices[i]) {
-			t.Errorf("EMA at index %d with period=1 should equal close price (%f), got %f", i, prices[i], dp.Value)
+		expectedIndex := n - 1 - i
+		if !almostEqual(dp.Value, prices[expectedIndex]) {
+			t.Errorf("EMA at index %d with period=1 should equal close price (%f), got %f", i, prices[expectedIndex], dp.Value)
 		}
 	}
 }
@@ -495,19 +503,23 @@ func TestLocalEMA_MonotonicPrice(t *testing.T) {
 	}
 
 	// EMA should be monotonically increasing (each value > previous)
+	// Result is newest-first, so EMA values should be monotonically decreasing
 	for i := 1; i < len(resultUp); i++ {
-		if resultUp[i].Value <= resultUp[i-1].Value {
-			t.Errorf("EMA should increase with increasing prices: EMA[%d] (%f) <= EMA[%d] (%f)",
+		if resultUp[i].Value >= resultUp[i-1].Value {
+			t.Errorf("EMA (newest-first) should decrease with increasing prices: EMA[%d] (%f) >= EMA[%d] (%f)",
 				i, resultUp[i].Value, i-1, resultUp[i-1].Value)
 		}
 	}
 
 	// EMA should lag behind prices (be less than current price)
-	// Note: First EMA equals first price (TradingView seeding), so check from index 1
-	for i := 1; i < len(resultUp); i++ {
-		if resultUp[i].Value >= pricesUp[i] {
+	// Result is newest-first, so we need to map to the original prices in reverse
+	// Note: The oldest EMA (seeded with first price) equals that price, so skip it from lag check
+	n := len(resultUp)
+	for i := 0; i < len(resultUp)-1; i++ { // Skip the last (oldest) EMA
+		priceIndex := n - 1 - i
+		if resultUp[i].Value >= pricesUp[priceIndex] {
 			t.Errorf("EMA should lag behind prices: EMA[%d] (%f) >= price[%d] (%f)",
-				i, resultUp[i].Value, i, pricesUp[i])
+				i, resultUp[i].Value, priceIndex, pricesUp[priceIndex])
 		}
 	}
 }

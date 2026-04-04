@@ -361,7 +361,18 @@ func (m *Model) isMacroTopic(article Article) bool {
 	}
 	return false
 }
+
+// isCryptoTicker checks if a ticker is a cryptocurrency.
+// Alpha Vantage prefixes crypto tickers with "CRYPTO:" (e.g., "CRYPTO:BTC").
 func isCryptoTicker(ticker string) bool {
+	upper := strings.ToUpper(ticker)
+
+	// Alpha Vantage prefixes crypto tickers with "CRYPTO:"
+	if strings.HasPrefix(upper, "CRYPTO:") {
+		return true
+	}
+
+	// Also check plain symbols for backward compatibility
 	cryptoTickers := map[string]bool{
 		"BTC":   true,
 		"ETH":   true,
@@ -374,7 +385,7 @@ func isCryptoTicker(ticker string) bool {
 		"MATIC": true,
 		"LINK":  true,
 	}
-	return cryptoTickers[strings.ToUpper(ticker)]
+	return cryptoTickers[upper]
 }
 
 // sortArticles sorts articles based on the current sort option.
@@ -446,7 +457,12 @@ func convertToArticle(item alphavantage.NewsItem) Article {
 
 		// Only count relevant tickers (relevance > 0.5)
 		if relevance > 0.5 {
-			article.Tickers = append(article.Tickers, ticker.Ticker)
+			tickerName := ticker.Ticker
+			// Strip "CRYPTO:" prefix for display
+			if strings.HasPrefix(strings.ToUpper(tickerName), "CRYPTO:") {
+				tickerName = tickerName[7:]
+			}
+			article.Tickers = append(article.Tickers, tickerName)
 			totalRelevance += relevance
 			totalSentiment += sentiment
 			relevantTickers++

@@ -12,6 +12,7 @@ import (
 
 	"github.com/owner/finterm/internal/alphavantage"
 	trenddomain "github.com/owner/finterm/internal/domain/trend"
+	"github.com/owner/finterm/internal/domain/trend/indicators"
 	"github.com/owner/finterm/internal/tui/components"
 )
 
@@ -59,6 +60,16 @@ type QuoteClient interface {
 	GetGlobalQuote(ctx context.Context, symbol string) (*alphavantage.GlobalQuote, error)
 }
 
+// TimeSeriesClient defines the interface for fetching time series data for equities.
+type TimeSeriesClient interface {
+	GetDailyTimeSeries(ctx context.Context, symbol, outputsize string) (*alphavantage.TimeSeriesDaily, error)
+}
+
+// CryptoQuoteClient defines the interface for fetching crypto quote data.
+type CryptoQuoteClient interface {
+	GetCryptoDaily(ctx context.Context, symbol, market string) (*alphavantage.CryptoDaily, error)
+}
+
 // QuoteData contains all the data to display for a quote.
 //
 //nolint:revive // type name stuttering is acceptable for package-scoped types
@@ -73,6 +84,8 @@ type Model struct {
 	engine Engine
 	// client fetches quote data from Alpha Vantage.
 	client QuoteClient
+	// detector determines asset class for a symbol.
+	detector *indicators.AssetClassDetector
 	// ctx is the context for async operations.
 	ctx context.Context
 	// cancel cancels the context.
@@ -122,9 +135,11 @@ func (m *Model) Configure(
 	ctx context.Context,
 	client QuoteClient,
 	engine Engine,
+	detector *indicators.AssetClassDetector,
 ) *Model {
 	m.client = client
 	m.engine = engine
+	m.detector = detector
 	m.ctx, m.cancel = context.WithCancel(ctx)
 	return m
 }
@@ -257,25 +272,138 @@ func (m Model) fetchQuoteCmd(symbol string) tea.Cmd {
 	return func() tea.Msg {
 		symbol = strings.ToUpper(symbol)
 
-		// Fetch global quote
-		quote, err := m.client.GetGlobalQuote(m.ctx, symbol)
+		var quote *alphavantage.GlobalQuote
+		var err error
+
+		// Detect asset class and use appropriate endpoint
+		isCrypto := m.detector != nil && m.detector.DetectAssetClass(symbol) == indicators.Crypto
+		if isCrypto {
+			quote, err = m.fetchCryptoAsQuote(symbol)
+		} else {
+			// For stocks: use TIME_SERIES_DAILY, get latest closed bar
+			quote, err = m.fetchStockAsQuote(symbol)
+		}
+
 		if err != nil {
 			return QuoteErrorMsg{Err: fmt.Errorf("fetching quote for %s: %w", symbol, err)}
 		}
 
-		// Fetch indicators using trend engine
+		// Fetch indicators
 		indicators, err := m.engine.AnalyzeWithSymbolDetection(m.ctx, symbol)
 		if err != nil {
 			return QuoteErrorMsg{Err: fmt.Errorf("fetching indicators for %s: %w", symbol, err)}
 		}
 
 		return QuoteResultMsg{
-			Data: &QuoteData{
-				Quote:      quote,
-				Indicators: indicators,
-			},
+			Data: &QuoteData{Quote: quote, Indicators: indicators},
 		}
 	}
+}
+
+// fetchStockAsQuote fetches a stock quote from TIME_SERIES_DAILY endpoint.
+func (m Model) fetchStockAsQuote(symbol string) (*alphavantage.GlobalQuote, error) {
+	tsClient, ok := m.client.(TimeSeriesClient)
+	if !ok {
+		// Fallback to GlobalQuote if client doesn't support time series
+		return m.client.GetGlobalQuote(m.ctx, symbol)
+	}
+
+	data, err := tsClient.GetDailyTimeSeries(m.ctx, symbol, "compact")
+	if err != nil {
+		return nil, err
+	}
+
+	// Find latest and previous dates
+	latestDate, prevDate := findLatestTwoDates(data.TimeSeries)
+	if latestDate == "" {
+		return nil, fmt.Errorf("no data for %s", symbol)
+	}
+
+	entry := data.TimeSeries[latestDate]
+	quote := &alphavantage.GlobalQuote{
+		Symbol:         symbol,
+		Open:           entry.Open,
+		High:           entry.High,
+		Low:            entry.Low,
+		Price:          entry.Close,
+		Volume:         entry.Volume,
+		LastTradingDay: latestDate,
+	}
+
+	// Calculate change from previous day
+	if prevDate != "" {
+		prevEntry := data.TimeSeries[prevDate]
+		closeVal, _ := alphavantage.ParseFloat(entry.Close)
+		prevClose, _ := alphavantage.ParseFloat(prevEntry.Close)
+		if prevClose > 0 {
+			diff := closeVal - prevClose
+			pct := (diff / prevClose) * 100
+			quote.PreviousClose = prevEntry.Close
+			quote.Change = fmt.Sprintf("%.4f", diff)
+			quote.ChangePercent = fmt.Sprintf("%.4f%%", pct)
+		}
+	}
+
+	return quote, nil
+}
+
+// fetchCryptoAsQuote fetches a crypto quote from DIGITAL_CURRENCY_DAILY endpoint.
+func (m Model) fetchCryptoAsQuote(symbol string) (*alphavantage.GlobalQuote, error) {
+	cryptoClient, ok := m.client.(CryptoQuoteClient)
+	if !ok {
+		return nil, fmt.Errorf("client does not support crypto quotes")
+	}
+
+	data, err := cryptoClient.GetCryptoDaily(m.ctx, symbol, "USD")
+	if err != nil {
+		return nil, err
+	}
+
+	// Find latest and previous dates
+	latestDate, prevDate := findLatestTwoDates(data.TimeSeries)
+	if latestDate == "" {
+		return nil, fmt.Errorf("no data for %s", symbol)
+	}
+
+	entry := data.TimeSeries[latestDate]
+	quote := &alphavantage.GlobalQuote{
+		Symbol:         symbol,
+		Open:           entry.Open,
+		High:           entry.High,
+		Low:            entry.Low,
+		Price:          entry.Close,
+		Volume:         entry.Volume,
+		LastTradingDay: latestDate,
+	}
+
+	// Calculate change from previous day
+	if prevDate != "" {
+		prevEntry := data.TimeSeries[prevDate]
+		closeVal, _ := alphavantage.ParseFloat(entry.Close)
+		prevClose, _ := alphavantage.ParseFloat(prevEntry.Close)
+		if prevClose > 0 {
+			diff := closeVal - prevClose
+			pct := (diff / prevClose) * 100
+			quote.PreviousClose = prevEntry.Close
+			quote.Change = fmt.Sprintf("%.4f", diff)
+			quote.ChangePercent = fmt.Sprintf("%.4f%%", pct)
+		}
+	}
+
+	return quote, nil
+}
+
+// findLatestTwoDates finds the two most recent dates from a time series map.
+func findLatestTwoDates[V any](ts map[string]V) (latest, prev string) {
+	for date := range ts {
+		if date > latest {
+			prev = latest
+			latest = date
+		} else if date > prev {
+			prev = date
+		}
+	}
+	return
 }
 
 // addToHistory adds a symbol to the lookup history, maintaining max size.

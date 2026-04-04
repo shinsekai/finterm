@@ -403,6 +403,11 @@ func TestApp_ErrorUpdateMsg(t *testing.T) {
 func TestApp_ViewRenders(t *testing.T) {
 	app := newMockApp(t)
 
+	// Initialize app dimensions
+	windowMsg := tea.WindowSizeMsg{Width: 80, Height: 24}
+	newModel, _ := app.Update(windowMsg)
+	app = newModel.(Model)
+
 	view := app.View()
 	assert.Contains(t, view, "1. Trend")
 

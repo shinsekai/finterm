@@ -221,22 +221,6 @@ func TestTrendModel_Update_WindowSizeMsg(t *testing.T) {
 	assert.Equal(t, 50, updatedModel.GetHeight(), "Height should be updated")
 }
 
-// TestTrendModel_Update_FetchCompleteMsg verifies handling of FetchCompleteMsg.
-func TestTrendModel_Update_FetchCompleteMsg(t *testing.T) {
-	model := newTestModel(t, &mockEngine{}, "AAPL")
-
-	// Load data for the ticker
-	result := &trenddomain.Result{Symbol: "AAPL", RSI: 50.5}
-	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: result})
-	model = asModel(t, updatedM)
-
-	// Send fetch complete message
-	msg := FetchCompleteMsg{}
-	updatedM, _ = model.Update(msg)
-	updatedModel := asModel(t, updatedM)
-	assert.Equal(t, StateLoaded, updatedModel.GetOverallState(), "Overall state should be loaded")
-}
-
 // TestTrendModel_Configure verifies the Configure method properly sets up the model.
 func TestTrendModel_Configure(t *testing.T) {
 	model := NewModel()
@@ -285,10 +269,6 @@ func TestTrendModel_Update_MixedState(t *testing.T) {
 	model = asModel(t, updatedM)
 
 	// Third row remains in loading state
-
-	// Send fetch complete to update overall state
-	updatedM, _ = model.Update(FetchCompleteMsg{})
-	model = asModel(t, updatedM)
 
 	// Verify mixed states
 	rows := model.GetRows()

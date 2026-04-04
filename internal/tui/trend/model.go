@@ -150,11 +150,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TrendErrorMsg:
 		// Handle error for a single ticker
 		return m.handleTrendError(msg)
-
-	case FetchCompleteMsg:
-		// All fetches completed
-		m.updateOverallState()
-		return m, nil
 	}
 
 	return m, nil
@@ -230,22 +225,18 @@ func (m Model) refreshAllCmd() tea.Cmd {
 
 // fetchAllCmd returns a command that fetches data for all tickers concurrently.
 func (m Model) fetchAllCmd() tea.Cmd {
-	return func() tea.Msg {
-		cmds := make([]tea.Cmd, len(m.watchlist))
+	cmds := make([]tea.Cmd, len(m.watchlist))
 
-		// Create a fetch command for each ticker
-		for i, symbol := range m.watchlist {
-			symbol := symbol // Capture loop variable
-			cmds[i] = func() tea.Msg {
-				return m.fetchTicker(symbol)
-			}
+	// Create a fetch command for each ticker
+	for i, symbol := range m.watchlist {
+		symbol := symbol // Capture loop variable
+		cmds[i] = func() tea.Msg {
+			return m.fetchTicker(symbol)
 		}
-
-		// Execute all fetches concurrently
-		// Return the first fetch complete message to trigger UI update
-		// Individual results will arrive as separate messages
-		return FetchCompleteMsg{}
 	}
+
+	// Execute all fetches concurrently via tea.Batch
+	return tea.Batch(cmds...)
 }
 
 // fetchTicker fetches trend data for a single ticker.
@@ -262,32 +253,6 @@ func (m Model) fetchTicker(symbol string) tea.Msg {
 	return TrendDataMsg{
 		Symbol: symbol,
 		Result: result,
-	}
-}
-
-// updateOverallState updates the overall state based on row states.
-func (m *Model) updateOverallState() {
-	var hasLoaded, hasError bool
-	allLoaded := true
-
-	for _, row := range m.rows {
-		switch row.State {
-		case StateLoading:
-			allLoaded = false
-		case StateLoaded:
-			hasLoaded = true
-		case StateError:
-			hasError = true
-		}
-	}
-
-	switch {
-	case !allLoaded:
-		m.overallState = StateLoading
-	case hasError && !hasLoaded:
-		m.overallState = StateError
-	default:
-		m.overallState = StateLoaded
 	}
 }
 
@@ -339,9 +304,6 @@ type TrendErrorMsg struct { //nolint:revive // type name stutters with package n
 	Symbol string
 	Err    error
 }
-
-// FetchCompleteMsg is a message when all fetch commands have been dispatched.
-type FetchCompleteMsg struct{}
 
 // FormatValue formats a float value for display with fixed decimal places.
 func FormatValue(value float64, decimals int) string {

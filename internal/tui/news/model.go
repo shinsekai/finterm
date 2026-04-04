@@ -342,9 +342,19 @@ func (m *Model) hasEquityTicker(article Article) bool {
 
 // hasCryptoTicker checks if an article has any crypto tickers.
 func (m *Model) hasCryptoTicker(article Article) bool {
+	// Check article's display tickers
 	for _, ticker := range article.Tickers {
 		if isCryptoTicker(ticker) {
 			return true
+		}
+	}
+
+	// Also check raw tickers from the API response (with CRYPTO: prefix)
+	if article.Item != nil {
+		for _, ticker := range article.Item.Tickers {
+			if isCryptoTicker(ticker.Ticker) {
+				return true
+			}
 		}
 	}
 	return false
@@ -456,30 +466,31 @@ func convertToArticle(item alphavantage.NewsItem) Article {
 	}
 
 	var totalRelevance, totalSentiment float64
-	relevantTickers := 0
+	relevantCount := 0
 
 	for _, ticker := range item.Tickers {
+		// Add ALL tickers for filtering/display (strip CRYPTO: prefix)
+		tickerName := ticker.Ticker
+		if strings.HasPrefix(strings.ToUpper(tickerName), "CRYPTO:") {
+			tickerName = tickerName[7:]
+		}
+		article.Tickers = append(article.Tickers, tickerName)
+
+		// But only use high-relevance tickers for score computation
 		relevance, _ := alphavantage.ParseFloat(string(ticker.RelevanceScore))
 		sentiment, _ := alphavantage.ParseFloat(string(ticker.TickerSentimentScore))
 
-		// Only count relevant tickers (relevance > 0.5)
-		if relevance > 0.5 {
-			tickerName := ticker.Ticker
-			// Strip "CRYPTO:" prefix for display
-			if strings.HasPrefix(strings.ToUpper(tickerName), "CRYPTO:") {
-				tickerName = tickerName[7:]
-			}
-			article.Tickers = append(article.Tickers, tickerName)
+		if relevance > 0.3 {
 			totalRelevance += relevance
 			totalSentiment += sentiment
-			relevantTickers++
+			relevantCount++
 		}
 	}
 
 	// Calculate average scores
-	if relevantTickers > 0 {
-		article.RelevanceScore = totalRelevance / float64(relevantTickers)
-		article.SentimentScore = totalSentiment / float64(relevantTickers)
+	if relevantCount > 0 {
+		article.RelevanceScore = totalRelevance / float64(relevantCount)
+		article.SentimentScore = totalSentiment / float64(relevantCount)
 	} else {
 		// Fallback to overall sentiment if no relevant tickers
 		sentiment, _ := alphavantage.ParseFloat(string(item.OverallSentimentScore))

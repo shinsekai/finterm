@@ -33,6 +33,19 @@ func (m *mockIndicator) Compute(_ context.Context, _ string, opts indicators.Opt
 	return m.dataPoints, nil
 }
 
+// mockCryptoFetcher is a mock implementation of CryptoDataFetcher for testing.
+type mockCryptoFetcher struct {
+	data []indicators.OHLCV
+	err  error
+}
+
+func (m *mockCryptoFetcher) FetchCryptoOHLCV(_ context.Context, _ string) ([]indicators.OHLCV, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.data, nil
+}
+
 // TestEngine_EquityRoutesToRemote verifies that equity symbols route to remote indicators.
 func TestEngine_EquityRoutesToRemote(t *testing.T) {
 	remoteRSI := &mockIndicator{
@@ -55,7 +68,7 @@ func TestEngine_EquityRoutesToRemote(t *testing.T) {
 
 	detector := indicators.NewAssetClassDetector(nil) // No crypto symbols → all equities
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
@@ -84,8 +97,8 @@ func TestEngine_CryptoRoutesToLocal(t *testing.T) {
 
 	testData := GenerateTestOHLCV(50, 100.0, 0.01, time.Now().AddDate(0, 0, -50))
 
-	localRSI := indicators.NewLocalRSI(testData)
-	localEMA := indicators.NewLocalEMA(testData)
+	localRSI := indicators.NewLocalRSI(nil)
+	localEMA := indicators.NewLocalEMA(nil)
 
 	cfg := config.DefaultConfig()
 	cfg.Trend.EMAFast = 10
@@ -93,7 +106,9 @@ func TestEngine_CryptoRoutesToLocal(t *testing.T) {
 
 	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"})
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	cryptoFetcher := &mockCryptoFetcher{data: testData}
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "BTC", indicators.Crypto)
@@ -131,7 +146,7 @@ func TestEngine_IndicatorError_Propagated(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 	ctx := context.Background()
 	_, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
@@ -168,7 +183,7 @@ func TestEngine_FullAnalysis_Equity(t *testing.T) {
 
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
@@ -209,8 +224,8 @@ func TestEngine_FullAnalysis_Crypto(t *testing.T) {
 
 	testData := GenerateTestOHLCV(50, 100.0, 0.02, time.Now().AddDate(0, 0, -50))
 
-	localRSI := indicators.NewLocalRSI(testData)
-	localEMA := indicators.NewLocalEMA(testData)
+	localRSI := indicators.NewLocalRSI(nil)
+	localEMA := indicators.NewLocalEMA(nil)
 
 	cfg := config.DefaultConfig()
 	cfg.Trend.EMAFast = 10
@@ -218,7 +233,9 @@ func TestEngine_FullAnalysis_Crypto(t *testing.T) {
 
 	detector := indicators.NewAssetClassDetector([]string{"BTC"})
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	cryptoFetcher := &mockCryptoFetcher{data: testData}
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "BTC", indicators.Crypto)
@@ -278,7 +295,7 @@ func TestEngine_UsesClosedBarOnly(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
@@ -353,7 +370,7 @@ func TestEngine_RSINotUsedInTrendSignal(t *testing.T) {
 			cfg := config.DefaultConfig()
 			detector := indicators.NewAssetClassDetector(nil)
 
-			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 			ctx := context.Background()
 			result, err := engine.Analyze(ctx, "TEST", indicators.Equity)
@@ -380,7 +397,7 @@ func TestEngine_EmptySymbol(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 	ctx := context.Background()
 	_, err := engine.Analyze(ctx, "", indicators.Equity)
@@ -400,7 +417,7 @@ func TestEngine_UnsupportedAssetClass(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 	ctx := context.Background()
 	_, err := engine.Analyze(ctx, "TEST", indicators.AssetClass(99))
@@ -424,7 +441,7 @@ func TestEngine_NoDataPoints(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 	ctx := context.Background()
 	_, err := engine.Analyze(ctx, "TEST", indicators.Equity)
@@ -444,13 +461,15 @@ func TestEngine_AnalyzeWithSymbolDetection(t *testing.T) {
 	}
 
 	testData := GenerateTestOHLCV(50, 100.0, 0.01, time.Now().AddDate(0, 0, -50))
-	localRSI := indicators.NewLocalRSI(testData)
-	localEMA := indicators.NewLocalEMA(testData)
+	localRSI := indicators.NewLocalRSI(nil)
+	localEMA := indicators.NewLocalEMA(nil)
 
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector([]string{"BTC"})
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	cryptoFetcher := &mockCryptoFetcher{data: testData}
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher)
 
 	ctx := context.Background()
 
@@ -485,7 +504,7 @@ func TestEngine_SetLocalData(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 	// Verify initial data
 	if len(engine.GetLocalData()) != 30 {
@@ -558,7 +577,7 @@ func TestEngine_ValuationMapping(t *testing.T) {
 			cfg := config.DefaultConfig()
 			detector := indicators.NewAssetClassDetector(nil)
 
-			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector)
+			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
 
 			ctx := context.Background()
 			result, err := engine.Analyze(ctx, "TEST", indicators.Equity)

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -60,9 +61,12 @@ func main() {
 	remoteEMA := indicators.NewRemoteEMA(avClient)
 
 	// Create local indicators (for crypto) - initialized with empty data
-	// Data will be loaded when crypto symbols are queried
+	// Data will be fetched when crypto symbols are queried via the fetcher
 	localRSI := indicators.NewLocalRSI(nil)
 	localEMA := indicators.NewLocalEMA(nil)
+
+	// Create crypto data fetcher adapter
+	cryptoFetcher := &cryptoFetcherAdapter{client: avClient}
 
 	// Create trend engine
 	trendEngine := trend.New(
@@ -72,6 +76,7 @@ func main() {
 		localEMA,
 		cfg,
 		detector,
+		cryptoFetcher,
 	)
 
 	// Create theme
@@ -142,4 +147,49 @@ func getConfigPath() string {
 		return "config.yaml"
 	}
 	return filepath.Join(homeDir, ".config", "finterm", "config.yaml")
+}
+
+// cryptoFetcherAdapter adapts the Alpha Vantage client to CryptoDataFetcher interface.
+// It fetches crypto daily OHLCV data and converts it to the domain OHLCV format.
+type cryptoFetcherAdapter struct {
+	client *alphavantage.Client
+}
+
+// FetchCryptoOHLCV fetches and converts crypto daily OHLCV data to domain types.
+// The returned slice is sorted oldest-first as required by local indicators.
+func (a *cryptoFetcherAdapter) FetchCryptoOHLCV(ctx context.Context, symbol string) ([]indicators.OHLCV, error) {
+	data, err := a.client.GetCryptoDaily(ctx, symbol, "USD")
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to OHLCV slice
+	ohlcvSlice := make([]indicators.OHLCV, 0, len(data.TimeSeries))
+	for dateStr, entry := range data.TimeSeries {
+		date, err := alphavantage.ParseDate(dateStr)
+		if err != nil {
+			continue
+		}
+		open, _ := alphavantage.ParseFloat(entry.Open)
+		high, _ := alphavantage.ParseFloat(entry.High)
+		low, _ := alphavantage.ParseFloat(entry.Low)
+		closeVal, _ := alphavantage.ParseFloat(entry.Close)
+		volume, _ := alphavantage.ParseFloat(entry.Volume)
+
+		ohlcvSlice = append(ohlcvSlice, indicators.OHLCV{
+			Date:   date,
+			Open:   open,
+			High:   high,
+			Low:    low,
+			Close:  closeVal,
+			Volume: volume,
+		})
+	}
+
+	// Sort oldest-first (local indicators expect chronological order)
+	sort.Slice(ohlcvSlice, func(i, j int) bool {
+		return ohlcvSlice[i].Date.Before(ohlcvSlice[j].Date)
+	})
+
+	return ohlcvSlice, nil
 }

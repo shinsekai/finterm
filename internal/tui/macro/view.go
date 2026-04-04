@@ -251,8 +251,20 @@ func (v *View) renderPanel(title string, state PanelState, err error, contentFun
 		content = contentFunc()
 	}
 
-	// Create box with title
+	// Calculate panel width based on terminal width
+	// For wide layout (3 columns): divide width by 3 with gap
+	// For narrow layout: use full width
+	panelWidth := v.model.GetWidth() - 4 // Account for borders and padding
+	if !v.model.IsNarrowTerminal() {
+		panelWidth = (panelWidth - 4) / 3 // 3 columns with 2 gaps
+	}
+	if panelWidth < 25 {
+		panelWidth = 25 // Minimum width
+	}
+
+	// Create box with title and calculated width
 	box := v.theme.Box().
+		Width(panelWidth).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(v.theme.BoxBorder().GetForeground()).
 		Render(

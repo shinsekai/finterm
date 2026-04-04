@@ -90,11 +90,12 @@ func (v *View) renderTable() string {
 	// Build table rows
 	tableRows := v.buildTableRows(rows)
 
-	// Configure table
+	// Configure table with full width
 	v.table.
 		WithColumns(columns).
 		WithRows(tableRows).
-		WithEmptyMessage("No data available")
+		WithEmptyMessage("No data available").
+		WithMaxWidth(v.model.GetWidth())
 
 	return v.table.Render()
 }
@@ -139,7 +140,7 @@ func (v *View) buildColumns() []components.Column {
 		},
 		{
 			Title:       "Valuation",
-			Width:       14,
+			Width:       0, // 0 means auto-calculate to fill remaining space
 			Alignment:   components.AlignLeft,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),

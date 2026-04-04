@@ -258,7 +258,7 @@ func TestParseNewsSentiment(t *testing.T) {
 	}
 
 	// Parse and validate sentiment score
-	score, err := ParseFloat(item.OverallSentimentScore)
+	score, err := ParseFloat(string(item.OverallSentimentScore))
 	if err != nil {
 		t.Errorf("ParseFloat failed: %v", err)
 	}

@@ -12,13 +12,13 @@
             "source": "TechNews Daily",
             "category_within": "Technology",
             "topic": "Earnings",
-            "overall_sentiment_score": "0.345000",
+            "overall_sentiment_score": 0.345,
             "sentiment_label": "Somewhat-Bullish",
             "ticker_sentiment": [
                 {
                     "ticker": "AAPL",
-                    "relevance_score": "0.987654",
-                    "ticker_sentiment_score": "0.345000",
+                    "relevance_score": 0.987654,
+                    "ticker_sentiment_score": 0.345,
                     "ticker_sentiment_label": "Somewhat-Bullish"
                 }
             ]
@@ -35,13 +35,13 @@
             "source": "Financial Times",
             "category_within": "Finance",
             "topic": "Markets",
-            "overall_sentiment_score": "-0.123000",
+            "overall_sentiment_score": -0.123,
             "sentiment_label": "Somewhat-Bearish",
             "ticker_sentiment": [
                 {
                     "ticker": "SPY",
-                    "relevance_score": "0.876543",
-                    "ticker_sentiment_score": "-0.123000",
+                    "relevance_score": 0.876543,
+                    "ticker_sentiment_score": -0.123,
                     "ticker_sentiment_label": "Somewhat-Bearish"
                 }
             ]

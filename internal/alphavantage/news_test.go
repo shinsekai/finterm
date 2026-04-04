@@ -101,12 +101,12 @@ const sampleNewsResponse = `{
 			"overall_sentiment_score": "0.234567",
 			"sentiment_label": "Bullish",
 			"ticker_sentiment": [
-				{
-					"ticker": "AAPL",
-					"relevance_score": "0.876543",
-					"ticker_sentiment_score": "0.345678",
-					"ticker_sentiment_label": "Bullish"
-				}
+	{
+		"ticker": "AAPL",
+		"relevance_score": "0.876543",
+		"ticker_sentiment_score": "0.345678",
+		"ticker_sentiment_label": "Bullish"
+	}
 			]
 		},
 		{
@@ -122,12 +122,12 @@ const sampleNewsResponse = `{
 			"overall_sentiment_score": "0.345678",
 			"sentiment_label": "Bullish",
 			"ticker_sentiment": [
-				{
-					"ticker": "MSFT",
-					"relevance_score": "0.987654",
-					"ticker_sentiment_score": "0.456789",
-					"ticker_sentiment_label": "Bullish"
-				}
+	{
+		"ticker": "MSFT",
+		"relevance_score": "0.987654",
+		"ticker_sentiment_score": "0.456789",
+		"ticker_sentiment_label": "Bullish"
+	}
 			]
 		}
 	]
@@ -154,30 +154,30 @@ func TestGetNewsSentiment_TickerFilter(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_, _ = fmt.Fprint(w, `{
-					"feed": [
-						{
-							"title": "Stock market update",
-							"url": "https://example.com/stock-update",
-							"time_published": "20240402T120000",
-							"authors": ["Finance Desk"],
-							"summary": "Market analysis for today.",
-							"banner_image": "https://example.com/images/stock.jpg",
-							"source": "Bloomberg",
-							"category_within": "finance",
-							"topic": "financial_markets",
-							"overall_sentiment_score": "0.123456",
-							"sentiment_label": "Neutral",
-							"ticker_sentiment": [
-								{
-									"ticker": "AAPL",
-									"relevance_score": "0.9",
-									"ticker_sentiment_score": "0.2",
-									"ticker_sentiment_label": "Neutral"
-								}
-							]
-						}
-					]
-				}`)
+		"feed": [
+			{
+				"title": "Stock market update",
+				"url": "https://example.com/stock-update",
+				"time_published": "20240402T120000",
+				"authors": ["Finance Desk"],
+				"summary": "Market analysis for today.",
+				"banner_image": "https://example.com/images/stock.jpg",
+				"source": "Bloomberg",
+				"category_within": "finance",
+				"topics": [{"topic": "financial_markets", "relevance_score": "0.839681"}, {"topic": "finance", "relevance_score": "1.0"}],
+				"overall_sentiment_score": "0.123456",
+				"sentiment_label": "Neutral",
+				"ticker_sentiment": [
+					{
+						"ticker": "AAPL",
+						"relevance_score": "0.9",
+						"ticker_sentiment_score": "0.2",
+						"ticker_sentiment_label": "Neutral"
+					}
+				]
+			}
+		]
+	}`)
 			}))
 			defer server.Close()
 
@@ -218,23 +218,23 @@ func TestGetNewsSentiment_TopicFilter(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_, _ = fmt.Fprint(w, `{
-					"feed": [
-						{
-							"title": "Tech industry news",
-							"url": "https://example.com/tech-news",
-							"time_published": "20240402T100000",
-							"authors": ["Tech Writer"],
-							"summary": "Latest developments in technology.",
-							"banner_image": "https://example.com/images/tech.jpg",
-							"source": "Wired",
-							"category_within": "technology",
-							"topic": "technology",
-							"overall_sentiment_score": "0.456789",
-							"sentiment_label": "Bullish",
-							"ticker_sentiment": []
-						}
-					]
-				}`)
+		"feed": [
+			{
+				"title": "Tech industry news",
+				"url": "https://example.com/tech-news",
+				"time_published": "20240402T100000",
+				"authors": ["Tech Writer"],
+				"summary": "Latest developments in technology.",
+				"banner_image": "https://example.com/images/tech.jpg",
+				"source": "Wired",
+				"category_within": "technology",
+				"topic": "technology",
+				"overall_sentiment_score": "0.456789",
+				"sentiment_label": "Bullish",
+				"ticker_sentiment": []
+			}
+		]
+	}`)
 			}))
 			defer server.Close()
 
@@ -274,33 +274,33 @@ func TestGetNewsSentiment_CombinedFilters(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = fmt.Fprint(w, `{
 			"feed": [
-				{
-					"title": "Apple and Microsoft AI collaboration",
-					"url": "https://example.com/ai-collab",
-					"time_published": "20240402T160000",
-					"authors": ["AI Reporter"],
-					"summary": "Tech giants partner on AI initiatives.",
-					"banner_image": "https://example.com/images/ai.jpg",
-					"source": "The Verge",
-					"category_within": "technology",
-					"topic": "technology",
-					"overall_sentiment_score": "0.567890",
-					"sentiment_label": "Bullish",
-					"ticker_sentiment": [
-						{
-							"ticker": "AAPL",
-							"relevance_score": "0.95",
-							"ticker_sentiment_score": "0.5",
-							"ticker_sentiment_label": "Bullish"
-						},
-						{
-							"ticker": "MSFT",
-							"relevance_score": "0.92",
-							"ticker_sentiment_score": "0.55",
-							"ticker_sentiment_label": "Bullish"
-						}
-					]
-				}
+	{
+		"title": "Apple and Microsoft AI collaboration",
+		"url": "https://example.com/ai-collab",
+		"time_published": "20240402T160000",
+		"authors": ["AI Reporter"],
+		"summary": "Tech giants partner on AI initiatives.",
+		"banner_image": "https://example.com/images/ai.jpg",
+		"source": "The Verge",
+		"category_within": "technology",
+		"topic": "technology",
+		"overall_sentiment_score": "0.567890",
+		"sentiment_label": "Bullish",
+		"ticker_sentiment": [
+			{
+				"ticker": "AAPL",
+				"relevance_score": "0.95",
+				"ticker_sentiment_score": "0.5",
+				"ticker_sentiment_label": "Bullish"
+			},
+			{
+				"ticker": "MSFT",
+				"relevance_score": "0.92",
+				"ticker_sentiment_score": "0.55",
+				"ticker_sentiment_label": "Bullish"
+			}
+		]
+	}
 			]
 		}`)
 	}))
@@ -359,45 +359,45 @@ func TestGetNewsSentiment_EmptyResult(t *testing.T) {
 	}
 }
 
-func TestGetNewsSentiment_ArticleParsing(t *testing.T) {
+func TestGetNewsSentiment_ArticleParsing(t *testing.T) { //nolint:gocyclo // High complexity due to validating multiple article fields including topics array
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = fmt.Fprint(w, `{
 			"feed": [
-				{
-					"title": "Comprehensive financial analysis: Markets in flux",
-					"url": "https://finance.example.com/markets-flux",
-					"time_published": "20240402T123045",
-					"authors": ["Sarah Johnson", "Michael Chen", "Emma Davis"],
-					"summary": "A detailed look at current market conditions, sector performance, and investor sentiment across global markets.",
-					"banner_image": "https://images.example.com/markets-banner.jpg",
-					"source": "Financial Times",
-					"category_within": "markets",
-					"topic": "financial_markets",
-					"overall_sentiment_score": "-0.123456",
-					"sentiment_label": "Bearish",
-					"ticker_sentiment": [
-						{
-							"ticker": "AAPL",
-							"relevance_score": "0.789012",
-							"ticker_sentiment_score": "-0.234567",
-							"ticker_sentiment_label": "Bearish"
-						},
-						{
-							"ticker": "MSFT",
-							"relevance_score": "0.654321",
-							"ticker_sentiment_score": "0.123456",
-							"ticker_sentiment_label": "Bullish"
-						},
-						{
-							"ticker": "GOOGL",
-							"relevance_score": "0.567890",
-							"ticker_sentiment_score": "-0.098765",
-							"ticker_sentiment_label": "Neutral"
-						}
-					]
-				}
+	{
+		"title": "Comprehensive financial analysis: Markets in flux",
+		"url": "https://finance.example.com/markets-flux",
+		"time_published": "20240402T123045",
+		"authors": ["Sarah Johnson", "Michael Chen", "Emma Davis"],
+		"summary": "A detailed look at current market conditions, sector performance, and investor sentiment across global markets.",
+		"banner_image": "https://images.example.com/markets-banner.jpg",
+		"source": "Financial Times",
+		"category_within": "markets",
+		"topics": [{"topic": "financial_markets", "relevance_score": "0.839681"}, {"topic": "finance", "relevance_score": "1.0"}],
+		"overall_sentiment_score": "-0.123456",
+		"overall_sentiment_label": "Bearish",
+		"ticker_sentiment": [
+			{
+				"ticker": "AAPL",
+				"relevance_score": "0.789012",
+				"ticker_sentiment_score": "-0.234567",
+				"ticker_sentiment_label": "Bearish"
+			},
+			{
+				"ticker": "MSFT",
+				"relevance_score": "0.654321",
+				"ticker_sentiment_score": "0.123456",
+				"ticker_sentiment_label": "Bullish"
+			},
+			{
+				"ticker": "GOOGL",
+				"relevance_score": "0.567890",
+				"ticker_sentiment_score": "-0.098765",
+				"ticker_sentiment_label": "Neutral"
+			}
+		]
+	}
 			]
 		}`)
 	}))
@@ -430,7 +430,6 @@ func TestGetNewsSentiment_ArticleParsing(t *testing.T) {
 		{"url", item.URL, "https://finance.example.com/markets-flux"},
 		{"time_published", item.TimePublished, "20240402T123045"},
 		{"source", item.Source, "Financial Times"},
-		{"topic", item.Topic, "financial_markets"},
 		{"category_within", item.CategoryWithin, "markets"},
 		{"overall_sentiment_score", string(item.OverallSentimentScore), "-0.123456"},
 		{"sentiment_label", item.SentimentLabel, "Bearish"},
@@ -457,6 +456,25 @@ func TestGetNewsSentiment_ArticleParsing(t *testing.T) {
 		}
 	}
 
+	// Test topics array
+	if len(item.Topics) != 2 {
+		t.Fatalf("expected 2 topics, got %d", len(item.Topics))
+	}
+	expectedTopics := []struct {
+		topic          string
+		relevanceScore string
+	}{
+		{"financial_markets", "0.839681"},
+		{"finance", "1.0"},
+	}
+	for i, topic := range item.Topics {
+		if topic.Topic != expectedTopics[i].topic {
+			t.Errorf("topics[%d]: got topic %q, want %q", i, topic.Topic, expectedTopics[i].topic)
+		}
+		if topic.RelevanceScore != expectedTopics[i].relevanceScore {
+			t.Errorf("topics[%d]: got relevance score %q, want %q", i, topic.RelevanceScore, expectedTopics[i].relevanceScore)
+		}
+	}
 	// Test ticker sentiments array
 	if len(item.Tickers) != 3 {
 		t.Fatalf("expected 3 ticker sentiments, got %d", len(item.Tickers))
@@ -695,48 +713,48 @@ func TestGetNewsSentiment_ArticleSorting(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = fmt.Fprint(w, `{
 			"feed": [
-				{
-					"title": "Oldest article",
-					"url": "https://example.com/oldest",
-					"time_published": "20240401T100000",
-					"authors": ["Writer"],
-					"summary": "Oldest article summary",
-					"banner_image": "https://example.com/oldest.jpg",
-					"source": "Source",
-					"category_within": "tech",
-					"topic": "technology",
-					"overall_sentiment_score": "0.1",
-					"sentiment_label": "Neutral",
-					"ticker_sentiment": []
-				},
-				{
-					"title": "Newest article",
-					"url": "https://example.com/newest",
-					"time_published": "20240403T100000",
-					"authors": ["Writer"],
-					"summary": "Newest article summary",
-					"banner_image": "https://example.com/newest.jpg",
-					"source": "Source",
-					"category_within": "tech",
-					"topic": "technology",
-					"overall_sentiment_score": "0.1",
-					"sentiment_label": "Neutral",
-					"ticker_sentiment": []
-				},
-				{
-					"title": "Middle article",
-					"url": "https://example.com/middle",
-					"time_published": "20240402T100000",
-					"authors": ["Writer"],
-					"summary": "Middle article summary",
-					"banner_image": "https://example.com/middle.jpg",
-					"source": "Source",
-					"category_within": "tech",
-					"topic": "technology",
-					"overall_sentiment_score": "0.1",
-					"sentiment_label": "Neutral",
-					"ticker_sentiment": []
-				}
+	{
+		"title": "Oldest article",
+		"url": "https://example.com/oldest",
+		"time_published": "20240401T100000",
+		"authors": ["Writer"],
+		"summary": "Oldest article summary",
+		"banner_image": "https://example.com/oldest.jpg",
+		"source": "Source",
+		"category_within": "tech",
+		"topic": "technology",
+		"overall_sentiment_score": "0.1",
+		"sentiment_label": "Neutral",
+		"ticker_sentiment": []
+	},
+	{
+		"title": "Newest article",
+		"url": "https://example.com/newest",
+		"time_published": "20240403T100000",
+		"authors": ["Writer"],
+		"summary": "Newest article summary",
+		"banner_image": "https://example.com/newest.jpg",
+		"source": "Source",
+		"category_within": "tech",
+		"topic": "technology",
+		"overall_sentiment_score": "0.1",
+		"sentiment_label": "Neutral",
+		"ticker_sentiment": []
+	},
+	{
+		"title": "Middle article",
+		"url": "https://example.com/middle",
+		"time_published": "20240402T100000",
+		"authors": ["Writer"],
+		"summary": "Middle article summary",
+		"banner_image": "https://example.com/middle.jpg",
+		"source": "Source",
+		"category_within": "tech",
+		"topic": "technology",
+		"overall_sentiment_score": "0.1",
+		"sentiment_label": "Neutral",
+		"ticker_sentiment": []
+	}
 			]
 		}`)
 	}))

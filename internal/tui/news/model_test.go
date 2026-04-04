@@ -116,15 +116,15 @@ func TestNewsModel_Update_FilterToggle(t *testing.T) {
 	articles := []Article{
 		{
 			Item: &alphavantage.NewsItem{
-				Title: "Article 1",
-				Topic: "technology",
+				Title:  "Article 1",
+				Topics: []alphavantage.TopicItem{{Topic: "technology"}},
 			},
 			Tickers: []string{"AAPL"},
 		},
 		{
 			Item: &alphavantage.NewsItem{
-				Title: "Article 2",
-				Topic: "blockchain",
+				Title:  "Article 2",
+				Topics: []alphavantage.TopicItem{{Topic: "blockchain"}},
 			},
 			Tickers: []string{"BTC"},
 		},
@@ -336,9 +336,9 @@ func TestNewsModel_filterArticles_FilterMacro(t *testing.T) {
 	model.filter = FilterMacro
 
 	articles := []Article{
-		{Item: &alphavantage.NewsItem{Title: "Article 1", Topic: "technology"}},
-		{Item: &alphavantage.NewsItem{Title: "Article 2", Topic: "macro_economy"}},
-		{Item: &alphavantage.NewsItem{Title: "Article 3", Topic: "employment_report"}},
+		{Item: &alphavantage.NewsItem{Title: "Article 1", Topics: []alphavantage.TopicItem{{Topic: "technology"}}}},
+		{Item: &alphavantage.NewsItem{Title: "Article 2", Topics: []alphavantage.TopicItem{{Topic: "macro_economy"}}}},
+		{Item: &alphavantage.NewsItem{Title: "Article 3", Topics: []alphavantage.TopicItem{{Topic: "employment_report"}}}},
 	}
 
 	result := model.filterArticles(articles)

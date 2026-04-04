@@ -249,8 +249,8 @@ func TestParseNewsSentiment(t *testing.T) {
 	if item.Source != "TechNews Daily" {
 		t.Errorf("got source %q, want 'TechNews Daily'", item.Source)
 	}
-	if item.Topic != "Earnings" {
-		t.Errorf("got topic %q, want 'Earnings'", item.Topic)
+	if len(item.Topics) == 0 || item.Topics[0].Topic != "Earnings" {
+		t.Errorf("got topics %v, want first topic to be 'Earnings'", item.Topics)
 	}
 	if item.SentimentLabel != "Somewhat-Bullish" {
 		t.Errorf("got sentiment label %q, want 'Somewhat-Bullish'", item.SentimentLabel)

@@ -352,11 +352,18 @@ func (m *Model) hasCryptoTicker(article Article) bool {
 
 // isMacroTopic checks if an article topic is macro-related.
 func (m *Model) isMacroTopic(article Article) bool {
-	topic := strings.ToLower(article.Item.Topic)
-	macroKeywords := []string{"macro", "economy", "inflation", "gdp", "employment", "fed"}
-	for _, keyword := range macroKeywords {
-		if strings.Contains(topic, keyword) {
-			return true
+	macroKeywords := []string{
+		"economy", "monetary", "fiscal", "inflation", "gdp",
+		"employment", "fed", "interest rate", "macro",
+	}
+
+	// Check all topics in the article
+	for _, topic := range article.Item.Topics {
+		topicLower := strings.ToLower(topic.Topic)
+		for _, keyword := range macroKeywords {
+			if strings.Contains(topicLower, keyword) {
+				return true
+			}
 		}
 	}
 	return false

@@ -8,6 +8,20 @@ import (
 )
 
 func TestLoad_ValidConfig(t *testing.T) {
+	// Ensure env var doesn't interfere with test
+	origEnv, origSet := os.LookupEnv(envAPIKey)
+	t.Cleanup(func() {
+		if origSet {
+			//nolint:errcheck // Best-effort restoration, error is acceptable
+			os.Setenv(envAPIKey, origEnv)
+		} else {
+			//nolint:errcheck // Best-effort unsetting, error is acceptable
+			os.Unsetenv(envAPIKey)
+		}
+	})
+	//nolint:errcheck // Best-effort unsetting, error is acceptable
+	os.Unsetenv(envAPIKey)
+
 	tests := []struct {
 		name    string
 		content string
@@ -131,6 +145,20 @@ theme:
 }
 
 func TestLoad_MissingAPIKey(t *testing.T) {
+	// Ensure env var doesn't interfere with test
+	origEnv, origSet := os.LookupEnv(envAPIKey)
+	t.Cleanup(func() {
+		if origSet {
+			//nolint:errcheck // Best-effort restoration, error is acceptable
+			os.Setenv(envAPIKey, origEnv)
+		} else {
+			//nolint:errcheck // Best-effort unsetting, error is acceptable
+			os.Unsetenv(envAPIKey)
+		}
+	})
+	//nolint:errcheck // Best-effort unsetting, error is acceptable
+	os.Unsetenv(envAPIKey)
+
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -180,7 +208,7 @@ func TestLoad_EnvVarOverride(t *testing.T) {
 					//nolint:errcheck // Best-effort restoration, error is acceptable
 					os.Setenv(envAPIKey, origEnv)
 				} else {
-					//nolint:errcheck // Best-effort restoration, error is acceptable
+					//nolint:errcheck // Best-effort unsetting, error is acceptable
 					os.Unsetenv(envAPIKey)
 				}
 			})
@@ -209,6 +237,20 @@ func TestLoad_EnvVarOverride(t *testing.T) {
 }
 
 func TestLoad_FileNotFound(t *testing.T) {
+	// Ensure env var doesn't interfere with test
+	origEnv, origSet := os.LookupEnv(envAPIKey)
+	t.Cleanup(func() {
+		if origSet {
+			//nolint:errcheck // Best-effort restoration, error is acceptable
+			os.Setenv(envAPIKey, origEnv)
+		} else {
+			//nolint:errcheck // Best-effort unsetting, error is acceptable
+			os.Unsetenv(envAPIKey)
+		}
+	})
+	//nolint:errcheck // Best-effort unsetting, error is acceptable
+	os.Unsetenv(envAPIKey)
+
 	_, err := Load("/nonexistent/path/to/config.yaml")
 	if err == nil {
 		t.Fatal("Load() expected error for nonexistent file, got nil")

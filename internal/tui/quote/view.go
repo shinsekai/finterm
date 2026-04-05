@@ -303,25 +303,6 @@ func (v *View) renderError() string {
 	return content
 }
 
-// renderQuoteBox renders the quote data in a styled box.
-func (v *View) renderQuoteBox() string {
-	if v.model.quoteData == nil || v.model.quoteData.Quote == nil {
-		return ""
-	}
-
-	quote := v.model.quoteData.Quote
-	indicators := v.model.quoteData.Indicators
-
-	// Build box content
-	boxContent := v.buildQuoteContent(quote, indicators)
-
-	// Calculate and render box with width
-	box := v.renderBoxWithWidth(boxContent)
-
-	// Center the box within terminal width
-	return v.centerBox(box)
-}
-
 // renderQuoteCards renders the quote data in two card sections.
 func (v *View) renderQuoteCards() string {
 	if v.model.quoteData == nil || v.model.quoteData.Quote == nil {
@@ -419,15 +400,15 @@ func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingD
 	content.WriteString("\n\n")
 
 	// EMA values
-	content.WriteString(fmt.Sprintf("%-14s$%s\n", v.theme.Muted().Render("EMA(10):"), humanizeFloat(indicators.EMAFast, 2)))
-	content.WriteString(fmt.Sprintf("%-14s$%s\n", v.theme.Muted().Render("EMA(20):"), humanizeFloat(indicators.EMASlow, 2)))
+	fmt.Fprintf(&content, "%-14s$%s\n", v.theme.Muted().Render("EMA(10):"), humanizeFloat(indicators.EMAFast, 2))
+	fmt.Fprintf(&content, "%-14s$%s\n", v.theme.Muted().Render("EMA(20):"), humanizeFloat(indicators.EMASlow, 2))
 
 	// Trend signal with icon
 	trendStyle, trendSymbol := v.getTrendStyleAndSymbol(indicators.Signal)
-	content.WriteString(fmt.Sprintf("%-14s%s %s\n",
+	fmt.Fprintf(&content, "%-14s%s %s\n",
 		v.theme.Muted().Render("Trend:"),
 		trendStyle.Render(trendSymbol),
-		trendStyle.Render(indicators.Signal.String())))
+		trendStyle.Render(indicators.Signal.String()))
 
 	// Last updated
 	if lastTradingDay != "" {
@@ -445,10 +426,10 @@ func (v *View) renderRSIBar(rsi float64) string {
 	// RSI label
 	rsiValuation := getRSIValuation(rsi)
 	valuationStyle := v.getValuationStyle(rsiValuation)
-	content.WriteString(fmt.Sprintf("%-14s%.1f  — %s\n",
+	fmt.Fprintf(&content, "%-14s%.1f  — %s\n",
 		v.theme.Muted().Render("RSI(14):"),
 		rsi,
-		valuationStyle.Render(rsiValuation)))
+		valuationStyle.Render(rsiValuation))
 
 	// Progress bar
 	barWidth := 40
@@ -484,43 +465,8 @@ func (v *View) renderRSIBar(rsi float64) string {
 // writePriceField writes a price field line with muted label.
 func (v *View) writePriceField(content *strings.Builder, label, value, condition string) {
 	if condition != "" {
-		content.WriteString(fmt.Sprintf("%-14s%s\n", v.theme.Muted().Render(label+":"), value))
+		fmt.Fprintf(content, "%-14s%s\n", v.theme.Muted().Render(label+":"), value)
 	}
-}
-
-// buildQuoteContent builds the content string for the quote box.
-func (v *View) buildQuoteContent(quote *alphavantage.GlobalQuote, indicators *trenddomain.Result) string {
-	var content strings.Builder
-
-	// Parse quote values
-	price, _ := strconv.ParseFloat(quote.Price, 64)
-	change, changePercent := parseChange(quote.Change, quote.ChangePercent)
-
-	// Determine change color
-	changeStyle := v.getChangeStyle(change)
-
-	// Symbol row
-	content.WriteString(" " + quote.Symbol)
-	if quote.Symbol != "" {
-		content.WriteString("\n\n")
-	}
-
-	// Basic quote fields
-	v.writeQuoteField(&content, "  Price:       ", "$"+formatPrice(quote.Price), "")
-	v.writeChangeField(&content, change, changePercent, changeStyle)
-	v.writeQuoteField(&content, "  Open:        ", "$"+formatPrice(quote.Open), quote.Open)
-	v.writeQuoteField(&content, "  High:        ", "$"+formatPrice(quote.High), quote.High)
-	v.writeQuoteField(&content, "  Low:         ", "$"+formatPrice(quote.Low), quote.Low)
-	v.writeQuoteField(&content, "  Volume:      ", formatVolume(quote.Volume, quote.Symbol, price), quote.Volume)
-	v.writeQuoteField(&content, "  Prev Close:  ", "$"+formatPrice(quote.PreviousClose), quote.PreviousClose)
-
-	// Indicators section
-	if indicators != nil {
-		content.WriteString("\n\n")
-		v.writeIndicators(&content, indicators, quote.LastTradingDay)
-	}
-
-	return content.String()
 }
 
 // getChangeStyle returns the appropriate style based on price change direction.
@@ -533,45 +479,6 @@ func (v *View) getChangeStyle(change float64) lipgloss.Style {
 	default:
 		return v.theme.Neutral()
 	}
-}
-
-// writeQuoteField writes a quote field line if the value is non-empty.
-func (v *View) writeQuoteField(content *strings.Builder, label, value, condition string) {
-	if condition != "" {
-		content.WriteString(label + value + "\n")
-	}
-}
-
-// writeChangeField writes the change field with appropriate styling.
-func (v *View) writeChangeField(content *strings.Builder, change float64, changePercent string, style lipgloss.Style) {
-	// Format: -$14.26 (-0.02%)
-	sign := ""
-	if change < 0 {
-		sign = "-"
-	}
-	changeText := fmt.Sprintf("%s$%s (%s)", sign, humanizeFloat(math.Abs(change), 2), formatPercent(changePercent))
-	fmt.Fprintf(content, "  Change:      %s\n", style.Render(changeText))
-}
-
-// writeIndicators writes the technical indicators section.
-func (v *View) writeIndicators(content *strings.Builder, indicators *trenddomain.Result, lastTradingDay string) {
-	rsiValuation := getRSIValuation(indicators.RSI)
-	valuationStyle := v.getValuationStyle(rsiValuation)
-	fmt.Fprintf(content, "  RSI(%d):     %s  — %s\n", 14, formatFloat(indicators.RSI, 1), valuationStyle.Render(rsiValuation))
-	fmt.Fprintf(content, "  EMA(10):     $%s\n", humanizeFloat(indicators.EMAFast, 2))
-	fmt.Fprintf(content, "  EMA(20):     $%s\n", humanizeFloat(indicators.EMASlow, 2))
-	v.writeTrendSignal(content, indicators)
-
-	if lastTradingDay != "" {
-		content.WriteString("\n")
-		fmt.Fprintf(content, "  Last updated: %s", lastTradingDay)
-	}
-}
-
-// writeTrendSignal writes the trend signal with appropriate styling.
-func (v *View) writeTrendSignal(content *strings.Builder, indicators *trenddomain.Result) {
-	trendStyle, trendSymbol := v.getTrendStyleAndSymbol(indicators.Signal)
-	fmt.Fprintf(content, "  Trend:       %s %s\n", trendStyle.Render(trendSymbol), trendStyle.Render(indicators.Signal.String()))
 }
 
 // getTrendStyleAndSymbol returns the style and symbol for a trend signal.
@@ -598,15 +505,6 @@ func (v *View) getValuationStyle(valuation string) lipgloss.Style {
 	}
 }
 
-// renderBoxWithWidth renders the box with calculated width based on terminal size.
-func (v *View) renderBoxWithWidth(content string) string {
-	boxWidth := v.calculateBoxWidth()
-
-	return v.theme.Box().
-		Width(boxWidth).
-		Render(content)
-}
-
 // calculateBoxWidth calculates the appropriate box width based on terminal size.
 func (v *View) calculateBoxWidth() int {
 	maxBoxWidth := 70
@@ -620,26 +518,6 @@ func (v *View) calculateBoxWidth() int {
 		boxWidth = 30
 	}
 	return boxWidth
-}
-
-// centerBox centers the rendered box within the terminal width.
-func (v *View) centerBox(box string) string {
-	boxLines := strings.Split(box, "\n")
-	terminalWidth := v.model.GetWidth()
-
-	var centeredBox strings.Builder
-	for _, line := range boxLines {
-		lineWidth := lipgloss.Width(line)
-		if lineWidth < terminalWidth {
-			leftPadding := (terminalWidth - lineWidth) / 2
-			centeredBox.WriteString(strings.Repeat(" ", leftPadding) + line)
-		} else {
-			centeredBox.WriteString(line)
-		}
-		centeredBox.WriteString("\n")
-	}
-
-	return strings.TrimSuffix(centeredBox.String(), "\n")
 }
 
 // renderShortcuts renders keyboard shortcut hints.
@@ -716,12 +594,6 @@ func formatVolume(volumeStr, symbol string, price float64) string {
 	default:
 		return fmt.Sprintf("%.0f", vol)
 	}
-}
-
-// formatFloat formats a float with specified decimal places.
-func formatFloat(f float64, decimals int) string {
-	format := fmt.Sprintf("%%.%df", decimals)
-	return fmt.Sprintf(format, f)
 }
 
 // formatPrice formats a price string with 2 decimal places and comma separators.

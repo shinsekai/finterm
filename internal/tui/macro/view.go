@@ -70,8 +70,8 @@ func (v *View) renderWideLayout() string {
 	// Combine rows
 	var builder strings.Builder
 
-	// Title
-	builder.WriteString(v.theme.Title().Render("MACRO DASHBOARD"))
+	// Title with icon
+	builder.WriteString(v.theme.Accent().Render("◇") + " " + v.theme.Title().Render("Macro Dashboard"))
 	builder.WriteString("\n\n")
 
 	// Panels
@@ -90,19 +90,19 @@ func (v *View) renderWideLayout() string {
 func (v *View) renderNarrowLayout() string {
 	var builder strings.Builder
 
-	// Title
-	builder.WriteString(v.theme.Title().Render("MACRO DASHBOARD"))
+	// Title with icon
+	builder.WriteString(v.theme.Accent().Render("◇") + " " + v.theme.Title().Render("Macro Dashboard"))
 	builder.WriteString("\n\n")
 
-	// Panels stacked vertically
+	// Panels stacked vertically with single newline between them
 	builder.WriteString(v.renderGDPPanel())
-	builder.WriteString("\n\n")
+	builder.WriteString("\n")
 	builder.WriteString(v.renderInflationPanel())
-	builder.WriteString("\n\n")
+	builder.WriteString("\n")
 	builder.WriteString(v.renderEmploymentPanel())
-	builder.WriteString("\n\n")
+	builder.WriteString("\n")
 	builder.WriteString(v.renderRatesPanel())
-	builder.WriteString("\n\n")
+	builder.WriteString("\n")
 	builder.WriteString(v.renderYieldsPanel())
 
 	// Footer
@@ -116,7 +116,7 @@ func (v *View) renderNarrowLayout() string {
 func (v *View) renderFooter() string {
 	staleIndicator := ""
 	if v.model.IsDataStale() {
-		staleIndicator = v.theme.Warning().Render(" ⚠ Data may be stale") + " "
+		staleIndicator = v.theme.Warning().Render("⚠ Stale") + " "
 	}
 
 	timeSince := "just now"
@@ -132,15 +132,39 @@ func (v *View) renderFooter() string {
 		}
 	}
 
-	left := fmt.Sprintf("Last updated: %s", timeSince)
-	right := fmt.Sprintf("TTL: %s", v.model.GetTTL())
-	help := "r: refresh  |  q: quit  |  1-4: tabs"
+	// Build footer parts
+	updateInfo := fmt.Sprintf("Updated %s  ·  TTL %s", timeSince, v.model.GetTTL())
+	keyHints := v.renderKeyHints()
 
-	footer := lipgloss.NewStyle().
-		Foreground(v.theme.Muted().GetForeground()).
-		Render(fmt.Sprintf("%s%s    %s    %s", staleIndicator, left, right, help))
+	return v.theme.Muted().Render(staleIndicator + updateInfo + "  ·  " + keyHints)
+}
 
-	return footer
+// renderKeyHints renders keyboard shortcut hints.
+func (v *View) renderKeyHints() string {
+	shortcuts := []struct {
+		key  string
+		desc string
+	}{
+		{"r", "refresh"},
+		{"1-4", "tabs"},
+		{"q", "quit"},
+	}
+
+	var parts []string
+	for _, sc := range shortcuts {
+		parts = append(parts, v.theme.Accent().Render(sc.key)+" "+v.theme.Muted().Render(sc.desc))
+	}
+
+	return strings.Join(parts, "  ·  ")
+}
+
+// panelIcons maps panel names to their emoji icons.
+var panelIcons = map[string]string{
+	"GDP":             "📊",
+	"Inflation":       "📈",
+	"Employment":      "👷",
+	"Interest Rates":  "🏦",
+	"Treasury Yields": "📋",
 }
 
 // renderGDPPanel renders the GDP panel.
@@ -150,13 +174,12 @@ func (v *View) renderGDPPanel() string {
 			return "No data available"
 		}
 		d := v.model.gdp.Data
-		return fmt.Sprintf(
-			" Real GDP:     %s\n"+
-				" QoQ:          %s\n"+
-				" Per Capita:   %s\n"+
-				" Period:       %s",
-			d.RealGDP, d.GDPChange, d.PerCapita, d.Period,
-		)
+		var builder strings.Builder
+		v.formatRow(&builder, "Real GDP", d.RealGDP)
+		v.formatRow(&builder, "QoQ", d.GDPChange)
+		v.formatRow(&builder, "Per Capita", d.PerCapita)
+		v.formatRowLast(&builder, "Period", d.Period)
+		return builder.String()
 	})
 }
 
@@ -167,13 +190,12 @@ func (v *View) renderInflationPanel() string {
 			return "No data available"
 		}
 		d := v.model.inflation.Data
-		return fmt.Sprintf(
-			" CPI:          %s\n"+
-				" YoY:          %s\n"+
-				" Inflation:    %s\n"+
-				" Period:       %s",
-			d.CPI, d.CPIYoY, d.Inflation, d.Period,
-		)
+		var builder strings.Builder
+		v.formatRow(&builder, "CPI", d.CPI)
+		v.formatRow(&builder, "YoY", d.CPIYoY)
+		v.formatRow(&builder, "Inflation", d.Inflation)
+		v.formatRowLast(&builder, "Period", d.Period)
+		return builder.String()
 	})
 }
 
@@ -184,13 +206,12 @@ func (v *View) renderEmploymentPanel() string {
 			return "No data available"
 		}
 		d := v.model.employment.Data
-		return fmt.Sprintf(
-			" Unemployment:  %s\n"+
-				" Nonfarm:      %s\n"+
-				" Trend:        %s\n"+
-				" Period:       %s",
-			d.Unemployment, d.Nonfarm, d.Trend, d.Period,
-		)
+		var builder strings.Builder
+		v.formatRow(&builder, "Unemployment", d.Unemployment)
+		v.formatRow(&builder, "Nonfarm", d.Nonfarm)
+		v.formatRow(&builder, "Trend", d.Trend)
+		v.formatRowLast(&builder, "Period", d.Period)
+		return builder.String()
 	})
 }
 
@@ -201,13 +222,12 @@ func (v *View) renderRatesPanel() string {
 			return "No data available"
 		}
 		d := v.model.rates.Data
-		return fmt.Sprintf(
-			" Fed Funds:    %s\n"+
-				" Previous:     %s\n"+
-				" Last Change:  %s\n"+
-				" Period:       %s",
-			d.FedFundsRate, d.Previous, d.LastChange, d.Period,
-		)
+		var builder strings.Builder
+		v.formatRow(&builder, "Fed Funds", d.FedFundsRate)
+		v.formatRow(&builder, "Previous", d.Previous)
+		v.formatRow(&builder, "Last Change", d.LastChange)
+		v.formatRowLast(&builder, "Period", d.Period)
+		return builder.String()
 	})
 }
 
@@ -218,14 +238,27 @@ func (v *View) renderYieldsPanel() string {
 			return "No data available"
 		}
 		d := v.model.yields.Data
-		return fmt.Sprintf(
-			" 2Y:           %s\n"+
-				" 5Y:           %s\n"+
-				" 10Y:          %s\n"+
-				" 30Y:          %s",
-			d.Yield2Y, d.Yield5Y, d.Yield10Y, d.Yield30Y,
-		)
+		var builder strings.Builder
+		v.formatRow(&builder, "2Y", d.Yield2Y)
+		v.formatRow(&builder, "5Y", d.Yield5Y)
+		v.formatRow(&builder, "10Y", d.Yield10Y)
+		v.formatRowLast(&builder, "30Y", d.Yield30Y)
+		return builder.String()
 	})
+}
+
+// formatRow formats a label-value pair with consistent formatting.
+func (v *View) formatRow(builder *strings.Builder, label, value string) {
+	if value != "" {
+		builder.WriteString(v.theme.Muted().Render(fmt.Sprintf("  %-14s", label+":")) + value + "\n")
+	}
+}
+
+// formatRowLast formats the last label-value pair (no trailing newline).
+func (v *View) formatRowLast(builder *strings.Builder, label, value string) {
+	if value != "" {
+		builder.WriteString(v.theme.Muted().Render(fmt.Sprintf("  %-14s", label+":")) + value)
+	}
 }
 
 // renderPanel renders a single panel with title, content, and border.
@@ -239,11 +272,11 @@ func (v *View) renderPanel(title string, state PanelState, err error, contentFun
 			WithTextStyle(v.theme.SpinnerText())
 		content = spinner.Render()
 	case PanelError:
-		content = v.theme.Error().Render("Error loading data")
+		content = v.theme.Error().Render("✗ Error loading data")
 		if err != nil {
 			errorText := err.Error()
 			if len(errorText) > 30 {
-				errorText = errorText[:27] + "..."
+				errorText = errorText[:27] + "…"
 			}
 			content += "\n" + v.theme.Muted().Render(errorText)
 		}
@@ -262,16 +295,21 @@ func (v *View) renderPanel(title string, state PanelState, err error, contentFun
 		panelWidth = 25 // Minimum width
 	}
 
+	// Get panel icon
+	icon := panelIcons[title]
+
 	// Create box with title and calculated width
 	box := v.theme.Box().
 		Width(panelWidth).
+		Padding(1, 1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(v.theme.BoxBorder().GetForeground()).
 		Render(
 			lipgloss.NewStyle().
 				Foreground(v.theme.BoxTitle().GetForeground()).
 				Bold(true).
-				Render(title) + "\n\n" + content,
+				Render(icon+" "+title) + "\n" +
+				v.theme.Divider().Render(strings.Repeat("─", panelWidth-4)) + "\n\n" + content,
 		)
 
 	return box
@@ -288,6 +326,8 @@ type Theme interface {
 	BoxTitle() lipgloss.Style
 	Spinner() lipgloss.Style
 	SpinnerText() lipgloss.Style
+	Accent() lipgloss.Style
+	Divider() lipgloss.Style
 }
 
 // defaultTheme provides a fallback theme when no theme is set.
@@ -330,4 +370,12 @@ func (t *defaultTheme) Spinner() lipgloss.Style {
 
 func (t *defaultTheme) SpinnerText() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4"))
+}
+
+func (t *defaultTheme) Accent() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true)
+}
+
+func (t *defaultTheme) Divider() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A"))
 }

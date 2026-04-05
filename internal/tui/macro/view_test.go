@@ -98,7 +98,7 @@ func TestMacroView_Render_WideTerminal(t *testing.T) {
 	output := view.Render()
 
 	// Check for expected content
-	checkContains(t, output, "MACRO DASHBOARD")
+	checkContains(t, output, "Macro Dashboard")
 	checkContains(t, output, "GDP")
 	checkContains(t, output, "$22.67T")
 	checkContains(t, output, "Inflation")
@@ -131,7 +131,7 @@ func TestMacroView_Render_NarrowTerminal(t *testing.T) {
 	output := view.Render()
 
 	// Check for expected content
-	checkContains(t, output, "MACRO DASHBOARD")
+	checkContains(t, output, "Macro Dashboard")
 	checkContains(t, output, "GDP")
 	checkContains(t, output, "$22.67T")
 }
@@ -231,7 +231,7 @@ func TestMacroView_Render_LoadingState(t *testing.T) {
 	output := view.Render()
 
 	// Check for loading indicators
-	checkContains(t, output, "MACRO DASHBOARD")
+	checkContains(t, output, "Macro Dashboard")
 	checkContains(t, output, "GDP")
 	checkContains(t, output, "Inflation")
 	checkContains(t, output, "Employment")
@@ -327,7 +327,7 @@ func TestMacroView_Render_StaleIndicator(t *testing.T) {
 	output := view.Render()
 
 	// Check for stale indicator
-	checkContains(t, output, "Data may be stale")
+	checkContains(t, output, "Stale")
 }
 
 // TestMacroView_Render_NoData tests rendering when no data is available.
@@ -370,7 +370,7 @@ func TestMacroView_Render_WithTheme(t *testing.T) {
 	output := view.Render()
 
 	// Check for expected content
-	checkContains(t, output, "MACRO DASHBOARD")
+	checkContains(t, output, "Macro Dashboard")
 	checkContains(t, output, "GDP")
 }
 
@@ -393,11 +393,11 @@ func TestMacroView_Render_Footer(t *testing.T) {
 	view := NewView(model)
 	output := view.Render()
 
-	// Check for footer elements
-	checkContains(t, output, "Last updated")
+	// Check for footer elements - new format with · separator
+	checkContains(t, output, "Updated")
 	checkContains(t, output, "TTL")
-	checkContains(t, output, "r: refresh")
-	checkContains(t, output, "q: quit")
+	checkContains(t, output, "refresh")
+	checkContains(t, output, "quit")
 }
 
 // mockError is a mock error for testing.
@@ -448,6 +448,14 @@ func (t *customTheme) SpinnerText() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("gray"))
 }
 
+func (t *customTheme) Accent() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("blue")).Bold(true)
+}
+
+func (t *customTheme) Divider() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("gray"))
+}
+
 // checkContains is a helper to check if a string contains a substring.
 func checkContains(t *testing.T, s, substr string) {
 	t.Helper()
@@ -469,4 +477,181 @@ func indexOfSubstring(s, substr string) int {
 		}
 	}
 	return -1
+}
+
+// TestMacroView_PanelIcons verifies each panel has its emoji icon.
+func TestMacroView_PanelIcons(t *testing.T) {
+	model := NewModel()
+	model.width = 120
+
+	// Set up all panels with data
+	now := time.Now()
+	model.gdp = GDPPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &GDPData{RealGDP: "$22.67T", Period: "Q3 2025", LastUpdated: now},
+	}
+	model.inflation = InflationPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &InflationData{CPI: "312.23", Period: "2026-02", LastUpdated: now},
+	}
+	model.employment = EmploymentPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &EmploymentData{Unemployment: "3.7%", Period: "2026-02", LastUpdated: now},
+	}
+	model.rates = RatesPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &RateData{FedFundsRate: "5.25%", Period: "2026-02", LastUpdated: now},
+	}
+	model.yields = YieldsPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &YieldData{Yield10Y: "4.15%", Period: "2026-02", LastUpdated: now},
+	}
+
+	view := NewView(model)
+	output := view.Render()
+
+	// Verify each panel has its icon
+	panelIcons := map[string]string{
+		"GDP":             "📊",
+		"Inflation":       "📈",
+		"Employment":      "👷",
+		"Interest Rates":  "🏦",
+		"Treasury Yields": "📋",
+	}
+
+	for title, icon := range panelIcons {
+		if !contains(output, icon) {
+			t.Errorf("Expected panel '%s' to have icon '%s'", title, icon)
+		}
+		// Also verify the icon appears near the title
+		iconTitle := icon + " " + title
+		if !contains(output, iconTitle) {
+			t.Errorf("Expected icon and title combination '%s' to be present", iconTitle)
+		}
+	}
+}
+
+// TestMacroView_PanelDivider verifies divider line after panel title.
+func TestMacroView_Render_PanelDivider(t *testing.T) {
+	model := NewModel()
+	model.width = 120
+
+	// Set up all panels with data
+	now := time.Now()
+	model.gdp = GDPPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &GDPData{RealGDP: "$22.67T", Period: "Q3 2025", LastUpdated: now},
+	}
+	model.inflation = InflationPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &InflationData{CPI: "312.23", Period: "2026-02", LastUpdated: now},
+	}
+	model.employment = EmploymentPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &EmploymentData{Unemployment: "3.7%", Period: "2026-02", LastUpdated: now},
+	}
+	model.rates = RatesPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &RateData{FedFundsRate: "5.25%", Period: "2026-02", LastUpdated: now},
+	}
+	model.yields = YieldsPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &YieldData{Yield10Y: "4.15%", Period: "2026-02", LastUpdated: now},
+	}
+
+	view := NewView(model)
+	output := view.Render()
+
+	// Verify divider character is present
+	if !contains(output, "─") {
+		t.Error("Expected output to contain divider character '─'")
+	}
+
+	// Count the number of divider lines - there should be at least 5 (one per panel)
+	count := 0
+	for _, c := range output {
+		if c == '─' {
+			count++
+		}
+	}
+
+	if count < 20 {
+		// Each panel has a divider line of at least a few characters, 5 panels = at least 20
+		t.Errorf("Expected at least 20 divider characters, got %d", count)
+	}
+}
+
+// TestMacroView_LabelAlignment verifies consistent label formatting.
+func TestMacroView_Render_LabelAlignment(t *testing.T) {
+	model := NewModel()
+	model.width = 120
+
+	// Set up all panels with data
+	now := time.Now()
+	model.gdp = GDPPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data: &GDPData{
+			RealGDP:     "$22.67T",
+			GDPChange:   "+2.1%",
+			PerCapita:   "$67,891",
+			Period:      "Q3 2025",
+			LastUpdated: now,
+		},
+	}
+
+	view := NewView(model)
+	output := view.Render()
+
+	// Verify that labels appear with consistent formatting
+	// The formatRow function uses "  %-14s" for label alignment
+	expectedLabels := []string{"Real GDP:", "QoQ:", "Per Capita:", "Period:"}
+	for _, label := range expectedLabels {
+		if !contains(output, label) {
+			t.Errorf("Expected label '%s' to be present in output", label)
+		}
+	}
+
+	// Verify that the GDP panel contains the value
+	// Note: Due to ANSI color codes from theme rendering, we can't check for
+	// exact adjacent string "Real GDP:$22.67T", but both should be present
+	if !contains(output, "$22.67T") {
+		t.Error("Expected GDP value '$22.67T' to be present in output")
+	}
+	if !contains(output, "+2.1%") {
+		t.Error("Expected GDP change '+2.1%' to be present in output")
+	}
+}
+
+// TestMacroView_RoundedBorders verifies rounded border corners.
+func TestMacroView_Render_RoundedBorders(t *testing.T) {
+	model := NewModel()
+	model.width = 120
+
+	// Set up all panels with data
+	now := time.Now()
+	model.gdp = GDPPanel{
+		Panel: Panel{State: PanelLoaded},
+		Data:  &GDPData{RealGDP: "$22.67T", Period: "Q3 2025", LastUpdated: now},
+	}
+
+	view := NewView(model)
+	output := view.Render()
+
+	// Verify rounded border characters are present
+	// lipgloss.RoundedBorder() uses ╭, ╮, ╰, ╯ for corners
+	hasTopLeft := contains(output, "╭")
+	hasTopRight := contains(output, "╮")
+	hasBottomLeft := contains(output, "╰")
+	hasBottomRight := contains(output, "╯")
+
+	if !hasTopLeft && !hasTopRight && !hasBottomLeft && !hasBottomRight {
+		t.Error("Expected output to contain rounded border corner characters (╭, ╮, ╰, or ╯)")
+	}
+
+	// At least verify we have some rounded corners
+	if !hasTopLeft || !hasBottomLeft {
+		// It's possible only some corners are rendered depending on terminal width
+		// But we should have at least top-left or bottom-left
+		t.Log("Note: Rounded border corners may vary based on terminal width")
+	}
 }

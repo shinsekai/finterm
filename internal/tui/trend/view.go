@@ -69,6 +69,12 @@ func (v *View) Render() string {
 	builder.WriteString(v.renderTitle())
 	builder.WriteString("\n\n")
 
+	// Render signal summary (only if rows exist)
+	if len(v.model.GetRows()) > 0 {
+		builder.WriteString(v.renderSummary())
+		builder.WriteString("\n\n")
+	}
+
 	// Render table
 	builder.WriteString(v.renderTable())
 	builder.WriteString("\n\n")
@@ -82,8 +88,56 @@ func (v *View) Render() string {
 // renderTitle renders the view title.
 func (v *View) renderTitle() string {
 	symbolCount := len(v.model.GetRows())
-	subtitle := fmt.Sprintf("  %d symbols", symbolCount)
+	loadedCount := v.model.GetLoadedCount()
+
+	var subtitle string
+	if loadedCount > 0 && loadedCount < symbolCount {
+		// Show loading progress
+		subtitle = fmt.Sprintf("  Loading %d/%d…", loadedCount, symbolCount)
+	} else {
+		// Show normal symbol count
+		subtitle = fmt.Sprintf("  %d symbols", symbolCount)
+	}
+
 	return v.theme.Accent().Render("◆") + " " + v.theme.Title().Render("Trend Analysis") + v.theme.Muted().Render(subtitle)
+}
+
+// renderSummary renders the signal summary bar.
+func (v *View) renderSummary() string {
+	bullish, bearish, neutral := v.model.GetSignalCounts()
+
+	var summary strings.Builder
+
+	if bullish > 0 {
+		summary.WriteString(v.theme.Bullish().Render(fmt.Sprintf("%d ▲", bullish)))
+	}
+
+	if bearish > 0 {
+		if summary.Len() > 0 {
+			summary.WriteString("  ")
+		}
+		summary.WriteString(v.theme.Bearish().Render(fmt.Sprintf("%d ▼", bearish)))
+	}
+
+	if neutral > 0 {
+		if summary.Len() > 0 {
+			summary.WriteString("  ")
+		}
+		summary.WriteString(v.theme.Neutral().Render(fmt.Sprintf("%d ─", neutral)))
+	}
+
+	// Show pending count if some rows are still loading
+	totalRows := len(v.model.GetRows())
+	loadedCount := v.model.GetLoadedCount()
+	pendingCount := totalRows - loadedCount
+	if pendingCount > 0 {
+		if summary.Len() > 0 {
+			summary.WriteString("  ")
+		}
+		summary.WriteString(v.theme.Muted().Render(fmt.Sprintf("· %d pending", pendingCount)))
+	}
+
+	return summary.String()
 }
 
 // renderTable renders the data table.
@@ -99,14 +153,21 @@ func (v *View) renderTable() string {
 	// Build table rows
 	tableRows := v.buildTableRows(rows)
 
-	// Configure table with full width
+	// Configure table with full width (reduce by 4 to account for border + padding)
 	v.table.
 		WithColumns(columns).
 		WithRows(tableRows).
 		WithEmptyMessage("No data available").
-		WithMaxWidth(v.model.GetWidth())
+		WithMaxWidth(v.model.GetWidth() - 4)
 
-	return v.table.Render()
+	// Wrap table in bordered container
+	borderColor := v.theme.Divider().GetForeground()
+	containerStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Padding(0, 1)
+
+	return containerStyle.Render(v.table.Render())
 }
 
 // buildColumns returns the table column definitions.
@@ -166,11 +227,18 @@ func (v *View) buildColumns() []components.Column {
 
 // buildTableRows converts model row data to table rows.
 func (v *View) buildTableRows(rows []RowData) []components.Row {
-	tableRows := make([]components.Row, len(rows))
 	activeRow := v.model.GetActiveRow()
+	tableRows := make([]components.Row, 0, len(rows)+1)
 
 	for i, row := range rows {
 		cells := v.buildRowCells(row)
+
+		// Add cursor marker to symbol cell
+		cursor := "  "
+		if i == activeRow {
+			cursor = "▸ "
+		}
+		cells[0].Text = cursor + cells[0].Text
 
 		// Apply alternating row style
 		rowStyle := v.theme.TableRow()
@@ -183,10 +251,28 @@ func (v *View) buildTableRows(rows []RowData) []components.Row {
 			rowStyle = rowStyle.Background(v.theme.Foreground()).Foreground(v.theme.Background())
 		}
 
-		tableRows[i] = components.Row{
+		tableRows = append(tableRows, components.Row{
 			Cells: cells,
 			Style: rowStyle,
+		})
+	}
+
+	// Add section separator between equities and crypto
+	cryptoStartIndex := v.model.GetCryptoStartIndex()
+	if cryptoStartIndex > 0 && cryptoStartIndex < len(rows) {
+		// Insert separator at the crypto start position
+		separatorCells := make([]components.Cell, 7)
+		separatorCells[0].Text = v.theme.Divider().Render("── Crypto ──")
+		// All other cells remain empty
+
+		separatorRow := components.Row{
+			Cells: separatorCells,
+			Style: v.theme.Muted(),
 		}
+
+		// Insert separator at the right position
+		tableRows = append(tableRows[:cryptoStartIndex],
+			append([]components.Row{separatorRow}, tableRows[cryptoStartIndex:]...)...)
 	}
 
 	return tableRows
@@ -445,14 +531,15 @@ func (d *defaultTheme) Background() lipgloss.Color {
 
 // formatPrice formats a price value with comma separators and 2 decimal places.
 // For prices < 1, shows more decimals; for prices >= 1000, adds comma separators.
+// All prices are prefixed with "$" unless zero (returns "—").
 func formatPrice(price float64) string {
 	if price == 0 {
-		return "--"
+		return "—"
 	}
 
 	// For very small prices (crypto fractions), show more precision
 	if price < 1 {
-		return fmt.Sprintf("%.6f", price)
+		return "$" + fmt.Sprintf("%.6f", price)
 	}
 
 	// For normal prices, format with 2 decimal places
@@ -475,5 +562,5 @@ func formatPrice(price float64) string {
 
 	// Add fractional part
 	fracStr := fmt.Sprintf("%.2f", fracPart)
-	return str + fracStr[1:] // Remove leading "0"
+	return "$" + str + fracStr[1:] // Prepend "$", remove leading "0"
 }

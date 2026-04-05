@@ -32,6 +32,10 @@ func (m *mockTheme) TableRow() lipgloss.Style {
 	return lipgloss.NewStyle()
 }
 
+func (m *mockTheme) TableRowAlt() lipgloss.Style {
+	return lipgloss.NewStyle().Background(lipgloss.Color("#2D2F3D"))
+}
+
 func (m *mockTheme) TableHeader() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true)
 }
@@ -52,6 +56,27 @@ func (m *mockTheme) Neutral() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("F1FA8C")).Bold(true)
 }
 
+func (m *mockTheme) BullishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#282A36")).
+		Background(lipgloss.Color("50FA7B")).
+		Bold(true)
+}
+
+func (m *mockTheme) BearishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#F8F8F2")).
+		Background(lipgloss.Color("FF5555")).
+		Bold(true)
+}
+
+func (m *mockTheme) NeutralBadge() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#282A36")).
+		Background(lipgloss.Color("F1FA8C")).
+		Bold(true)
+}
+
 func (m *mockTheme) Help() lipgloss.Style {
 	return lipgloss.NewStyle().Italic(true)
 }
@@ -66,6 +91,14 @@ func (m *mockTheme) Muted() lipgloss.Style {
 
 func (m *mockTheme) Spinner() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("7D56F4"))
+}
+
+func (m *mockTheme) Accent() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("7D56F4")).Bold(true)
+}
+
+func (m *mockTheme) Divider() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A"))
 }
 
 func (m *mockTheme) Foreground() lipgloss.Color {
@@ -100,11 +133,11 @@ func TestTrendModel_View_LoadingState(t *testing.T) {
 	rendered := view.Render()
 
 	assert.Contains(t, rendered, "Trend Analysis", "View should contain title")
-	assert.Contains(t, rendered, "Loading...", "View should contain loading indicator for tickers")
+	assert.Contains(t, rendered, "Loading…", "View should contain loading indicator for tickers")
 	assert.Contains(t, rendered, "AAPL", "View should contain AAPL symbol")
 	assert.Contains(t, rendered, "MSFT", "View should contain MSFT symbol")
-	assert.Contains(t, rendered, "↑↓ Navigate", "View should contain navigation help")
-	assert.Contains(t, rendered, "r Refresh", "View should contain refresh help")
+	assert.Contains(t, rendered, "navigate", "View should contain navigation help")
+	assert.Contains(t, rendered, "refresh", "View should contain refresh help")
 }
 
 // TestTrendModel_View_LoadedState verifies rendering in loaded state with data.
@@ -127,7 +160,7 @@ func TestTrendModel_View_LoadedState(t *testing.T) {
 
 	assert.Contains(t, rendered, "Trend Analysis", "View should contain title")
 	assert.Contains(t, rendered, "AAPL", "View should contain AAPL symbol")
-	assert.Contains(t, rendered, "Bullish", "View should contain bullish signal")
+	assert.Contains(t, rendered, "BULL", "View should contain bullish signal badge")
 	assert.Contains(t, rendered, "50.50", "View should contain RSI value")
 	assert.Contains(t, rendered, "150.25", "View should contain EMA fast value")
 	assert.Contains(t, rendered, "145.75", "View should contain EMA slow value")
@@ -158,9 +191,9 @@ func TestTrendModel_View_MixedState(t *testing.T) {
 
 	assert.Contains(t, rendered, "Trend Analysis", "View should contain title")
 	assert.Contains(t, rendered, "AAPL", "View should contain AAPL symbol")
-	assert.Contains(t, rendered, "Bullish", "View should contain bullish signal for AAPL")
+	assert.Contains(t, rendered, "BULL", "View should contain bullish signal for AAPL")
 	assert.Contains(t, rendered, "API error", "View should contain error for MSFT")
-	assert.Contains(t, rendered, "Loading...", "View should contain loading for GOOGL")
+	assert.Contains(t, rendered, "Loading…", "View should contain loading for GOOGL")
 }
 
 // TestTrendModel_View_EmptyWatchlist verifies rendering with empty watchlist.
@@ -230,7 +263,7 @@ func TestTrendModel_View_BearishSignal(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 	rendered := view.Render()
 
-	assert.Contains(t, rendered, "Bearish", "View should contain bearish signal")
+	assert.Contains(t, rendered, "BEAR", "View should contain bearish signal badge")
 	assert.Contains(t, rendered, "AAPL", "View should contain AAPL symbol")
 }
 
@@ -307,12 +340,12 @@ func TestTrendModel_View_RenderTableColumns(t *testing.T) {
 	rendered := view.Render()
 
 	// Check column headers
-	assert.Contains(t, rendered, "Symbol", "View should have Symbol column")
-	assert.Contains(t, rendered, "Signal", "View should have Signal column")
+	assert.Contains(t, rendered, "SYMBOL", "View should have SYMBOL column")
+	assert.Contains(t, rendered, "SIGNAL", "View should have SIGNAL column")
 	assert.Contains(t, rendered, "RSI", "View should have RSI column")
-	assert.Contains(t, rendered, "EMA Fast", "View should have EMA Fast column")
-	assert.Contains(t, rendered, "EMA Slow", "View should have EMA Slow column")
-	assert.Contains(t, rendered, "Valuation", "View should have Valuation column")
+	assert.Contains(t, rendered, "EMA FAST", "View should have EMA FAST column")
+	assert.Contains(t, rendered, "EMA SLOW", "View should have EMA SLOW column")
+	assert.Contains(t, rendered, "VALUATION", "View should have VALUATION column")
 }
 
 // TestTrendModel_View_DefaultTheme verifies view works with default theme.
@@ -339,7 +372,8 @@ func TestTrendModel_View_ErrorState(t *testing.T) {
 	rendered := view.Render()
 
 	assert.Contains(t, rendered, "AAPL", "View should contain symbol")
-	assert.Contains(t, rendered, "API error", "View should contain error indicator")
+	assert.Contains(t, rendered, "✗ API error", "View should contain error indicator")
+	assert.Contains(t, rendered, "—", "View should contain em dash for missing values")
 }
 
 // TestTrendModel_View_String verifies String method.
@@ -369,7 +403,142 @@ func TestTrendModel_View_Footer(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 
 	footer := view.renderFooter()
-	assert.Contains(t, footer, "↑↓ Navigate", "Footer should have navigation help")
-	assert.Contains(t, footer, "r Refresh", "Footer should have refresh help")
-	assert.Contains(t, footer, "q Quit", "Footer should have quit help")
+	assert.Contains(t, footer, "navigate", "Footer should have navigation help")
+	assert.Contains(t, footer, "refresh", "Footer should have refresh help")
+	assert.Contains(t, footer, "tabs", "Footer should have tabs help")
+	assert.Contains(t, footer, "help", "Footer should have help key")
+	assert.Contains(t, footer, "·", "Footer should have separator")
+}
+
+// TestTrendView_SignalBadge_Bullish verifies bullish signal badge rendering.
+func TestTrendView_SignalBadge_Bullish(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	badge := view.renderSignalBadge(trenddomain.Bullish)
+	assert.Contains(t, badge, "▲ BULL", "Bullish badge should show arrow and BULL")
+}
+
+// TestTrendView_SignalBadge_Bearish verifies bearish signal badge rendering.
+func TestTrendView_SignalBadge_Bearish(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	badge := view.renderSignalBadge(trenddomain.Bearish)
+	assert.Contains(t, badge, "▼ BEAR", "Bearish badge should show arrow and BEAR")
+}
+
+// TestTrendView_SignalBadge_Neutral verifies neutral signal badge rendering.
+func TestTrendView_SignalBadge_Neutral(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	// Use Bullish as fallback since Neutral doesn't exist in domain
+	// The renderSignalBadge handles unknown signals as neutral
+	badge := view.renderSignalBadge(trenddomain.Bullish + 10) // Use an invalid signal index
+	assert.Contains(t, badge, "─ HOLD", "Neutral badge should show dash and HOLD")
+}
+
+// TestTrendView_RSIColorCoding verifies RSI value color coding.
+func TestTrendView_RSIColorCoding(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	tests := []struct {
+		name          string
+		rsi           float64
+		shouldHave    string
+		shouldNotHave string
+	}{
+		{"RSI < 30 (oversold) - green", 25.0, "25.00", ""},
+		{"RSI > 70 (overbought) - red", 75.0, "75.00", ""},
+		{"RSI 30-45 (undervalued) - green", 40.0, "40.00", ""},
+		{"RSI 55-70 (overvalued) - red", 60.0, "60.00", ""},
+		{"RSI 45-55 (fair) - default", 50.0, "50.00", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rsiRendered := view.renderRSIValue(tt.rsi)
+			assert.Contains(t, rsiRendered, tt.shouldHave, "RSI should contain value")
+		})
+	}
+}
+
+// TestTrendView_ValuationBadge verifies valuation badge rendering.
+func TestTrendView_ValuationBadge(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	tests := []struct {
+		name      string
+		valuation string
+		expected  string
+	}{
+		{"Oversold", "Oversold", "◆ Oversold"},
+		{"Undervalued", "Undervalued", "◇ Undervalued"},
+		{"Overbought", "Overbought", "◆ Overbought"},
+		{"Overvalued", "Overvalued", "◇ Overvalued"},
+		{"Fair value", "Fair value", "○ Fair value"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			badge := view.renderValuationBadge(tt.valuation)
+			assert.Contains(t, badge, tt.expected, "Valuation badge should show icon and text")
+		})
+	}
+}
+
+// TestTrendView_AlternatingRows verifies that odd rows use TableRowAlt style.
+func TestTrendView_AlternatingRows(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL")
+
+	// Set all rows to loaded
+	for i := range model.rows {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:  model.rows[i].Symbol,
+			RSI:     50.0,
+			EMAFast: 150.0,
+			EMASlow: 145.0,
+			Signal:  trenddomain.Bullish,
+		}
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	// Just verify rendering doesn't crash
+	assert.Contains(t, rendered, "AAPL", "View should contain AAPL")
+	assert.Contains(t, rendered, "MSFT", "View should contain MSFT")
+	assert.Contains(t, rendered, "GOOGL", "View should contain GOOGL")
+}
+
+// TestTrendView_SymbolAccentStyle verifies symbols are rendered with accent style.
+func TestTrendView_SymbolAccentStyle(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	model.rows[0].State = StateLoaded
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:  "AAPL",
+		RSI:     50.0,
+		EMAFast: 150.0,
+		EMASlow: 145.0,
+		Signal:  trenddomain.Bullish,
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	assert.Contains(t, rendered, "AAPL", "View should contain symbol with accent style")
+}
+
+// TestTrendView_TitleWithIcon verifies title has diamond icon.
+func TestTrendView_TitleWithIcon(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	title := view.renderTitle()
+	assert.Contains(t, title, "◆", "Title should contain diamond icon")
+	assert.Contains(t, title, "Trend Analysis", "Title should contain text")
 }

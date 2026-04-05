@@ -350,3 +350,177 @@ func TestState_String(t *testing.T) {
 		})
 	}
 }
+
+// TestTrendModel_GetCryptoStartIndex_MixedWatchlist verifies GetCryptoStartIndex
+// when the watchlist contains both equities and crypto.
+func TestTrendModel_GetCryptoStartIndex_MixedWatchlist(t *testing.T) {
+	model := NewModel()
+
+	watchlist := &config.WatchlistConfig{
+		Equities: []string{"AAPL", "MSFT", "GOOGL"},
+		Crypto:   []string{"BTC", "ETH"},
+	}
+
+	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}))
+
+	assert.Equal(t, 3, model.GetCryptoStartIndex(), "Crypto should start at index 3 (after 3 equities)")
+}
+
+// TestTrendModel_GetCryptoStartIndex_EquitiesOnly verifies GetCryptoStartIndex
+// when the watchlist contains only equities.
+func TestTrendModel_GetCryptoStartIndex_EquitiesOnly(t *testing.T) {
+	model := NewModel()
+
+	watchlist := &config.WatchlistConfig{
+		Equities: []string{"AAPL", "MSFT"},
+		Crypto:   []string{},
+	}
+
+	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}))
+
+	assert.Equal(t, 2, model.GetCryptoStartIndex(), "Crypto start index should equal number of equities")
+}
+
+// TestTrendModel_GetCryptoStartIndex_CryptoOnly verifies GetCryptoStartIndex
+// when the watchlist contains only crypto.
+func TestTrendModel_GetCryptoStartIndex_CryptoOnly(t *testing.T) {
+	model := NewModel()
+
+	watchlist := &config.WatchlistConfig{
+		Equities: []string{},
+		Crypto:   []string{"BTC", "ETH", "SOL"},
+	}
+
+	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}))
+
+	assert.Equal(t, 0, model.GetCryptoStartIndex(), "Crypto should start at index 0 (no equities)")
+}
+
+// TestTrendModel_GetCryptoStartIndex_EmptyWatchlist verifies GetCryptoStartIndex
+// when the watchlist is empty.
+func TestTrendModel_GetCryptoStartIndex_EmptyWatchlist(t *testing.T) {
+	model := NewModel()
+
+	watchlist := &config.WatchlistConfig{
+		Equities: []string{},
+		Crypto:   []string{},
+	}
+
+	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}))
+
+	assert.Equal(t, 0, model.GetCryptoStartIndex(), "Crypto start index should be 0 for empty watchlist")
+}
+
+// TestTrendModel_GetLoadedCount_AllLoading verifies GetLoadedCount returns 0
+// when all rows are in loading state.
+func TestTrendModel_GetLoadedCount_AllLoading(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL")
+
+	// All rows start in loading state
+	assert.Equal(t, 0, model.GetLoadedCount(), "Loaded count should be 0 when all are loading")
+}
+
+// TestTrendModel_GetLoadedCount_MixedStates verifies GetLoadedCount correctly
+// counts loaded and cached rows but ignores loading and error states.
+func TestTrendModel_GetLoadedCount_MixedStates(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL", "BTC")
+
+	// Set some rows to loaded state
+	result := &trenddomain.Result{Symbol: "AAPL", RSI: 50.5, Signal: trenddomain.Bullish}
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: result})
+	model = asModel(t, updatedM)
+
+	result2 := &trenddomain.Result{Symbol: "GOOGL", RSI: 45.0, Signal: trenddomain.Bearish}
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "GOOGL", Result: result2})
+	model = asModel(t, updatedM)
+
+	// Set one row to error state
+	err := errors.New("network error")
+	updatedM, _ = model.Update(TrendErrorMsg{Symbol: "MSFT", Err: err})
+	model = asModel(t, updatedM)
+
+	// BTC remains in loading state
+	// 2 loaded (AAPL, GOOGL) + 0 cached + 1 error (MSFT) + 1 loading (BTC) = 2 loaded
+	assert.Equal(t, 2, model.GetLoadedCount(), "Loaded count should be 2")
+}
+
+// TestTrendModel_GetLoadedCount_IncludesCached verifies GetLoadedCount includes
+// rows in StateCached.
+func TestTrendModel_GetLoadedCount_IncludesCached(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT")
+
+	// Set first row to loaded state
+	result := &trenddomain.Result{Symbol: "AAPL", RSI: 50.5}
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: result})
+	model = asModel(t, updatedM)
+
+	// Manually set second row to cached state (simulating cached data)
+	model.rows[1].State = StateCached
+
+	assert.Equal(t, 2, model.GetLoadedCount(), "Loaded count should include cached rows")
+}
+
+// TestTrendModel_GetSignalCounts_MixedSignals verifies GetSignalCounts correctly
+// counts bullish, bearish, and neutral signals.
+func TestTrendModel_GetSignalCounts_MixedSignals(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL", "TSLA", "NVDA")
+
+	// Set rows with various signals
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: &trenddomain.Result{Symbol: "AAPL", Signal: trenddomain.Bullish}})
+	model = asModel(t, updatedM)
+
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "MSFT", Result: &trenddomain.Result{Symbol: "MSFT", Signal: trenddomain.Bearish}})
+	model = asModel(t, updatedM)
+
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "GOOGL", Result: &trenddomain.Result{Symbol: "GOOGL", Signal: trenddomain.Bullish}})
+	model = asModel(t, updatedM)
+
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "TSLA", Result: &trenddomain.Result{Symbol: "TSLA", Signal: trenddomain.Bearish}})
+	model = asModel(t, updatedM)
+
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "NVDA", Result: &trenddomain.Result{Symbol: "NVDA", Signal: trenddomain.Bearish}})
+	model = asModel(t, updatedM)
+
+	bullish, bearish, neutral := model.GetSignalCounts()
+
+	assert.Equal(t, 2, bullish, "Should count 2 bullish signals")
+	assert.Equal(t, 3, bearish, "Should count 3 bearish signals")
+	assert.Equal(t, 0, neutral, "Should count 0 neutral signals")
+}
+
+// TestTrendModel_GetSignalCounts_IgnoresLoadingRows verifies GetSignalCounts
+// ignores rows that are still loading or in error state.
+func TestTrendModel_GetSignalCounts_IgnoresLoadingRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL")
+
+	// Set only one row to loaded
+	result := &trenddomain.Result{Symbol: "AAPL", Signal: trenddomain.Bullish}
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: result})
+	model = asModel(t, updatedM)
+
+	// Set one row to error
+	err := errors.New("network error")
+	updatedM, _ = model.Update(TrendErrorMsg{Symbol: "MSFT", Err: err})
+	model = asModel(t, updatedM)
+
+	// GOOGL remains in loading state
+
+	bullish, bearish, neutral := model.GetSignalCounts()
+
+	assert.Equal(t, 1, bullish, "Should count 1 bullish signal")
+	assert.Equal(t, 0, bearish, "Should have 0 bearish signals")
+	assert.Equal(t, 0, neutral, "Should have 0 neutral signals")
+}
+
+// TestTrendModel_GetSignalCounts_EmptyRows verifies GetSignalCounts returns
+// all zeros when there are no loaded rows.
+func TestTrendModel_GetSignalCounts_EmptyRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{})
+
+	// No rows at all
+	bullish, bearish, neutral := model.GetSignalCounts()
+
+	assert.Equal(t, 0, bullish, "Should have 0 bullish signals")
+	assert.Equal(t, 0, bearish, "Should have 0 bearish signals")
+	assert.Equal(t, 0, neutral, "Should have 0 neutral signals")
+}

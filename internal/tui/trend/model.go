@@ -81,6 +81,8 @@ type Model struct {
 	cancel context.CancelFunc
 	// width and height are the terminal dimensions.
 	width, height int
+	// equitiesCount is the number of equity symbols in the watchlist.
+	equitiesCount int
 }
 
 // NewModel creates a new trend model.
@@ -106,6 +108,9 @@ func (m *Model) Configure(
 	m.engine = engine
 	m.detector = detector
 	m.ctx, m.cancel = context.WithCancel(ctx)
+
+	// Track where equities end and crypto begins
+	m.equitiesCount = len(watchlist.Equities)
 
 	// Build combined watchlist from equities and crypto
 	m.watchlist = append([]string{}, watchlist.Equities...)
@@ -319,6 +324,47 @@ func (m Model) GetWidth() int {
 // GetHeight returns the current height.
 func (m Model) GetHeight() int {
 	return m.height
+}
+
+// GetCryptoStartIndex returns the index of the first crypto row.
+// If there are no crypto symbols, returns len(m.rows).
+func (m Model) GetCryptoStartIndex() int {
+	return m.equitiesCount
+}
+
+// GetLoadedCount returns the number of rows that have finished loading
+// (either loaded or cached state).
+func (m Model) GetLoadedCount() int {
+	count := 0
+	for _, row := range m.rows {
+		if row.State == StateLoaded || row.State == StateCached {
+			count++
+		}
+	}
+	return count
+}
+
+// GetSignalCounts returns the count of bullish, bearish, and neutral signals
+// across all loaded rows. Loading and error rows are ignored.
+func (m Model) GetSignalCounts() (bullish, bearish, neutral int) {
+	var b, br, n int
+	for _, row := range m.rows {
+		if row.State != StateLoaded && row.State != StateCached {
+			continue
+		}
+		if row.Result == nil {
+			continue
+		}
+		switch row.Result.Signal {
+		case trenddomain.Bullish:
+			b++
+		case trenddomain.Bearish:
+			br++
+		default:
+			n++
+		}
+	}
+	return b, br, n
 }
 
 // KeyBindings returns the keyboard bindings for the trend view.

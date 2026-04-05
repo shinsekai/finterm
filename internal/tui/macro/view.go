@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/owner/finterm/internal/tui/components"
+	"github.com/shinsekai/finterm/internal/tui/components"
 )
 
 // View returns the view as a string. Implements tea.Model.

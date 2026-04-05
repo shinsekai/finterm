@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/owner/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/alphavantage"
 )
 
 // viewMockTheme is a mock implementation of Theme for view tests.

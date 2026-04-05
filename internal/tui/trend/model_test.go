@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/owner/finterm/internal/config"
-	trenddomain "github.com/owner/finterm/internal/domain/trend"
-	"github.com/owner/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/config"
+	trenddomain "github.com/shinsekai/finterm/internal/domain/trend"
+	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 )
 
 // mockEngine is a mock implementation of Engine for testing.

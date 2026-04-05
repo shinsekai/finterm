@@ -9,9 +9,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/owner/finterm/internal/config"
-	trenddomain "github.com/owner/finterm/internal/domain/trend"
-	"github.com/owner/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/config"
+	trenddomain "github.com/shinsekai/finterm/internal/domain/trend"
+	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 )
 
 // viewMockEngine is a mock implementation of Engine for view tests.

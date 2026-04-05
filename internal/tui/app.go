@@ -10,14 +10,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/owner/finterm/internal/cache"
-	"github.com/owner/finterm/internal/config"
-	"github.com/owner/finterm/internal/domain/trend/indicators"
-	"github.com/owner/finterm/internal/tui/components"
-	"github.com/owner/finterm/internal/tui/macro"
-	"github.com/owner/finterm/internal/tui/news"
-	"github.com/owner/finterm/internal/tui/quote"
-	"github.com/owner/finterm/internal/tui/trend"
+	"github.com/shinsekai/finterm/internal/cache"
+	"github.com/shinsekai/finterm/internal/config"
+	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/tui/components"
+	"github.com/shinsekai/finterm/internal/tui/macro"
+	"github.com/shinsekai/finterm/internal/tui/news"
+	"github.com/shinsekai/finterm/internal/tui/quote"
+	"github.com/shinsekai/finterm/internal/tui/trend"
 )
 
 const (

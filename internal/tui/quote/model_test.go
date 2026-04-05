@@ -10,9 +10,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/owner/finterm/internal/alphavantage"
-	trenddomain "github.com/owner/finterm/internal/domain/trend"
-	"github.com/owner/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	trenddomain "github.com/shinsekai/finterm/internal/domain/trend"
+	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 )
 
 // mockEngine is a mock implementation of Engine for testing.

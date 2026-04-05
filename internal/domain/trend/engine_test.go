@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/owner/finterm/internal/config"
-	"github.com/owner/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/config"
+	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 )
 
 // mockIndicator is a mock implementation of the Indicator interface for testing.

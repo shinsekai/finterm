@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/owner/finterm/internal/alphavantage"
-	"github.com/owner/finterm/internal/cache"
-	"github.com/owner/finterm/internal/config"
-	trenddomain "github.com/owner/finterm/internal/domain/trend"
-	"github.com/owner/finterm/internal/domain/trend/indicators"
-	"github.com/owner/finterm/internal/tui/components"
-	"github.com/owner/finterm/internal/tui/trend"
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/cache"
+	"github.com/shinsekai/finterm/internal/config"
+	trenddomain "github.com/shinsekai/finterm/internal/domain/trend"
+	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/tui/components"
+	"github.com/shinsekai/finterm/internal/tui/trend"
 )
 
 // mockEngine is a mock implementation of trend.Engine for testing.

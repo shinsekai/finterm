@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/owner/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/alphavantage"
 )
 
 // mockAVClient is a mock implementation of AVClient for testing.

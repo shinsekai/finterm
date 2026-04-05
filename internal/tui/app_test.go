@@ -409,7 +409,8 @@ func TestApp_ViewRenders(t *testing.T) {
 	app = newModel.(Model)
 
 	view := app.View()
-	assert.Contains(t, view, "1. Trend")
+	assert.Contains(t, view, "◆")
+	assert.Contains(t, view, "Trend")
 
 	// Test help view
 	overlay := components.NewHelpOverlay(globalBindings, nil)
@@ -625,15 +626,59 @@ func TestApp_StatusBar_RendersConnectionState(t *testing.T) {
 	// Test online state
 	app.connectionState = ConnOnline
 	statusBar := app.renderStatusBar()
-	assert.Contains(t, statusBar, "online")
+	assert.Contains(t, statusBar, "● online")
 
 	// Test rate limited state
 	app.connectionState = ConnRateLimited
 	statusBar = app.renderStatusBar()
-	assert.Contains(t, statusBar, "rate limited")
+	assert.Contains(t, statusBar, "● rate limited")
 
 	// Test offline state
 	app.connectionState = ConnOffline
 	statusBar = app.renderStatusBar()
-	assert.Contains(t, statusBar, "offline")
+	assert.Contains(t, statusBar, "● offline")
+}
+
+// TestApp_TabBar_ShowsIcons tests that each tab icon appears in the rendered tab bar.
+func TestApp_TabBar_ShowsIcons(t *testing.T) {
+	app := newMockApp(t)
+	app.width = 80
+
+	tabBar := app.renderTabBar()
+
+	// Verify all icons appear
+	assert.Contains(t, tabBar, "◆", "Trend tab icon should appear")
+	assert.Contains(t, tabBar, "◈", "Quote tab icon should appear")
+	assert.Contains(t, tabBar, "◇", "Macro tab icon should appear")
+	assert.Contains(t, tabBar, "◉", "News tab icon should appear")
+}
+
+// TestApp_StatusBar_ErrorCountFormat tests error count formatting with icons.
+func TestApp_StatusBar_ErrorCountFormat(t *testing.T) {
+	app := newMockApp(t)
+	app.width = 80
+
+	// Test with no errors
+	app.errorCount = 0
+	statusBar := app.renderStatusBar()
+	assert.Contains(t, statusBar, "✓ no errors", "Should show checkmark when no errors")
+
+	// Test with errors
+	app.errorCount = 3
+	statusBar = app.renderStatusBar()
+	assert.Contains(t, statusBar, "✗ 3 errors", "Should show X icon and error count when errors exist")
+
+	// Test with single error
+	app.errorCount = 1
+	statusBar = app.renderStatusBar()
+	assert.Contains(t, statusBar, "✗ 1 errors", "Should show X icon with singular error count")
+}
+
+// TestApp_StatusBar_HasSeparatorLine tests that status bar has a separator line.
+func TestApp_StatusBar_HasSeparatorLine(t *testing.T) {
+	app := newMockApp(t)
+	app.width = 80
+
+	statusBar := app.renderStatusBar()
+	assert.Contains(t, statusBar, "─", "Status bar should contain separator character")
 }

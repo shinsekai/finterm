@@ -16,15 +16,21 @@ import (
 type Theme interface {
 	Title() lipgloss.Style
 	TableRow() lipgloss.Style
+	TableRowAlt() lipgloss.Style
 	TableHeader() lipgloss.Style
 	TableEmpty() lipgloss.Style
 	Bullish() lipgloss.Style
 	Bearish() lipgloss.Style
+	BullishBadge() lipgloss.Style
+	BearishBadge() lipgloss.Style
 	Neutral() lipgloss.Style
+	NeutralBadge() lipgloss.Style
 	Help() lipgloss.Style
 	Error() lipgloss.Style
 	Muted() lipgloss.Style
 	Spinner() lipgloss.Style
+	Accent() lipgloss.Style
+	Divider() lipgloss.Style
 	Foreground() lipgloss.Color
 	Background() lipgloss.Color
 }
@@ -75,7 +81,9 @@ func (v *View) Render() string {
 
 // renderTitle renders the view title.
 func (v *View) renderTitle() string {
-	return v.theme.Title().Render("Trend Analysis")
+	symbolCount := len(v.model.GetRows())
+	subtitle := fmt.Sprintf("  %d symbols", symbolCount)
+	return v.theme.Accent().Render("◆") + " " + v.theme.Title().Render("Trend Analysis") + v.theme.Muted().Render(subtitle)
 }
 
 // renderTable renders the data table.
@@ -105,21 +113,21 @@ func (v *View) renderTable() string {
 func (v *View) buildColumns() []components.Column {
 	return []components.Column{
 		{
-			Title:       "Symbol",
+			Title:       "SYMBOL",
 			Width:       10,
 			Alignment:   components.AlignLeft,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
-			Title:       "Signal",
+			Title:       "SIGNAL",
 			Width:       15,
 			Alignment:   components.AlignLeft,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
-			Title:       "Price",
+			Title:       "PRICE",
 			Width:       14,
 			Alignment:   components.AlignRight,
 			Style:       v.theme.TableRow(),
@@ -133,21 +141,21 @@ func (v *View) buildColumns() []components.Column {
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
-			Title:       "EMA Fast",
+			Title:       "EMA FAST",
 			Width:       12,
 			Alignment:   components.AlignRight,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
-			Title:       "EMA Slow",
+			Title:       "EMA SLOW",
 			Width:       12,
 			Alignment:   components.AlignRight,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
-			Title:       "Valuation",
+			Title:       "VALUATION",
 			Width:       0, // 0 means auto-calculate to fill remaining space
 			Alignment:   components.AlignLeft,
 			Style:       v.theme.TableRow(),
@@ -164,8 +172,13 @@ func (v *View) buildTableRows(rows []RowData) []components.Row {
 	for i, row := range rows {
 		cells := v.buildRowCells(row)
 
-		// Apply highlight style to active row
+		// Apply alternating row style
 		rowStyle := v.theme.TableRow()
+		if i%2 == 1 {
+			rowStyle = v.theme.TableRowAlt()
+		}
+
+		// Apply highlight style to active row (overrides alternating)
 		if i == activeRow {
 			rowStyle = rowStyle.Background(v.theme.Foreground()).Foreground(v.theme.Background())
 		}
@@ -199,12 +212,12 @@ func (v *View) buildRowCells(row RowData) []components.Cell {
 func (v *View) buildLoadingCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
-		{Text: v.theme.Spinner().Render("Loading...")},
-		{Text: "-"},
-		{Text: "-"},
-		{Text: "-"},
-		{Text: "-"},
-		{Text: "-"},
+		{Text: v.theme.Spinner().Render("⟳ Loading…")},
+		{Text: "—"},
+		{Text: "—"},
+		{Text: "—"},
+		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -212,36 +225,14 @@ func (v *View) buildLoadingCells(row RowData) []components.Cell {
 func (v *View) buildLoadedCells(row RowData) []components.Cell {
 	result := row.Result
 
-	// Color-code signal
-	var signalStyle lipgloss.Style
-	switch result.Signal {
-	case trenddomain.Bullish:
-		signalStyle = v.theme.Bullish()
-	case trenddomain.Bearish:
-		signalStyle = v.theme.Bearish()
-	default:
-		signalStyle = v.theme.Neutral()
-	}
-
-	// Color-code valuation
-	var valuationStyle lipgloss.Style
-	switch result.Valuation {
-	case "Oversold", "Undervalued":
-		valuationStyle = v.theme.Bullish()
-	case "Overvalued", "Overbought":
-		valuationStyle = v.theme.Bearish()
-	default:
-		valuationStyle = v.theme.TableRow()
-	}
-
 	return []components.Cell{
-		{Text: result.Symbol},
-		{Text: signalStyle.Render(result.Signal.String())},
+		{Text: v.theme.Accent().Render(result.Symbol)},
+		{Text: v.renderSignalBadge(result.Signal)},
 		{Text: formatPrice(result.Price)},
-		{Text: FormatValue(result.RSI, 2)},
+		{Text: v.renderRSIValue(result.RSI)},
 		{Text: FormatValue(result.EMAFast, 2)},
 		{Text: FormatValue(result.EMASlow, 2)},
-		{Text: valuationStyle.Render(result.Valuation)},
+		{Text: v.renderValuationBadge(result.Valuation)},
 	}
 }
 
@@ -249,58 +240,36 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 func (v *View) buildCachedCells(row RowData) []components.Cell {
 	result := row.Result
 
-	// Color-code signal
-	var signalStyle lipgloss.Style
-	switch result.Signal {
-	case trenddomain.Bullish:
-		signalStyle = v.theme.Bullish()
-	case trenddomain.Bearish:
-		signalStyle = v.theme.Bearish()
-	default:
-		signalStyle = v.theme.Neutral()
-	}
-
-	// Color-code valuation
-	var valuationStyle lipgloss.Style
-	switch result.Valuation {
-	case "Oversold", "Undervalued":
-		valuationStyle = v.theme.Bullish()
-	case "Overvalued", "Overbought":
-		valuationStyle = v.theme.Bearish()
-	default:
-		valuationStyle = v.theme.TableRow()
-	}
-
-	// Add "offline" badge to symbol
-	symbolWithBadge := result.Symbol + " " + v.theme.Muted().Render("[offline]")
+	// Add ○ offline indicator to symbol
+	symbolWithBadge := v.theme.Accent().Render(result.Symbol) + " " + v.theme.Muted().Render("○")
 
 	return []components.Cell{
 		{Text: symbolWithBadge},
-		{Text: signalStyle.Render(result.Signal.String())},
+		{Text: v.renderSignalBadge(result.Signal)},
 		{Text: formatPrice(result.Price)},
-		{Text: FormatValue(result.RSI, 2)},
+		{Text: v.renderRSIValue(result.RSI)},
 		{Text: FormatValue(result.EMAFast, 2)},
 		{Text: FormatValue(result.EMASlow, 2)},
-		{Text: valuationStyle.Render(result.Valuation)},
+		{Text: v.renderValuationBadge(result.Valuation)},
 	}
 }
 
 // buildErrorCells builds cells for an error row.
 func (v *View) buildErrorCells(row RowData) []components.Cell {
-	errorText := "Error"
+	errorText := "✗ Error"
 	if row.Error != nil {
-		errorText = row.Error.Error()
+		errorText = "✗ " + row.Error.Error()
 		// Show full error text (no truncation)
 	}
 
 	return []components.Cell{
 		{Text: row.Symbol},
 		{Text: v.theme.Error().Render(errorText)},
-		{Text: "--"},
-		{Text: "--"},
-		{Text: "--"},
-		{Text: "--"},
-		{Text: "--"},
+		{Text: "—"},
+		{Text: "—"},
+		{Text: "—"},
+		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -309,17 +278,76 @@ func (v *View) buildUnknownCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
 		{Text: v.theme.Muted().Render("Unknown")},
-		{Text: "--"},
-		{Text: "--"},
-		{Text: "--"},
-		{Text: "--"},
-		{Text: "--"},
+		{Text: "—"},
+		{Text: "—"},
+		{Text: "—"},
+		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
 // renderFooter renders the footer with key bindings.
 func (v *View) renderFooter() string {
-	return v.theme.Help().Render("↑↓ Navigate  |  r Refresh  |  q Quit")
+	return v.theme.Accent().Render("↑↓") + " " + v.theme.Muted().Render("navigate") +
+		"  ·  " +
+		v.theme.Accent().Render("r") + " " + v.theme.Muted().Render("refresh") +
+		"  ·  " +
+		v.theme.Accent().Render("1-4") + " " + v.theme.Muted().Render("tabs") +
+		"  ·  " +
+		v.theme.Accent().Render("?") + " " + v.theme.Muted().Render("help")
+}
+
+// renderSignalBadge renders a signal as a colored badge.
+func (v *View) renderSignalBadge(signal trenddomain.Signal) string {
+	switch signal {
+	case trenddomain.Bullish:
+		return v.theme.BullishBadge().Render("▲ BULL")
+	case trenddomain.Bearish:
+		return v.theme.BearishBadge().Render("▼ BEAR")
+	default:
+		return v.theme.NeutralBadge().Render("─ HOLD")
+	}
+}
+
+// renderRSIValue renders an RSI value with appropriate color coding.
+func (v *View) renderRSIValue(rsi float64) string {
+	var style lipgloss.Style
+	switch {
+	case rsi < 30:
+		// Oversold - bullish style (green)
+		style = v.theme.Bullish()
+	case rsi > 70:
+		// Overbought - bearish style (red)
+		style = v.theme.Bearish()
+	case rsi >= 30 && rsi < 45:
+		// Undervalued - lighter green
+		style = v.theme.Bullish()
+	case rsi > 55 && rsi <= 70:
+		// Overvalued - lighter red
+		style = v.theme.Bearish()
+	default:
+		// Fair value (45-55) - default text
+		style = lipgloss.NewStyle()
+	}
+	return style.Render(FormatValue(rsi, 2))
+}
+
+// renderValuationBadge renders a valuation as a styled badge with icon.
+func (v *View) renderValuationBadge(valuation string) string {
+	switch valuation {
+	case "Oversold":
+		return v.theme.Bullish().Render("◆ Oversold")
+	case "Undervalued":
+		return v.theme.Bullish().Render("◇ Undervalued")
+	case "Overbought":
+		return v.theme.Bearish().Render("◆ Overbought")
+	case "Overvalued":
+		return v.theme.Bearish().Render("◇ Overvalued")
+	case "Fair value":
+		return v.theme.Muted().Render("○ Fair value")
+	default:
+		return valuation
+	}
 }
 
 // String returns the rendered view.
@@ -336,6 +364,10 @@ func (d *defaultTheme) Title() lipgloss.Style {
 
 func (d *defaultTheme) TableRow() lipgloss.Style {
 	return lipgloss.NewStyle()
+}
+
+func (d *defaultTheme) TableRowAlt() lipgloss.Style {
+	return lipgloss.NewStyle().Background(lipgloss.Color("#2D2F3D"))
 }
 
 func (d *defaultTheme) TableHeader() lipgloss.Style {
@@ -358,6 +390,27 @@ func (d *defaultTheme) Neutral() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("F1FA8C")).Bold(true)
 }
 
+func (d *defaultTheme) BullishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#282A36")).
+		Background(lipgloss.Color("50FA7B")).
+		Bold(true)
+}
+
+func (d *defaultTheme) BearishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#F8F8F2")).
+		Background(lipgloss.Color("FF5555")).
+		Bold(true)
+}
+
+func (d *defaultTheme) NeutralBadge() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#282A36")).
+		Background(lipgloss.Color("F1FA8C")).
+		Bold(true)
+}
+
 func (d *defaultTheme) Help() lipgloss.Style {
 	return lipgloss.NewStyle().Italic(true)
 }
@@ -372,6 +425,14 @@ func (d *defaultTheme) Muted() lipgloss.Style {
 
 func (d *defaultTheme) Spinner() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("7D56F4"))
+}
+
+func (d *defaultTheme) Accent() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("7D56F4")).Bold(true)
+}
+
+func (d *defaultTheme) Divider() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A"))
 }
 
 func (d *defaultTheme) Foreground() lipgloss.Color {

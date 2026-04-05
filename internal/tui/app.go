@@ -4,6 +4,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -226,8 +227,8 @@ func (m Model) View() string {
 	}
 
 	// Calculate available heights
-	tabBarHeight := 2    // tab bar + newline
-	statusBarHeight := 2 // status bar + newline
+	tabBarHeight := 3    // tab row + accent line + newline
+	statusBarHeight := 3 // separator + status bar + newline
 	contentHeight := m.height - tabBarHeight - statusBarHeight
 	if contentHeight < 1 {
 		contentHeight = 1
@@ -314,15 +315,25 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // renderTabBar renders the tab navigation bar.
 func (m Model) renderTabBar() string {
+	tabIcons := []string{"◆", "◈", "◇", "◉"}
 	var tabs []string
 	for i, tab := range m.tabs {
 		style := m.theme.Tab()
 		if i == m.activeTab {
 			style = m.theme.TabActive()
 		}
-		tabs = append(tabs, style.Render(fmt.Sprintf("%d. %s", i+1, tab.name)))
+		tabText := fmt.Sprintf(" %s %s ", tabIcons[i], tab.name)
+		tabs = append(tabs, style.Render(tabText))
 	}
-	return m.theme.TabBar().Render(lipgloss.JoinHorizontal(lipgloss.Top, tabs...))
+
+	// Join tabs with subtle separator
+	divider := m.theme.Divider().Render("│")
+	tabRow := lipgloss.JoinHorizontal(lipgloss.Top, tabs[0], divider, tabs[1], divider, tabs[2], divider, tabs[3])
+
+	// Add full-width bottom accent line
+	accentLine := m.theme.Divider().Render(strings.Repeat("━", m.width))
+
+	return lipgloss.JoinVertical(lipgloss.Left, tabRow, accentLine) + "\n"
 }
 
 // showHelpOverlay shows the help overlay with context-sensitive bindings.
@@ -351,18 +362,26 @@ func (m Model) getViewBindings() []components.Binding {
 
 // renderStatusBar renders the status bar with connection state, last update time, and error count.
 func (m Model) renderStatusBar() string {
-	left := fmt.Sprintf("Status: %s | Last update: %s", m.renderConnectionState(), m.formatLastUpdate())
-	right := fmt.Sprintf("Errors: %d", m.errorCount)
+	// Top separator line
+	separator := m.theme.Divider().Render(strings.Repeat("─", m.width))
 
-	statusBar := lipgloss.NewStyle().
-		Foreground(m.theme.Foreground()).
-		Background(m.theme.Background()).
-		Width(m.width).
-		Padding(0, 1)
+	// Left side: connection state + last update time
+	left := fmt.Sprintf("%s | %s", m.renderConnectionState(), m.theme.Muted().Render(m.formatLastUpdate()))
 
-	return statusBar.Render(lipgloss.JoinHorizontal(lipgloss.Bottom,
+	// Right side: error count with icon + key hints
+	var errorText string
+	if m.errorCount > 0 {
+		errorText = fmt.Sprintf("✗ %d errors", m.errorCount)
+	} else {
+		errorText = "✓ no errors"
+	}
+	right := fmt.Sprintf("%s  %s", errorText, m.theme.Muted().Render("?:help  q:quit"))
+
+	statusBar := m.theme.StatusBar().Render(lipgloss.JoinHorizontal(lipgloss.Bottom,
 		left,
 		lipgloss.PlaceHorizontal(m.width, lipgloss.Right, right)))
+
+	return lipgloss.JoinVertical(lipgloss.Left, separator, statusBar) + "\n"
 }
 
 // renderConnectionState renders the connection state with appropriate styling.
@@ -373,13 +392,13 @@ func (m Model) renderConnectionState() string {
 	switch m.connectionState {
 	case ConnOnline:
 		style = m.theme.StatusOnline()
-		text = "online"
+		text = "● online"
 	case ConnRateLimited:
 		style = m.theme.StatusRateLimited()
-		text = "rate limited"
+		text = "● rate limited"
 	case ConnOffline:
 		style = m.theme.StatusOffline()
-		text = "offline"
+		text = "● offline"
 	}
 
 	return style.Render(text)

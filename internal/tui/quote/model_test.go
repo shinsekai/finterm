@@ -928,3 +928,240 @@ func TestQuoteView_PriceRendered(t *testing.T) {
 		t.Logf("Full view output:\n%s", view)
 	}
 }
+
+// TestQuoteView_DayRangeBar_Normal verifies day range bar with valid data.
+func TestQuoteView_DayRangeBar_Normal(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	view := NewView(model).SetTheme(&defaultTheme{})
+
+	bar := view.renderDayRangeBar(155.00, "150", "160")
+
+	assert.Contains(t, bar, "150", "Should contain low value")
+	assert.Contains(t, bar, "160", "Should contain high value")
+	assert.Contains(t, bar, "▓", "Should contain filled block character")
+	assert.Contains(t, bar, "░", "Should contain empty block character")
+}
+
+// TestQuoteView_DayRangeBar_MissingLow verifies day range bar is skipped when Low is missing.
+func TestQuoteView_DayRangeBar_MissingLow(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	view := NewView(model).SetTheme(&defaultTheme{})
+
+	bar := view.renderDayRangeBar(155.00, "", "160")
+
+	assert.Empty(t, bar, "Should return empty string when Low is missing")
+}
+
+// TestQuoteView_DayRangeBar_MissingHigh verifies day range bar is skipped when High is missing.
+func TestQuoteView_DayRangeBar_MissingHigh(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	view := NewView(model).SetTheme(&defaultTheme{})
+
+	bar := view.renderDayRangeBar(155.00, "150", "")
+
+	assert.Empty(t, bar, "Should return empty string when High is missing")
+}
+
+// TestQuoteView_DayRangeBar_PriceAtLow verifies bar shows minimal fill at low.
+func TestQuoteView_DayRangeBar_PriceAtLow(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	view := NewView(model).SetTheme(&defaultTheme{})
+
+	bar := view.renderDayRangeBar(150.00, "150", "160")
+
+	assert.Contains(t, bar, "░", "Should contain empty block character when at low")
+}
+
+// TestQuoteView_DayRangeBar_PriceAtHigh verifies bar is fully filled at high.
+func TestQuoteView_DayRangeBar_PriceAtHigh(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	view := NewView(model).SetTheme(&defaultTheme{})
+
+	bar := view.renderDayRangeBar(160.00, "150", "160")
+
+	// When price is at high, bar should be fully filled (no empty blocks)
+	assert.Contains(t, bar, "▓", "Should contain filled block character")
+	assert.NotContains(t, bar, "░", "Should not contain empty block character when at high")
+}
+
+// TestQuoteView_EMACrossover_Bullish verifies bullish crossover display.
+func TestQuoteView_EMACrossover_Bullish(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:  "AAPL",
+			RSI:     52.3,
+			EMAFast: 150,
+			EMASlow: 145,
+			Signal:  trenddomain.Bullish,
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "above", "Should show 'above' for bullish crossover")
+	assert.Contains(t, card, "$5.00", "Should show correct delta amount")
+}
+
+// TestQuoteView_EMACrossover_Bearish verifies bearish crossover display.
+func TestQuoteView_EMACrossover_Bearish(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:  "AAPL",
+			RSI:     52.3,
+			EMAFast: 140,
+			EMASlow: 145,
+			Signal:  trenddomain.Bearish,
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "below", "Should show 'below' for bearish crossover")
+	assert.Contains(t, card, "$5.00", "Should show correct delta amount")
+}
+
+// TestQuoteView_EMACrossover_Converged verifies converged EMAs display.
+func TestQuoteView_EMACrossover_Converged(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:  "AAPL",
+			RSI:     52.3,
+			EMAFast: 145,
+			EMASlow: 145,
+			Signal:  trenddomain.Bearish, // Equality is treated as Bearish
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "converged", "Should show 'converged' when EMAs are equal")
+}
+
+// TestQuoteView_TrendBadge_Bullish verifies bullish badge.
+func TestQuoteView_TrendBadge_Bullish(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:  "AAPL",
+			RSI:     52.3,
+			EMAFast: 150,
+			EMASlow: 145,
+			Signal:  trenddomain.Bullish,
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "▲ BULL", "Should show bullish badge")
+}
+
+// TestQuoteView_TrendBadge_Bearish verifies bearish badge.
+func TestQuoteView_TrendBadge_Bearish(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:  "AAPL",
+			RSI:     52.3,
+			EMAFast: 140,
+			EMASlow: 145,
+			Signal:  trenddomain.Bearish,
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "▼ BEAR", "Should show bearish badge")
+}
+
+// TestQuoteView_IdleRecentLookups verifies recent lookups shown in idle state.
+func TestQuoteView_IdleRecentLookups(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.lookupHistory = []string{"AAPL", "MSFT", "GOOGL"}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	rendered := view.renderIdle()
+
+	assert.Contains(t, rendered, "Recent:", "Should show Recent: label")
+	assert.Contains(t, rendered, "AAPL", "Should show AAPL")
+	assert.Contains(t, rendered, "MSFT", "Should show MSFT")
+	assert.Contains(t, rendered, "GOOGL", "Should show GOOGL")
+}
+
+// TestQuoteView_IdleNoHistory verifies no recent section when history is empty.
+func TestQuoteView_IdleNoHistory(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.lookupHistory = []string{}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	rendered := view.renderIdle()
+
+	assert.NotContains(t, rendered, "Recent:", "Should not show Recent: label when history is empty")
+}
+
+// TestQuoteView_IdleRecentMaxFive verifies maximum 5 recent entries shown.
+func TestQuoteView_IdleRecentMaxFive(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	// Add 8 entries to history
+	model.lookupHistory = []string{"AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG", "HHH"}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	rendered := view.renderIdle()
+
+	assert.Contains(t, rendered, "Recent:", "Should show Recent: label")
+	// Check that only 5 entries are shown (most recent 5: DDD, EEE, FFF, GGG, HHH)
+	assert.Contains(t, rendered, "DDD", "Should show DDD (4th most recent)")
+	assert.Contains(t, rendered, "EEE", "Should show EEE (5th most recent)")
+	assert.Contains(t, rendered, "FFF", "Should show FFF (6th most recent)")
+	assert.Contains(t, rendered, "GGG", "Should show GGG (7th most recent)")
+	assert.Contains(t, rendered, "HHH", "Should show HHH (8th most recent)")
+	assert.NotContains(t, rendered, "AAA", "Should not show AAA (oldest, beyond limit)")
+	assert.NotContains(t, rendered, "BBB", "Should not show BBB (second oldest, beyond limit)")
+	assert.NotContains(t, rendered, "CCC", "Should not show CCC (third oldest, beyond limit)")
+}
+
+// TestQuoteView_ErrorRetryHint verifies modern retry hint in error state.
+func TestQuoteView_ErrorRetryHint(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateError
+	model.err = errors.New("test error")
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	rendered := view.renderError()
+
+	assert.Contains(t, rendered, "retry", "Should show 'retry' hint")
+	assert.Contains(t, rendered, "clear", "Should show 'clear' hint")
+	assert.Contains(t, rendered, "Enter", "Should show Enter key hint")
+	assert.Contains(t, rendered, "Esc", "Should show Esc key hint")
+}

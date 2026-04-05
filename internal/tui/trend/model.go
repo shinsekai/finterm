@@ -145,11 +145,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case TrendDataMsg:
 		// Handle data for a single ticker
-		return m.handleTrendData(msg)
+		m = m.handleTrendData(msg)
+		// Trigger next ticker fetch
+		nextIndex := msg.Index + 1
+		if nextIndex < len(m.watchlist) {
+			return m, m.fetchTickerCmd(nextIndex)
+		}
+		m = m.updateOverallState()
+		return m, nil
 
 	case TrendErrorMsg:
 		// Handle error for a single ticker
-		return m.handleTrendError(msg)
+		m = m.handleTrendError(msg)
+		// Continue to next ticker even on error
+		nextIndex := msg.Index + 1
+		if nextIndex < len(m.watchlist) {
+			return m, m.fetchTickerCmd(nextIndex)
+		}
+		m = m.updateOverallState()
+		return m, nil
 	}
 
 	return m, nil
@@ -187,28 +201,28 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 // handleTrendData updates the model with trend analysis result for a ticker.
-func (m Model) handleTrendData(msg TrendDataMsg) (Model, tea.Cmd) {
+func (m Model) handleTrendData(msg TrendDataMsg) Model {
 	for i, row := range m.rows {
 		if row.Symbol == msg.Symbol {
 			m.rows[i].State = StateLoaded
 			m.rows[i].Result = msg.Result
 			m.rows[i].Error = nil
-			return m, nil
+			return m
 		}
 	}
-	return m, nil
+	return m
 }
 
 // handleTrendError updates the model with an error for a ticker.
-func (m Model) handleTrendError(msg TrendErrorMsg) (Model, tea.Cmd) {
+func (m Model) handleTrendError(msg TrendErrorMsg) Model {
 	for i, row := range m.rows {
 		if row.Symbol == msg.Symbol {
 			m.rows[i].State = StateError
 			m.rows[i].Error = msg.Err
-			return m, nil
+			return m
 		}
 	}
-	return m, nil
+	return m
 }
 
 // refreshAllCmd returns a command to refresh all tickers.
@@ -223,37 +237,63 @@ func (m Model) refreshAllCmd() tea.Cmd {
 	return m.fetchAllCmd()
 }
 
-// fetchAllCmd returns a command that fetches data for all tickers concurrently.
+// fetchAllCmd returns a command that starts fetching tickers sequentially.
+// Each result/error triggers the next fetch via fetchTickerCmd.
 func (m Model) fetchAllCmd() tea.Cmd {
-	cmds := make([]tea.Cmd, len(m.watchlist))
-
-	// Create a fetch command for each ticker
-	for i, symbol := range m.watchlist {
-		symbol := symbol // Capture loop variable
-		cmds[i] = func() tea.Msg {
-			return m.fetchTicker(symbol)
-		}
+	if len(m.watchlist) == 0 {
+		return nil
 	}
-
-	// Execute all fetches concurrently via tea.Batch
-	return tea.Batch(cmds...)
+	// Start with the first ticker
+	return m.fetchTickerCmd(0)
 }
 
-// fetchTicker fetches trend data for a single ticker.
-func (m Model) fetchTicker(symbol string) tea.Msg {
-	result, err := m.engine.AnalyzeWithSymbolDetection(m.ctx, symbol)
-
-	if err != nil {
-		return TrendErrorMsg{
+// fetchTickerCmd fetches a single ticker and returns the result.
+func (m Model) fetchTickerCmd(index int) tea.Cmd {
+	if index >= len(m.watchlist) {
+		return nil
+	}
+	symbol := m.watchlist[index]
+	return func() tea.Msg {
+		result, err := m.engine.AnalyzeWithSymbolDetection(m.ctx, symbol)
+		if err != nil {
+			return TrendErrorMsg{
+				Symbol: symbol,
+				Err:    err,
+				Index:  index,
+			}
+		}
+		return TrendDataMsg{
 			Symbol: symbol,
-			Err:    err,
+			Result: result,
+			Index:  index,
+		}
+	}
+}
+
+// updateOverallState updates the overall state based on the status of all rows.
+func (m Model) updateOverallState() Model {
+	allLoaded := true
+	hasLoading := false
+
+	for _, row := range m.rows {
+		switch row.State {
+		case StateLoading:
+			allLoaded = false
+			hasLoading = true
+		case StateError:
+			allLoaded = false
 		}
 	}
 
-	return TrendDataMsg{
-		Symbol: symbol,
-		Result: result,
+	switch {
+	case hasLoading:
+		m.overallState = StateLoading
+	case allLoaded:
+		m.overallState = StateLoaded
+	default:
+		m.overallState = StateError
 	}
+	return m
 }
 
 // GetRows returns the current rows data.
@@ -297,12 +337,14 @@ type RefreshMsg struct{}
 type TrendDataMsg struct { //nolint:revive // type name stutters with package name
 	Symbol string
 	Result *trenddomain.Result
+	Index  int
 }
 
 // TrendErrorMsg is a message when an error occurs fetching data for a ticker.
 type TrendErrorMsg struct { //nolint:revive // type name stutters with package name
 	Symbol string
 	Err    error
+	Index  int
 }
 
 // FormatValue formats a float value for display with fixed decimal places.

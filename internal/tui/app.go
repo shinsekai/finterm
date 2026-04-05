@@ -117,7 +117,7 @@ func NewApp(
 
 	// Create and configure news model
 	newsModel := news.NewModel()
-	newsModel.Configure(context.Background(), newsClient)
+	newsModel.Configure(context.Background(), newsClient, watchlist.Crypto)
 
 	return Model{
 		theme: theme,

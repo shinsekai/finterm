@@ -1,7 +1,7 @@
 # Golangci-lint configuration for Finterm project
 # See CLAUDE.md §3.1 for details
 
-version: 2
+version: "2"
 
 linters:
   enable:
@@ -15,6 +15,6 @@ linters:
     - gocritic
     - revive
 
-linters-settings:
+linters_settings:
   gocyclo:
     min-complexity: 15

@@ -66,7 +66,7 @@ finterm/
 │   ├── alphavantage/                  # API client layer
 │   │   ├── client.go                  # HTTP client, rate limiter, retry
 │   │   ├── client_test.go
-│   │   ├── timeseries.go              # Time series endpoints
+│   │   ├── timeseries.go              # Time series + crypto endpoints
 │   │   ├── timeseries_test.go
 │   │   ├── technicals.go              # Technical indicator endpoints
 │   │   ├── technicals_test.go
@@ -74,8 +74,6 @@ finterm/
 │   │   ├── macro_test.go
 │   │   ├── news.go                    # News sentiment endpoint
 │   │   ├── news_test.go
-│   │   ├── crypto.go                  # Crypto-specific endpoints
-│   │   ├── crypto_test.go
 │   │   └── models.go                  # Shared response types
 │   ├── cache/                         # In-memory TTL cache
 │   │   ├── cache.go

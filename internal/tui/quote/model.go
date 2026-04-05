@@ -483,6 +483,11 @@ func (m Model) GetHeight() int {
 	return m.height
 }
 
+// GetLookupHistory returns the lookup history slice.
+func (m Model) GetLookupHistory() []string {
+	return m.lookupHistory
+}
+
 // KeyBindings returns the keyboard bindings for the quote view.
 func (m Model) KeyBindings() []components.KeyBinding {
 	return []components.KeyBinding{

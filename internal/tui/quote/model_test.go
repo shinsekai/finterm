@@ -855,3 +855,76 @@ func TestQuoteView_EmDash(t *testing.T) {
 	percent := formatPercent("")
 	assert.Equal(t, "—", percent, "Empty percent should return em dash")
 }
+
+// TestQuoteModel_GetLookupHistory_Empty verifies empty slice for fresh model.
+func TestQuoteModel_GetLookupHistory_Empty(t *testing.T) {
+	model := NewModel()
+
+	history := model.GetLookupHistory()
+
+	if history == nil {
+		t.Error("Expected non-nil history slice")
+	}
+
+	if len(history) != 0 {
+		t.Errorf("Expected empty history, got %v", history)
+	}
+}
+
+// TestQuoteModel_GetLookupHistory_AfterLookups verifies history contains lookups.
+func TestQuoteModel_GetLookupHistory_AfterLookups(t *testing.T) {
+	model := NewModel()
+
+	// Add 3 tickers to history
+	model.addToHistory("AAPL")
+	model.addToHistory("MSFT")
+	model.addToHistory("GOOGL")
+
+	history := model.GetLookupHistory()
+
+	if len(history) != 3 {
+		t.Errorf("Expected history length 3, got %d", len(history))
+	}
+
+	expected := []string{"AAPL", "MSFT", "GOOGL"}
+	for i, expectedTicker := range expected {
+		if history[i] != expectedTicker {
+			t.Errorf("Expected %s at index %d, got %s", expectedTicker, i, history[i])
+		}
+	}
+}
+
+// TestQuoteView_PriceRendered verifies price is rendered correctly.
+func TestQuoteView_PriceRendered(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{
+			Symbol:         "AAPL",
+			Price:          "155.50",
+			Change:         "2.34",
+			ChangePercent:  "1.25%",
+			Open:           "153.00",
+			High:           "156.00",
+			Low:            "152.50",
+			Volume:         "50000000",
+			PreviousClose:  "153.16",
+			LastTradingDay: "2026-04-01",
+		},
+		Indicators: &trenddomain.Result{
+			Symbol:  "AAPL",
+			RSI:     52.3,
+			EMAFast: 154.00,
+			EMASlow: 153.50,
+			Signal:  trenddomain.Bullish,
+		},
+	}
+
+	view := model.View()
+
+	// Price should be rendered - look for "$155.50" or "155.50"
+	if !assert.Contains(t, view, "155.50", "View should contain price 155.50") {
+		t.Logf("Full view output:\n%s", view)
+	}
+}

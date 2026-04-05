@@ -28,6 +28,9 @@ go.work.sum
 bin/
 finterm
 
+# Goreleaser output directory
+dist/
+
 # Configuration file with API keys
 config.yaml
 

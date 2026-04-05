@@ -4,6 +4,14 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/shinsekai/finterm/actions/workflows/ci.yml"><img src="https://github.com/shinsekai/finterm/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://goreportcard.com/report/github.com/shinsekai/finterm"><img src="https://goreportcard.com/badge/github.com/shinsekai/finterm" alt="Go Report Card"></a>
+  <a href="https://github.com/shinsekai/finterm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/shinsekai/finterm" alt="License"></a>
+  <a href="https://github.com/shinsekai/finterm/releases/latest"><img src="https://img.shields.io/github/v/release/shinsekai/finterm?include_prereleases" alt="Release"></a>
+  <img src="https://img.shields.io/badge/go-%3E%3D1.24-blue?logo=go" alt="Go Version">
+</p>
+
+<p align="center">
   Trend-following signals · Real-time quotes · Macro dashboard · Sentiment-scored news
 </p>
 

@@ -22,6 +22,9 @@ type Theme interface {
 	Bullish() lipgloss.Style
 	Bearish() lipgloss.Style
 	Neutral() lipgloss.Style
+	BullishBadge() lipgloss.Style
+	BearishBadge() lipgloss.Style
+	NeutralBadge() lipgloss.Style
 	Help() lipgloss.Style
 	Error() lipgloss.Style
 	Loading() lipgloss.Style
@@ -60,6 +63,30 @@ func (t *defaultTheme) Bearish() lipgloss.Style {
 
 func (t *defaultTheme) Neutral() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("#F1FA8C")).Bold(true)
+}
+
+func (t *defaultTheme) BullishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#282A36")).
+		Background(lipgloss.Color("#50FA7B")).
+		Bold(true).
+		Padding(0, 1)
+}
+
+func (t *defaultTheme) BearishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#282A36")).
+		Background(lipgloss.Color("#FF5555")).
+		Bold(true).
+		Padding(0, 1)
+}
+
+func (t *defaultTheme) NeutralBadge() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#282A36")).
+		Background(lipgloss.Color("#F1FA8C")).
+		Bold(true).
+		Padding(0, 1)
 }
 
 func (t *defaultTheme) Help() lipgloss.Style {
@@ -197,6 +224,21 @@ func (v *View) renderIdle() string {
 	// Keyboard shortcuts
 	content += v.renderShortcuts()
 
+	// Recent lookups
+	history := v.model.GetLookupHistory()
+	if len(history) > 0 {
+		content += "\n\n"
+		content += v.theme.Muted().Render("Recent:")
+		// Show last 5, most recent first
+		limit := 5
+		if len(history) < limit {
+			limit = len(history)
+		}
+		for i := len(history) - 1; i >= len(history)-limit; i-- {
+			content += "  " + v.theme.Accent().Render(history[i])
+		}
+	}
+
 	return content
 }
 
@@ -278,8 +320,8 @@ func (v *View) renderError() string {
 	content += "\n\n"
 
 	// Help text
-	helpText := "Press Enter to try again or Esc to clear input"
-	content += v.theme.Help().Render(helpText)
+	helpText := v.theme.Accent().Render("Enter") + " " + v.theme.Muted().Render("retry") + "  ·  " + v.theme.Accent().Render("Esc") + " " + v.theme.Muted().Render("clear")
+	content += helpText
 	content += "\n\n"
 
 	// Input label
@@ -372,6 +414,13 @@ func (v *View) renderPriceCard(quote *alphavantage.GlobalQuote) string {
 	content.WriteString(changeStyle.Render(changeText))
 	content.WriteString("\n\n")
 
+	// Day range bar
+	dayRangeBar := v.renderDayRangeBar(price, quote.Low, quote.High)
+	if dayRangeBar != "" {
+		content.WriteString(dayRangeBar)
+		content.WriteString("\n\n")
+	}
+
 	// OHLCV data rows with muted labels
 	v.writePriceField(&content, "Open", "$"+formatPrice(quote.Open), quote.Open)
 	v.writePriceField(&content, "High", "$"+formatPrice(quote.High), quote.High)
@@ -380,6 +429,58 @@ func (v *View) renderPriceCard(quote *alphavantage.GlobalQuote) string {
 	v.writePriceField(&content, "Prev Close", "$"+formatPrice(quote.PreviousClose), quote.PreviousClose)
 
 	return v.theme.Card().Render(content.String())
+}
+
+// renderDayRangeBar renders a horizontal bar showing the price position within the day's range.
+func (v *View) renderDayRangeBar(price float64, lowStr, highStr string) string {
+	// Parse low and high values
+	low, err := strconv.ParseFloat(lowStr, 64)
+	if err != nil || low == 0 {
+		return ""
+	}
+
+	high, err := strconv.ParseFloat(highStr, 64)
+	if err != nil || high == 0 {
+		return ""
+	}
+
+	// Calculate position within range (0 to 1)
+	var position float64
+	if high > low {
+		position = (price - low) / (high - low)
+	}
+	// Clamp to [0, 1]
+	if position < 0 {
+		position = 0
+	} else if position > 1 {
+		position = 1
+	}
+
+	// Build the bar: 20 characters total
+	barWidth := 20
+	filledWidth := int(position * float64(barWidth))
+	if filledWidth > barWidth {
+		filledWidth = barWidth
+	}
+	if filledWidth < 0 {
+		filledWidth = 0
+	}
+
+	filled := strings.Repeat("▓", filledWidth)
+	empty := strings.Repeat("░", barWidth-filledWidth)
+
+	// Format low and high values with proper decimal places
+	lowVal, _ := strconv.ParseFloat(lowStr, 64)
+	highVal, _ := strconv.ParseFloat(highStr, 64)
+
+	var content strings.Builder
+	content.WriteString(v.theme.Muted().Render(fmt.Sprintf("Low $%.2f", lowVal)))
+	content.WriteString(" ")
+	content.WriteString(v.theme.Accent().Render(filled) + v.theme.Muted().Render(empty))
+	content.WriteString(" ")
+	content.WriteString(v.theme.Muted().Render(fmt.Sprintf("High $%.2f", highVal)))
+
+	return content.String()
 }
 
 // renderIndicatorsCard renders the technical indicators in a card.
@@ -403,12 +504,34 @@ func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingD
 	fmt.Fprintf(&content, "%-14s$%s\n", v.theme.Muted().Render("EMA(10):"), humanizeFloat(indicators.EMAFast, 2))
 	fmt.Fprintf(&content, "%-14s$%s\n", v.theme.Muted().Render("EMA(20):"), humanizeFloat(indicators.EMASlow, 2))
 
-	// Trend signal with icon
-	trendStyle, trendSymbol := v.getTrendStyleAndSymbol(indicators.Signal)
-	fmt.Fprintf(&content, "%-14s%s %s\n",
-		v.theme.Muted().Render("Trend:"),
-		trendStyle.Render(trendSymbol),
-		trendStyle.Render(indicators.Signal.String()))
+	// EMA crossover delta
+	delta := indicators.EMAFast - indicators.EMASlow
+	switch {
+	case delta > 0:
+		fmt.Fprintf(&content, "%-14s%s\n",
+			v.theme.Muted().Render(""),
+			v.theme.Bullish().Render(fmt.Sprintf("  ▲ EMA(10) above EMA(20) by $%s", humanizeFloat(delta, 2))))
+	case delta < 0:
+		fmt.Fprintf(&content, "%-14s%s\n",
+			v.theme.Muted().Render(""),
+			v.theme.Bearish().Render(fmt.Sprintf("  ▼ EMA(10) below EMA(20) by $%s", humanizeFloat(math.Abs(delta), 2))))
+	default:
+		fmt.Fprintf(&content, "%-14s%s\n",
+			v.theme.Muted().Render(""),
+			v.theme.Neutral().Render("  ─ EMAs converged"))
+	}
+
+	// Trend signal with badge
+	var badge string
+	switch indicators.Signal {
+	case trenddomain.Bullish:
+		badge = v.theme.BullishBadge().Render("▲ BULL")
+	case trenddomain.Bearish:
+		badge = v.theme.BearishBadge().Render("▼ BEAR")
+	default:
+		badge = v.theme.NeutralBadge().Render("─ HOLD")
+	}
+	fmt.Fprintf(&content, "%-14s%s\n", v.theme.Muted().Render("Trend:"), badge)
 
 	// Last updated
 	if lastTradingDay != "" {
@@ -478,18 +601,6 @@ func (v *View) getChangeStyle(change float64) lipgloss.Style {
 		return v.theme.Bearish()
 	default:
 		return v.theme.Neutral()
-	}
-}
-
-// getTrendStyleAndSymbol returns the style and symbol for a trend signal.
-func (v *View) getTrendStyleAndSymbol(signal trenddomain.Signal) (lipgloss.Style, string) {
-	switch signal {
-	case trenddomain.Bullish:
-		return v.theme.Bullish(), "▲"
-	case trenddomain.Bearish:
-		return v.theme.Bearish(), "▼"
-	default:
-		return v.theme.Neutral(), "─"
 	}
 }
 

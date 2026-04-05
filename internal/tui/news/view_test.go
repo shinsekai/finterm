@@ -65,6 +65,26 @@ func (m *viewMockTheme) Background() lipgloss.Color {
 	return lipgloss.Color("#282A36")
 }
 
+func (m *viewMockTheme) BullishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#282A36")).Background(lipgloss.Color("50FA7B")).Bold(true)
+}
+
+func (m *viewMockTheme) BearishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#282A36")).Background(lipgloss.Color("FF5555")).Bold(true)
+}
+
+func (m *viewMockTheme) NeutralBadge() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#282A36")).Background(lipgloss.Color("F1FA8C")).Bold(true)
+}
+
+func (m *viewMockTheme) Accent() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("BD93F9")).Bold(true)
+}
+
+func (m *viewMockTheme) Divider() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A")).Faint(true)
+}
+
 // newTestModelForView creates a model with test articles for view testing.
 func newTestModelForView() *Model {
 	model := NewModel()
@@ -110,7 +130,7 @@ func TestNewsModel_View_ArticleRendering(t *testing.T) {
 	view := NewView(*model).SetTheme(&viewMockTheme{})
 	rendered := view.Render()
 
-	assert.Contains(t, rendered, "NEWS FEED", "View should contain title")
+	assert.Contains(t, rendered, "News Feed", "View should contain title")
 	assert.Contains(t, rendered, "Apple Reports Record Revenue", "View should contain first article title")
 	assert.Contains(t, rendered, "Bitcoin Drops Below Support", "View should contain second article title")
 	assert.Contains(t, rendered, "AAPL", "View should contain AAPL ticker")
@@ -143,7 +163,7 @@ func TestNewsModel_View_EmptyState(t *testing.T) {
 	view := NewView(*model).SetTheme(&viewMockTheme{})
 	rendered := view.Render()
 
-	assert.Contains(t, rendered, "NEWS FEED", "View should contain title")
+	assert.Contains(t, rendered, "News Feed", "View should contain title")
 	assert.Contains(t, rendered, "No articles found", "View should show empty message")
 }
 
@@ -224,11 +244,12 @@ func TestNewsModel_View_HelpBar(t *testing.T) {
 	view := NewView(*model).SetTheme(&viewMockTheme{})
 	rendered := view.Render()
 
-	assert.Contains(t, rendered, "[j/k] navigate", "View should contain navigation help")
-	assert.Contains(t, rendered, "[Enter] open", "View should contain open help")
-	assert.Contains(t, rendered, "[f] filter", "View should contain filter help")
-	assert.Contains(t, rendered, "[s] sort", "View should contain sort help")
-	assert.Contains(t, rendered, "[r] refresh", "View should contain refresh help")
+	// New format uses accent keys with muted descriptions
+	assert.Contains(t, rendered, "navigate", "View should contain navigation help")
+	assert.Contains(t, rendered, "open", "View should contain open help")
+	assert.Contains(t, rendered, "filter", "View should contain filter help")
+	assert.Contains(t, rendered, "sort", "View should contain sort help")
+	assert.Contains(t, rendered, "refresh", "View should contain refresh help")
 }
 
 // TestNewsModel_View_LoadingState verifies loading state rendering.
@@ -242,8 +263,8 @@ func TestNewsModel_View_LoadingState(t *testing.T) {
 	view := NewView(*model).SetTheme(&viewMockTheme{})
 	rendered := view.Render()
 
-	assert.Contains(t, rendered, "NEWS FEED", "View should contain title")
-	assert.Contains(t, rendered, "Loading news...", "View should contain loading message")
+	assert.Contains(t, rendered, "News Feed", "View should contain title")
+	assert.Contains(t, rendered, "Loading news…", "View should contain loading message with unicode ellipsis")
 }
 
 // TestNewsModel_View_ErrorState verifies error state rendering.
@@ -258,8 +279,8 @@ func TestNewsModel_View_ErrorState(t *testing.T) {
 	view := NewView(*model).SetTheme(&viewMockTheme{})
 	rendered := view.Render()
 
-	assert.Contains(t, rendered, "NEWS FEED", "View should contain title")
-	assert.Contains(t, rendered, "Error:", "View should contain error indicator")
+	assert.Contains(t, rendered, "News Feed", "View should contain title")
+	assert.Contains(t, rendered, "✗", "View should contain error indicator prefix")
 	assert.Contains(t, rendered, "test error", "View should contain error message")
 }
 
@@ -342,7 +363,7 @@ func TestNewsModel_View_DefaultTheme(t *testing.T) {
 	rendered := view.Render()
 
 	assert.NotEmpty(t, rendered, "View should not be empty with default theme")
-	assert.Contains(t, rendered, "NEWS FEED", "View should contain title with default theme")
+	assert.Contains(t, rendered, "News Feed", "View should contain title with default theme")
 }
 
 // TestNewsModel_View_String verifies String method.
@@ -393,7 +414,7 @@ func TestNewsModel_View_ViewportHandling(t *testing.T) {
 	rendered := view.Render()
 
 	assert.NotEmpty(t, rendered, "View should render with many articles")
-	assert.Contains(t, rendered, "NEWS FEED", "View should contain title")
+	assert.Contains(t, rendered, "News Feed", "View should contain title")
 }
 
 // TestNewsModel_View_ScrollOffset verifies scroll offset in rendering.
@@ -444,4 +465,85 @@ func (e *testError) Error() string {
 // newTestError creates a test error.
 func newTestError(msg string) *testError {
 	return &testError{msg: msg}
+}
+
+// TestNewsView_TitleIcon verifies the title contains the icon.
+func TestNewsView_TitleIcon(t *testing.T) {
+	model := newTestModelForView()
+	view := NewView(*model).SetTheme(&viewMockTheme{})
+	rendered := view.Render()
+
+	assert.Contains(t, rendered, "◉", "View should contain title icon")
+}
+
+// TestNewsView_SentimentBadge_Bullish verifies bullish badge rendering.
+func TestNewsView_SentimentBadge_Bullish(t *testing.T) {
+	model := newTestModelForView()
+	view := NewView(*model).SetTheme(&viewMockTheme{})
+	rendered := view.Render()
+
+	// The bullish article has sentiment score 0.72
+	assert.Contains(t, rendered, "▲", "View should contain bullish indicator")
+}
+
+// TestNewsView_SentimentBadge_Bearish verifies bearish badge rendering.
+func TestNewsView_SentimentBadge_Bearish(t *testing.T) {
+	model := newTestModelForView()
+	view := NewView(*model).SetTheme(&viewMockTheme{})
+	rendered := view.Render()
+
+	// The bearish article has sentiment score 0.28
+	assert.Contains(t, rendered, "▼", "View should contain bearish indicator")
+}
+
+// TestNewsView_TickerAccentStyle verifies tickers rendered with accent style.
+func TestNewsView_TickerAccentStyle(t *testing.T) {
+	model := newTestModelForView()
+	view := NewView(*model).SetTheme(&viewMockTheme{})
+	rendered := view.Render()
+
+	// Tickers should be present in the rendered view
+	assert.Contains(t, rendered, "AAPL", "View should contain AAPL ticker")
+	assert.Contains(t, rendered, "BTC", "View should contain BTC ticker")
+}
+
+// TestNewsView_ArticleMetadataSeparator verifies " · " separator between source and time.
+func TestNewsView_ArticleMetadataSeparator(t *testing.T) {
+	model := newTestModelForView()
+	view := NewView(*model).SetTheme(&viewMockTheme{})
+	rendered := view.Render()
+
+	// Check that articles have " · " separator between source and time
+	// The separator is used in line 2 of each article
+	assert.Contains(t, rendered, " · ", "View should contain dot separator")
+}
+
+// TestNewsView_LoadingEllipsis verifies unicode ellipsis not three dots.
+func TestNewsView_LoadingEllipsis(t *testing.T) {
+	model := NewModel()
+	model.width = 100
+	model.height = 30
+	model.calculateViewportHeight()
+	model.state = StateLoading
+
+	view := NewView(*model).SetTheme(&viewMockTheme{})
+	rendered := view.Render()
+
+	assert.Contains(t, rendered, "Loading news…", "View should contain unicode ellipsis")
+	assert.NotContains(t, rendered, "Loading news...", "View should not contain three dot ellipsis")
+}
+
+// TestNewsView_ErrorPrefix verifies "✗" prefix in error display.
+func TestNewsView_ErrorPrefix(t *testing.T) {
+	model := NewModel()
+	model.width = 100
+	model.height = 30
+	model.calculateViewportHeight()
+	model.state = StateError
+	model.err = newTestError("test error")
+
+	view := NewView(*model).SetTheme(&viewMockTheme{})
+	rendered := view.Render()
+
+	assert.Contains(t, rendered, "✗", "View should contain error prefix")
 }

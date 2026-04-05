@@ -19,6 +19,11 @@ type Theme interface {
 	Bullish() lipgloss.Style
 	Bearish() lipgloss.Style
 	Neutral() lipgloss.Style
+	BullishBadge() lipgloss.Style
+	BearishBadge() lipgloss.Style
+	NeutralBadge() lipgloss.Style
+	Accent() lipgloss.Style
+	Divider() lipgloss.Style
 	Help() lipgloss.Style
 	Error() lipgloss.Style
 	Muted() lipgloss.Style
@@ -63,7 +68,7 @@ func (v *View) Render() string {
 	builder.WriteString("\n")
 
 	// Render separator
-	builder.WriteString(strings.Repeat("─", width))
+	builder.WriteString(v.theme.Divider().Render(strings.Repeat("─", width)))
 	builder.WriteString("\n")
 
 	// Render filter/sort bar
@@ -71,7 +76,7 @@ func (v *View) Render() string {
 	builder.WriteString("\n")
 
 	// Render separator
-	builder.WriteString(strings.Repeat("─", width))
+	builder.WriteString(v.theme.Divider().Render(strings.Repeat("─", width)))
 	builder.WriteString("\n")
 
 	// Render content area
@@ -80,7 +85,7 @@ func (v *View) Render() string {
 	builder.WriteString("\n")
 
 	// Render separator
-	builder.WriteString(strings.Repeat("─", width))
+	builder.WriteString(v.theme.Divider().Render(strings.Repeat("─", width)))
 	builder.WriteString("\n")
 
 	// Render help bar
@@ -91,22 +96,22 @@ func (v *View) Render() string {
 
 // renderTitleBar renders the title bar.
 func (v *View) renderTitleBar(width int) string {
-	title := v.theme.Title().Render(" NEWS FEED ")
-	refresh := v.theme.Help().Render("[r] refresh")
-	help := v.theme.Help().Render("[?] help")
+	title := v.theme.Accent().Render("◉") + " " + v.theme.Title().Render("News Feed")
+	refresh := v.theme.Help().Render("r refresh")
+	help := v.theme.Help().Render("? help")
+	rightSide := refresh + " · " + help
 
-	// Center the title and position help items on the right
+	// Position title on left, help items on the right
 	titleWidth := lipgloss.Width(title)
-	refreshWidth := lipgloss.Width(refresh)
-	helpWidth := lipgloss.Width(help)
+	rightWidth := lipgloss.Width(rightSide)
 
-	padding := width - titleWidth - refreshWidth - helpWidth - 4
+	padding := width - titleWidth - rightWidth
 	if padding < 0 {
 		padding = 0
 	}
 
 	pad := strings.Repeat(" ", padding)
-	return title + pad + refresh + " " + help
+	return title + pad + rightSide
 }
 
 // renderFilterSortBar renders the filter and sort controls.
@@ -173,7 +178,7 @@ func (v *View) renderContent() string {
 
 // renderLoading renders the loading state.
 func (v *View) renderLoading() string {
-	spinner := components.NewSpinner().WithText("Loading news...").WithFrameStyle(v.theme.Spinner())
+	spinner := components.NewSpinner().WithText("⟳ Loading news…").WithFrameStyle(v.theme.Spinner())
 	return spinner.Render()
 }
 
@@ -181,9 +186,9 @@ func (v *View) renderLoading() string {
 func (v *View) renderError() string {
 	err := v.model.GetError()
 	if err == nil {
-		return v.theme.Error().Render("An unknown error occurred")
+		return v.theme.Error().Render("✗ An unknown error occurred")
 	}
-	return v.theme.Error().Render("Error: " + err.Error())
+	return v.theme.Error().Render("✗ Error: " + err.Error())
 }
 
 // renderArticles renders the article list.
@@ -233,11 +238,12 @@ func (v *View) renderArticle(article Article, isActive bool) string {
 	indicator, sentimentStyle := v.getSentimentIndicator(sentiment)
 	sentimentLabel := v.getSentimentLabel(sentiment)
 
-	// Build ticker string
+	// Build ticker string with accent style
 	tickerStr := strings.Join(article.Tickers, ", ")
 	if len(tickerStr) > 10 {
 		tickerStr = tickerStr[:7] + "..."
 	}
+	tickerDisplay := v.theme.Accent().Render(tickerStr)
 
 	// Parse time
 	timeStr := v.formatTimePublished(item.TimePublished)
@@ -258,22 +264,23 @@ func (v *View) renderArticle(article Article, isActive bool) string {
 		line1Style = line1Style.Background(v.theme.Foreground()).Foreground(v.theme.Background())
 	}
 
-	line1 := indicator + " " +
+	line1 := indicator + "  " +
 		sentimentStyle.Render(fmt.Sprintf("%.2f", sentiment)) + "  " +
-		tickerStr + " │ " +
+		tickerDisplay + " │ " +
 		line1Style.Render(headline)
 	lines = append(lines, line1)
 
 	// Line 2: source + time
 	line2 := "              │ " +
-		v.theme.Muted().Render(item.Source+" — "+timeStr)
+		v.theme.Muted().Render(item.Source) + " · " +
+		v.theme.Muted().Render(timeStr)
 	lines = append(lines, line2)
 
 	// Line 3: sentiment label + relevance
 	line3 := "              │ " +
 		v.theme.Muted().Render("Sentiment: ") +
-		sentimentStyle.Render(sentimentLabel) +
-		v.theme.Muted().Render(" │ Relevance: ") +
+		sentimentStyle.Render(sentimentLabel) + " · " +
+		v.theme.Muted().Render("Relevance: ") +
 		v.theme.Muted().Render(fmt.Sprintf("%.2f", relevance))
 	lines = append(lines, line3)
 
@@ -284,11 +291,11 @@ func (v *View) renderArticle(article Article, isActive bool) string {
 func (v *View) getSentimentIndicator(score float64) (string, lipgloss.Style) {
 	switch {
 	case score > 0.6:
-		return "▲", v.theme.Bullish()
+		return v.theme.BullishBadge().Render("▲"), v.theme.Bullish()
 	case score < 0.4:
-		return "▼", v.theme.Bearish()
+		return v.theme.BearishBadge().Render("▼"), v.theme.Bearish()
 	default:
-		return "─", v.theme.Neutral()
+		return v.theme.NeutralBadge().Render("─"), v.theme.Neutral()
 	}
 }
 
@@ -349,21 +356,19 @@ func (v *View) formatTimePublished(timeStr string) string {
 
 // renderEmptyState renders the empty state.
 func (v *View) renderEmptyState() string {
-	return v.theme.TableEmpty().Render("No articles found")
+	return v.theme.TableEmpty().Render("○ No articles found")
 }
 
 // renderHelpBar renders the help bar.
-func (v *View) renderHelpBar(width int) string {
-	help := v.theme.Help().Render("[j/k] navigate  [Enter] open  [f] filter  [s] sort  [r] refresh")
-
-	// Calculate padding to right-align
-	helpWidth := lipgloss.Width(help)
-	padding := width - helpWidth
-	if padding < 0 {
-		padding = 0
+func (v *View) renderHelpBar(_ int) string {
+	helpParts := []string{
+		v.theme.Accent().Render("j/k") + " " + v.theme.Muted().Render("navigate"),
+		v.theme.Accent().Render("Enter") + " " + v.theme.Muted().Render("open"),
+		v.theme.Accent().Render("f") + " " + v.theme.Muted().Render("filter"),
+		v.theme.Accent().Render("s") + " " + v.theme.Muted().Render("sort"),
+		v.theme.Accent().Render("r") + " " + v.theme.Muted().Render("refresh"),
 	}
-
-	return strings.Repeat(" ", padding) + help
+	return strings.Join(helpParts, "  ·  ")
 }
 
 // String returns the rendered view.
@@ -424,4 +429,24 @@ func (d *defaultTheme) Foreground() lipgloss.Color {
 
 func (d *defaultTheme) Background() lipgloss.Color {
 	return lipgloss.Color("#282A36")
+}
+
+func (d *defaultTheme) BullishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#282A36")).Background(lipgloss.Color("50FA7B")).Bold(true)
+}
+
+func (d *defaultTheme) BearishBadge() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#282A36")).Background(lipgloss.Color("FF5555")).Bold(true)
+}
+
+func (d *defaultTheme) NeutralBadge() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#282A36")).Background(lipgloss.Color("F1FA8C")).Bold(true)
+}
+
+func (d *defaultTheme) Accent() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("BD93F9")).Bold(true)
+}
+
+func (d *defaultTheme) Divider() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A")).Faint(true)
 }

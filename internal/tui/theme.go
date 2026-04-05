@@ -23,7 +23,7 @@ type palette struct {
 	connOnline, connRateLimited, connOffline lipgloss.Color
 
 	// Table colors
-	tableHeader, tableBody, tableBorder lipgloss.Color
+	tableHeader, tableBody, tableBorder, tableRowAlt lipgloss.Color
 }
 
 // defaultPalette provides the standard colorful theme.
@@ -49,6 +49,7 @@ var defaultPalette = palette{
 	tableHeader:     lipgloss.Color("#BD93F9"),
 	tableBody:       lipgloss.Color("#F8F8F2"),
 	tableBorder:     lipgloss.Color("#44475A"),
+	tableRowAlt:     lipgloss.Color("#2D2F3D"),
 }
 
 // minimalPalette provides a minimal black-and-white theme.
@@ -74,6 +75,7 @@ var minimalPalette = palette{
 	tableHeader:     lipgloss.Color("#FFFFFF"),
 	tableBody:       lipgloss.Color("#FFFFFF"),
 	tableBorder:     lipgloss.Color("#333333"),
+	tableRowAlt:     lipgloss.Color("#111111"),
 }
 
 // colorblindPalette provides a theme optimized for colorblind users.
@@ -99,24 +101,40 @@ var colorblindPalette = palette{
 	tableHeader:     lipgloss.Color("#4D90FE"),
 	tableBody:       lipgloss.Color("#202124"),
 	tableBorder:     lipgloss.Color("#DADCE0"),
+	tableRowAlt:     lipgloss.Color("#F0F0F0"),
 }
 
 // Style definitions for UI elements.
 type styles struct {
 	// Tab bar styles
-	tabBar, tab, tabActive lipgloss.Style
+	tabBar, tab, tabActive, tabIcon lipgloss.Style
 
 	// Table styles
-	tableHeader, tableRow, tableBorder, tableEmpty lipgloss.Style
+	tableHeader, tableRow, tableRowAlt, tableBorder, tableEmpty lipgloss.Style
 
 	// Signal styles
-	bullish, bearish, neutral lipgloss.Style
+	bullish, bearish, neutral                lipgloss.Style
+	bullishBadge, bearishBadge, neutralBadge lipgloss.Style
+
+	// Card styles
+	card, cardHeader, cardHeaderAccent lipgloss.Style
 
 	// Box and border styles
 	box, boxBorder, boxTitle lipgloss.Style
 
 	// Text styles
-	help, error, loading lipgloss.Style
+	help, error, loading, warning lipgloss.Style
+
+	// Status bar styles
+	statusBar, statusBarLeft, statusBarRight lipgloss.Style
+
+	// Section styles
+	sectionHeader, divider lipgloss.Style
+
+	// Accent and input styles
+	accent                 lipgloss.Style
+	inputField, inputLabel lipgloss.Style
+	metaLabel, metaValue   lipgloss.Style
 
 	// Spinner styles
 	spinner, spinnerText lipgloss.Style
@@ -187,6 +205,10 @@ func (t *Theme) buildStyles() {
 		Bold(true).
 		Padding(0, 2)
 
+	t.styles.tabIcon = base.
+		Foreground(t.palette.primary).
+		Bold(true)
+
 	// Table styles
 	t.styles.tableHeader = lipgloss.NewStyle().
 		Foreground(t.palette.tableHeader).
@@ -200,9 +222,14 @@ func (t *Theme) buildStyles() {
 		Background(t.palette.background).
 		Padding(0, 1)
 
+	t.styles.tableRowAlt = lipgloss.NewStyle().
+		Foreground(t.palette.tableBody).
+		Background(t.palette.tableRowAlt).
+		Padding(0, 1)
+
 	t.styles.tableBorder = lipgloss.NewStyle().
 		Foreground(t.palette.tableBorder).
-		BorderStyle(lipgloss.NormalBorder())
+		BorderStyle(lipgloss.RoundedBorder())
 
 	t.styles.tableEmpty = lipgloss.NewStyle().
 		Foreground(t.palette.muted).
@@ -221,15 +248,49 @@ func (t *Theme) buildStyles() {
 		Foreground(t.palette.neutral).
 		Bold(true)
 
-	// Box styles
+	// Signal badge styles
+	t.styles.bullishBadge = lipgloss.NewStyle().
+		Foreground(t.palette.background).
+		Background(t.palette.bullish).
+		Bold(true).
+		Padding(0, 1)
+
+	t.styles.bearishBadge = lipgloss.NewStyle().
+		Foreground(t.palette.foreground).
+		Background(t.palette.bearish).
+		Bold(true).
+		Padding(0, 1)
+
+	t.styles.neutralBadge = lipgloss.NewStyle().
+		Foreground(t.palette.background).
+		Background(t.palette.neutral).
+		Bold(true).
+		Padding(0, 1)
+
+	// Card styles
+	t.styles.card = base.
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(t.palette.border).
+		Padding(1, 2)
+
+	t.styles.cardHeader = lipgloss.NewStyle().
+		Foreground(t.palette.foreground).
+		Bold(true).
+		MarginBottom(1)
+
+	t.styles.cardHeaderAccent = lipgloss.NewStyle().
+		Foreground(t.palette.primary).
+		Bold(true)
+
+	// Box styles (switch to RoundedBorder)
 	t.styles.box = base.
-		Border(lipgloss.NormalBorder()).
+		Border(lipgloss.RoundedBorder()).
 		BorderForeground(t.palette.border).
 		Padding(1)
 
 	t.styles.boxBorder = lipgloss.NewStyle().
 		Foreground(t.palette.border).
-		BorderStyle(lipgloss.NormalBorder())
+		BorderStyle(lipgloss.RoundedBorder())
 
 	t.styles.boxTitle = lipgloss.NewStyle().
 		Foreground(t.palette.header).
@@ -246,6 +307,58 @@ func (t *Theme) buildStyles() {
 
 	t.styles.loading = lipgloss.NewStyle().
 		Foreground(t.palette.info)
+
+	t.styles.warning = lipgloss.NewStyle().
+		Foreground(t.palette.warning).
+		Bold(true)
+
+	// Status bar styles
+	t.styles.statusBar = base.
+		Background(t.palette.muted).
+		Foreground(t.palette.foreground).
+		Padding(0, 1)
+
+	t.styles.statusBarLeft = lipgloss.NewStyle().
+		Foreground(t.palette.foreground)
+
+	t.styles.statusBarRight = lipgloss.NewStyle().
+		Foreground(t.palette.foreground)
+
+	// Section styles
+	t.styles.sectionHeader = lipgloss.NewStyle().
+		Foreground(t.palette.header).
+		Bold(true).
+		Border(lipgloss.Border{Bottom: "─"}).
+		BorderForeground(t.palette.border).
+		Padding(0, 1)
+
+	t.styles.divider = lipgloss.NewStyle().
+		Foreground(t.palette.border).
+		SetString("─")
+
+	// Accent and input styles
+	t.styles.accent = lipgloss.NewStyle().
+		Foreground(t.palette.primary).
+		Bold(true)
+
+	t.styles.inputField = lipgloss.NewStyle().
+		Foreground(t.palette.foreground).
+		Background(t.palette.background).
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(t.palette.primary).
+		Padding(0, 1)
+
+	t.styles.inputLabel = lipgloss.NewStyle().
+		Foreground(t.palette.muted).
+		MarginRight(1)
+
+	t.styles.metaLabel = lipgloss.NewStyle().
+		Foreground(t.palette.muted).
+		Width(16)
+
+	t.styles.metaValue = lipgloss.NewStyle().
+		Foreground(t.palette.foreground).
+		Bold(true)
 
 	// Spinner styles
 	t.styles.spinner = lipgloss.NewStyle().
@@ -302,6 +415,11 @@ func (t *Theme) TabActive() lipgloss.Style {
 	return t.styles.tabActive
 }
 
+// TabIcon returns the tab icon style.
+func (t *Theme) TabIcon() lipgloss.Style {
+	return t.styles.tabIcon
+}
+
 // TableHeader returns the table header style.
 func (t *Theme) TableHeader() lipgloss.Style {
 	return t.styles.tableHeader
@@ -310,6 +428,11 @@ func (t *Theme) TableHeader() lipgloss.Style {
 // TableRow returns the table row style.
 func (t *Theme) TableRow() lipgloss.Style {
 	return t.styles.tableRow
+}
+
+// TableRowAlt returns the alternating table row style.
+func (t *Theme) TableRowAlt() lipgloss.Style {
+	return t.styles.tableRowAlt
 }
 
 // TableBorder returns the table border style.
@@ -337,6 +460,21 @@ func (t *Theme) Neutral() lipgloss.Style {
 	return t.styles.neutral
 }
 
+// BullishBadge returns the bullish badge style with background fill.
+func (t *Theme) BullishBadge() lipgloss.Style {
+	return t.styles.bullishBadge
+}
+
+// BearishBadge returns the bearish badge style with background fill.
+func (t *Theme) BearishBadge() lipgloss.Style {
+	return t.styles.bearishBadge
+}
+
+// NeutralBadge returns the neutral badge style with background fill.
+func (t *Theme) NeutralBadge() lipgloss.Style {
+	return t.styles.neutralBadge
+}
+
 // Box returns the box style.
 func (t *Theme) Box() lipgloss.Style {
 	return t.styles.box
@@ -352,6 +490,21 @@ func (t *Theme) BoxTitle() lipgloss.Style {
 	return t.styles.boxTitle
 }
 
+// Card returns the card style with rounded border.
+func (t *Theme) Card() lipgloss.Style {
+	return t.styles.card
+}
+
+// CardHeader returns the card header style.
+func (t *Theme) CardHeader() lipgloss.Style {
+	return t.styles.cardHeader
+}
+
+// CardHeaderAccent returns the card header accent style.
+func (t *Theme) CardHeaderAccent() lipgloss.Style {
+	return t.styles.cardHeaderAccent
+}
+
 // Help returns the help text style.
 func (t *Theme) Help() lipgloss.Style {
 	return t.styles.help
@@ -365,6 +518,11 @@ func (t *Theme) Error() lipgloss.Style {
 // Loading returns the loading text style.
 func (t *Theme) Loading() lipgloss.Style {
 	return t.styles.loading
+}
+
+// Warning returns the warning text style.
+func (t *Theme) Warning() lipgloss.Style {
+	return t.styles.warning
 }
 
 // Spinner returns the spinner frame style.
@@ -405,6 +563,66 @@ func (t *Theme) StatusRateLimited() lipgloss.Style {
 // StatusOffline returns the offline status style.
 func (t *Theme) StatusOffline() lipgloss.Style {
 	return t.styles.statusOffline
+}
+
+// StatusBar returns the status bar style.
+func (t *Theme) StatusBar() lipgloss.Style {
+	return t.styles.statusBar
+}
+
+// StatusBarLeft returns the status bar left section style.
+func (t *Theme) StatusBarLeft() lipgloss.Style {
+	return t.styles.statusBarLeft
+}
+
+// StatusBarRight returns the status bar right section style.
+func (t *Theme) StatusBarRight() lipgloss.Style {
+	return t.styles.statusBarRight
+}
+
+// SectionHeader returns the section header style.
+func (t *Theme) SectionHeader() lipgloss.Style {
+	return t.styles.sectionHeader
+}
+
+// Divider returns the divider style.
+func (t *Theme) Divider() lipgloss.Style {
+	return t.styles.divider
+}
+
+// Accent returns the accent style (primary color, bold).
+func (t *Theme) Accent() lipgloss.Style {
+	return t.styles.accent
+}
+
+// InputField returns the input field style.
+func (t *Theme) InputField() lipgloss.Style {
+	return t.styles.inputField
+}
+
+// InputLabel returns the input label style.
+func (t *Theme) InputLabel() lipgloss.Style {
+	return t.styles.inputLabel
+}
+
+// MetaLabel returns the meta label style for label-value pairs.
+func (t *Theme) MetaLabel() lipgloss.Style {
+	return t.styles.metaLabel
+}
+
+// MetaValue returns the meta value style for label-value pairs.
+func (t *Theme) MetaValue() lipgloss.Style {
+	return t.styles.metaValue
+}
+
+// Primary returns the primary color.
+func (t *Theme) Primary() lipgloss.Color {
+	return t.palette.primary
+}
+
+// Border returns the border color.
+func (t *Theme) Border() lipgloss.Color {
+	return t.palette.border
 }
 
 // Foreground returns the foreground color.

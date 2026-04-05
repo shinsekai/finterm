@@ -29,7 +29,7 @@ func (m *mockClient) GetNewsSentiment(_ context.Context, _ alphavantage.NewsOpts
 // newTestModel creates a configured model for testing and returns it as a value.
 func newTestModel() Model {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{})
+	model.Configure(context.Background(), &mockClient{}, []string{"BTC", "ETH", "SOL"})
 	return *model
 }
 

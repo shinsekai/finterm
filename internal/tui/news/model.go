@@ -113,8 +113,10 @@ type Client interface {
 func (m *Model) Configure(
 	ctx context.Context,
 	client Client,
+	cryptoSymbols []string,
 ) *Model {
 	m.client = client
+	m.cryptoSymbols = cryptoSymbols
 	m.ctx, m.cancel = context.WithCancel(ctx)
 	return m
 }
@@ -135,6 +137,8 @@ type Article struct {
 type Model struct {
 	// client fetches news data.
 	client Client
+	// cryptoSymbols contains the crypto watchlist symbols.
+	cryptoSymbols []string
 	// articles contains the current articles (after filtering and sorting).
 	articles []Article
 	// allArticles contains all articles before filtering.
@@ -435,24 +439,54 @@ func (m Model) handleNewsData(msg DataMsg) (Model, tea.Cmd) {
 func (m Model) fetchNewsCmd() tea.Cmd {
 	m.state = StateLoading
 	return func() tea.Msg {
-		opts := alphavantage.NewsOpts{
-			Limit: alphavantage.DefaultNewsLimit,
+		// Fetch general news (covers equities + macro)
+		generalOpts := alphavantage.NewsOpts{
+			Limit: 30,
 			Sort:  "LATEST",
 		}
-		response, err := m.client.GetNewsSentiment(m.ctx, opts)
+		generalResp, err := m.client.GetNewsSentiment(m.ctx, generalOpts)
 		if err != nil {
 			return ErrorMsg{Err: fmt.Errorf("fetching news: %w", err)}
 		}
 
-		// Convert to Article format with scores
-		articles := make([]Article, 0, len(response.Items))
-		for _, item := range response.Items {
-			article := convertToArticle(item)
-			articles = append(articles, article)
+		// Fetch crypto-specific news
+		cryptoResp := &alphavantage.NewsSentiment{}
+		if len(m.cryptoSymbols) > 0 {
+			cryptoTickers := make([]string, len(m.cryptoSymbols))
+			for i, sym := range m.cryptoSymbols {
+				cryptoTickers[i] = "CRYPTO:" + strings.ToUpper(sym)
+			}
+			cryptoOpts := alphavantage.NewsOpts{
+				Tickers: cryptoTickers,
+				Limit:   20,
+				Sort:    "LATEST",
+			}
+			cryptoResp, err = m.client.GetNewsSentiment(m.ctx, cryptoOpts)
+			if err != nil {
+				// Don't fail entirely if crypto news fails — show general news
+				cryptoResp = &alphavantage.NewsSentiment{}
+			}
+		}
+
+		// Merge and deduplicate by URL
+		seen := make(map[string]bool)
+		var allArticles []Article
+
+		for _, item := range generalResp.Items {
+			if !seen[item.URL] {
+				seen[item.URL] = true
+				allArticles = append(allArticles, convertToArticle(item))
+			}
+		}
+		for _, item := range cryptoResp.Items {
+			if !seen[item.URL] {
+				seen[item.URL] = true
+				allArticles = append(allArticles, convertToArticle(item))
+			}
 		}
 
 		return DataMsg{
-			Articles:  articles,
+			Articles:  allArticles,
 			Timestamp: time.Now(),
 		}
 	}

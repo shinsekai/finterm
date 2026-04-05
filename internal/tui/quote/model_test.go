@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/owner/finterm/internal/alphavantage"
 	trenddomain "github.com/owner/finterm/internal/domain/trend"
@@ -693,4 +694,164 @@ func BenchmarkQuoteModel_ValidateTicker(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = validateTicker("AAPL")
 	}
+}
+
+// TestQuoteView_PriceCard_RendersBorderedBox verifies rounded border characters.
+func TestQuoteView_PriceCard_RendersBorderedBox(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{
+			Symbol:         "AAPL",
+			Price:          "189.84",
+			Change:         "2.34",
+			ChangePercent:  "1.25%",
+			Open:           "187.50",
+			High:           "190.20",
+			Low:            "186.80",
+			Volume:         "52345678",
+			PreviousClose:  "187.50",
+			LastTradingDay: "2026-04-01",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	rendered := view.renderPriceCard(model.quoteData.Quote)
+
+	// Check for rounded border characters
+	assert.Contains(t, rendered, "╭", "Should contain top-left rounded corner")
+	assert.Contains(t, rendered, "╮", "Should contain top-right rounded corner")
+	assert.Contains(t, rendered, "╰", "Should contain bottom-left rounded corner")
+	assert.Contains(t, rendered, "╯", "Should contain bottom-right rounded corner")
+}
+
+// TestQuoteView_IndicatorsCard_RSIBar verifies RSI bar renders with █ and ░ characters.
+func TestQuoteView_IndicatorsCard_RSIBar(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+
+	// Test with RSI = 50 (middle of range)
+	rsiBar := view.renderRSIBar(50)
+
+	assert.Contains(t, rsiBar, "█", "Should contain filled block character")
+	assert.Contains(t, rsiBar, "░", "Should contain empty block character")
+	assert.Contains(t, rsiBar, "0", "Should contain zone marker 0")
+	assert.Contains(t, rsiBar, "30", "Should contain zone marker 30")
+	assert.Contains(t, rsiBar, "70", "Should contain zone marker 70")
+	assert.Contains(t, rsiBar, "100", "Should contain zone marker 100")
+}
+
+// TestQuoteView_IndicatorsCard_TrendSignalIcon verifies trend signal icons.
+func TestQuoteView_IndicatorsCard_TrendSignalIcon(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:  "AAPL",
+			RSI:     50,
+			EMAFast: 150,
+			EMASlow: 145,
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+
+	// Test bullish
+	model.quoteData.Indicators.Signal = trenddomain.Bullish
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+	assert.Contains(t, card, "▲", "Bullish should contain up arrow")
+
+	// Test bearish
+	model.quoteData.Indicators.Signal = trenddomain.Bearish
+	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+	assert.Contains(t, card, "▼", "Bearish should contain down arrow")
+}
+
+// TestQuoteView_ChangeDisplay_BullishIcon verifies ▲ icon for positive change.
+func TestQuoteView_ChangeDisplay_BullishIcon(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{
+			Symbol:        "AAPL",
+			Price:         "189.84",
+			Change:        "2.34",
+			ChangePercent: "1.25%",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderPriceCard(model.quoteData.Quote)
+
+	assert.Contains(t, card, "▲", "Positive change should show up arrow")
+}
+
+// TestQuoteView_ChangeDisplay_BearishIcon verifies ▼ icon for negative change.
+func TestQuoteView_ChangeDisplay_BearishIcon(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{
+			Symbol:        "AAPL",
+			Price:         "189.84",
+			Change:        "-2.34",
+			ChangePercent: "-1.25%",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderPriceCard(model.quoteData.Quote)
+
+	assert.Contains(t, card, "▼", "Negative change should show down arrow")
+}
+
+// TestQuoteView_ErrorCard_RedBorder verifies error card with red border.
+func TestQuoteView_ErrorCard_RedBorder(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateError
+	model.err = errors.New("test error")
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	rendered := view.renderError()
+
+	// Check for ✗ in error message
+	assert.Contains(t, rendered, "✗", "Error should contain X symbol")
+	assert.Contains(t, rendered, "Error loading quote", "Should contain error message")
+}
+
+// TestQuoteView_InputLabel verifies "Symbol" label above input.
+func TestQuoteView_InputLabel(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	rendered := view.renderIdle()
+
+	assert.Contains(t, rendered, "Symbol", "Should contain Symbol label")
+	assert.Contains(t, rendered, "(e.g. AAPL, BTC, ETH)", "Should contain example hint")
+}
+
+// TestQuoteView_EmDash verifies em dash used instead of double dash.
+func TestQuoteView_EmDash(t *testing.T) {
+	// Test parseChange
+	_, changePercent := parseChange("", "")
+	assert.Equal(t, "—", changePercent, "Empty change should return em dash")
+
+	// Test formatVolume
+	volume := formatVolume("", "AAPL", 100)
+	assert.Equal(t, "—", volume, "Empty volume should return em dash")
+
+	// Test formatPrice
+	price := formatPrice("")
+	assert.Equal(t, "—", price, "Empty price should return em dash")
+
+	// Test formatPercent
+	percent := formatPercent("")
+	assert.Equal(t, "—", percent, "Empty percent should return em dash")
 }

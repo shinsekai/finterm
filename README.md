@@ -90,7 +90,7 @@ For equities, RSI and EMA are fetched from Alpha Vantage's server-side endpoints
 ### From source
 
 ```bash
-git clone https://github.com/<owner>/finterm.git
+git clone https://github.com/shinsekai/finterm.git
 cd finterm
 make build
 ./bin/finterm
@@ -99,7 +99,7 @@ make build
 ### With `go install`
 
 ```bash
-go install github.com/<owner>/finterm/cmd/finterm@latest
+go install github.com/shinsekai/finterm/cmd/finterm@latest
 ```
 
 ## Configuration
@@ -257,7 +257,7 @@ finterm/
 
 ## License
 
-[MIT](LICENSE)
+[GPL-3.0](LICENSE)
 
 ## Acknowledgements
 

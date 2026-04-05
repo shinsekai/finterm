@@ -15,7 +15,7 @@
 **Description**: Create the Go module and the full directory tree as defined in `CLAUDE.md` §2.
 
 **Deliverables**:
-- `go.mod` with module path `github.com/owner/finterm` and Go 1.26+.
+- `go.mod` with module path `github.com/shinsekai/finterm` and Go 1.26+.
 - All directories created with placeholder `.go` files where needed (to keep Go happy).
 - `cmd/finterm/main.go` with a minimal `func main()` that prints "finterm" and exits.
 - `Makefile` with targets: `build`, `run`, `test`, `lint`, `fmt`, `vet`, `clean`.

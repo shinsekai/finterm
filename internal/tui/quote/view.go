@@ -29,6 +29,12 @@ type Theme interface {
 	Spinner() lipgloss.Style
 	SpinnerText() lipgloss.Style
 	Box() lipgloss.Style
+	Card() lipgloss.Style
+	CardHeader() lipgloss.Style
+	Accent() lipgloss.Style
+	Divider() lipgloss.Style
+	Primary() lipgloss.Color
+	Border() lipgloss.Color
 	Foreground() lipgloss.Color
 	Background() lipgloss.Color
 }
@@ -87,6 +93,36 @@ func (t *defaultTheme) Box() lipgloss.Style {
 		Padding(1)
 }
 
+func (t *defaultTheme) Card() lipgloss.Style {
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#44475A")).
+		Padding(1, 2)
+}
+
+func (t *defaultTheme) CardHeader() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#BD93F9")).
+		Bold(true).
+		MarginBottom(1)
+}
+
+func (t *defaultTheme) Accent() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true)
+}
+
+func (t *defaultTheme) Divider() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A"))
+}
+
+func (t *defaultTheme) Primary() lipgloss.Color {
+	return lipgloss.Color("#7D56F4")
+}
+
+func (t *defaultTheme) Border() lipgloss.Color {
+	return lipgloss.Color("#44475A")
+}
+
 func (t *defaultTheme) Foreground() lipgloss.Color {
 	return lipgloss.Color("#F8F8F2")
 }
@@ -139,28 +175,27 @@ func (v *View) Render() string {
 func (v *View) renderIdle() string {
 	var content string
 
-	// Title
-	content += v.theme.Title().Render("QUOTE LOOKUP")
+	// Title with icon
+	content += v.theme.Accent().Render("◈") + " " + v.theme.Title().Render("Quote Lookup")
 	content += "\n\n"
 
-	// Help text
-	helpText := "Enter ticker symbol (e.g., AAPL, BTC, ETH)"
-	content += v.theme.Help().Render(helpText)
-	content += "\n\n"
+	// Input label
+	label := v.theme.Accent().Render("Symbol ") + v.theme.Muted().Render("(e.g. AAPL, BTC, ETH)")
+	content += label + "\n"
 
-	// Text input
+	// Text input with rounded border using primary color
 	inputStyle := lipgloss.NewStyle().
 		Foreground(v.theme.Foreground()).
 		Background(v.theme.Background()).
 		Padding(0, 1).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#5C3FD6"))
+		BorderForeground(v.theme.Primary())
 
 	content += inputStyle.Render(v.model.textInput.View())
-	content += "\n"
+	content += "\n\n"
 
 	// Keyboard shortcuts
-	content += v.theme.Muted().Render(v.renderShortcuts())
+	content += v.renderShortcuts()
 
 	return content
 }
@@ -169,8 +204,8 @@ func (v *View) renderIdle() string {
 func (v *View) renderLoading() string {
 	var content string
 
-	// Title
-	content += v.theme.Title().Render("QUOTE LOOKUP")
+	// Title with icon
+	content += v.theme.Accent().Render("◈") + " " + v.theme.Title().Render("Quote Lookup")
 	content += "\n\n"
 
 	// Spinner
@@ -182,7 +217,7 @@ func (v *View) renderLoading() string {
 	content += "\n\n"
 
 	// Loading message
-	message := fmt.Sprintf("Fetching quote for %s...", strings.ToUpper(v.model.textInput.Value()))
+	message := fmt.Sprintf("⟳ Fetching %s…", strings.ToUpper(v.model.textInput.Value()))
 	content += v.theme.Loading().Render(message)
 
 	return content
@@ -192,32 +227,31 @@ func (v *View) renderLoading() string {
 func (v *View) renderLoaded() string {
 	var content string
 
-	// Title
-	content += v.theme.Title().Render("QUOTE LOOKUP")
+	// Title with icon
+	content += v.theme.Accent().Render("◈") + " " + v.theme.Title().Render("Quote Lookup")
 	content += "\n\n"
 
-	// Help text
-	helpText := "Enter another ticker symbol (e.g., AAPL, BTC, ETH)"
-	content += v.theme.Help().Render(helpText)
-	content += "\n\n"
+	// Input label
+	label := v.theme.Accent().Render("Symbol ") + v.theme.Muted().Render("(e.g. AAPL, BTC, ETH)")
+	content += label + "\n"
 
-	// Text input - show interactive input for next query
+	// Text input with rounded border using primary color
 	inputStyle := lipgloss.NewStyle().
 		Foreground(v.theme.Foreground()).
 		Background(v.theme.Background()).
 		Padding(0, 1).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#5C3FD6"))
+		BorderForeground(v.theme.Primary())
 
 	content += inputStyle.Render(v.model.textInput.View())
-	content += "\n"
-
-	// Keyboard shortcuts
-	content += v.theme.Muted().Render(v.renderShortcuts())
 	content += "\n\n"
 
-	// Quote data box
-	content += v.renderQuoteBox()
+	// Keyboard shortcuts
+	content += v.renderShortcuts()
+	content += "\n\n"
+
+	// Quote data cards
+	content += v.renderQuoteCards()
 
 	return content
 }
@@ -226,17 +260,21 @@ func (v *View) renderLoaded() string {
 func (v *View) renderError() string {
 	var content string
 
-	// Title
-	content += v.theme.Title().Render("QUOTE LOOKUP")
+	// Title with icon
+	content += v.theme.Accent().Render("◈") + " " + v.theme.Title().Render("Quote Lookup")
 	content += "\n\n"
 
-	// Error message
-	content += v.theme.Error().Render("Error loading quote")
-	content += "\n\n"
+	// Error card with red border
+	errorCardStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#FF5555")).
+		Padding(1, 2)
 
-	// Error details
-	errorText := fmt.Sprintf("%v", v.model.err)
-	content += v.theme.Muted().Render(errorText)
+	var cardContent strings.Builder
+	cardContent.WriteString(v.theme.Error().Render("✗ Error loading quote") + "\n\n")
+	cardContent.WriteString(v.theme.Muted().Render(fmt.Sprintf("%v", v.model.err)))
+
+	content += errorCardStyle.Render(cardContent.String())
 	content += "\n\n"
 
 	// Help text
@@ -244,19 +282,23 @@ func (v *View) renderError() string {
 	content += v.theme.Help().Render(helpText)
 	content += "\n\n"
 
-	// Text input - show interactive input for retry
+	// Input label
+	label := v.theme.Accent().Render("Symbol ") + v.theme.Muted().Render("(e.g. AAPL, BTC, ETH)")
+	content += label + "\n"
+
+	// Text input with rounded border using primary color
 	inputStyle := lipgloss.NewStyle().
 		Foreground(v.theme.Foreground()).
 		Background(v.theme.Background()).
 		Padding(0, 1).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#5C3FD6"))
+		BorderForeground(v.theme.Primary())
 
 	content += inputStyle.Render(v.model.textInput.View())
-	content += "\n"
+	content += "\n\n"
 
 	// Keyboard shortcuts
-	content += v.theme.Muted().Render(v.renderShortcuts())
+	content += v.renderShortcuts()
 
 	return content
 }
@@ -278,6 +320,172 @@ func (v *View) renderQuoteBox() string {
 
 	// Center the box within terminal width
 	return v.centerBox(box)
+}
+
+// renderQuoteCards renders the quote data in two card sections.
+func (v *View) renderQuoteCards() string {
+	if v.model.quoteData == nil || v.model.quoteData.Quote == nil {
+		return ""
+	}
+
+	quote := v.model.quoteData.Quote
+	indicators := v.model.quoteData.Indicators
+
+	var cards []string
+
+	// Price Card
+	priceCard := v.renderPriceCard(quote)
+	cards = append(cards, priceCard)
+
+	// Indicators Card
+	if indicators != nil {
+		indicatorsCard := v.renderIndicatorsCard(indicators, quote.LastTradingDay)
+		cards = append(cards, indicatorsCard)
+	}
+
+	return strings.Join(cards, "\n\n")
+}
+
+// renderPriceCard renders the price data in a card.
+func (v *View) renderPriceCard(quote *alphavantage.GlobalQuote) string {
+	var content strings.Builder
+
+	// Parse quote values
+	price, _ := strconv.ParseFloat(quote.Price, 64)
+	change, changePercent := parseChange(quote.Change, quote.ChangePercent)
+
+	// Symbol header
+	content.WriteString(v.theme.Title().Render(quote.Symbol))
+	content.WriteString("\n")
+
+	// Divider
+	boxWidth := v.calculateBoxWidth()
+	content.WriteString(v.theme.Divider().Render(strings.Repeat("─", boxWidth)))
+	content.WriteString("\n\n")
+
+	// Price prominently displayed
+	priceStyle := lipgloss.NewStyle().
+		Foreground(v.theme.Foreground()).
+		Bold(true).
+		MarginBottom(1)
+	content.WriteString(priceStyle.Render("$" + humanizeFloat(price, 2)))
+	content.WriteString("\n")
+
+	// Change with directional icon
+	changeStyle := v.getChangeStyle(change)
+	icon := "─"
+	if change > 0 {
+		icon = "▲"
+	} else if change < 0 {
+		icon = "▼"
+	}
+	changeText := fmt.Sprintf("%s %s$%s (%s)", icon,
+		func() string {
+			if change < 0 {
+				return ""
+			}
+			return "+"
+		}(),
+		humanizeFloat(math.Abs(change), 2),
+		formatPercent(changePercent))
+	content.WriteString(changeStyle.Render(changeText))
+	content.WriteString("\n\n")
+
+	// OHLCV data rows with muted labels
+	v.writePriceField(&content, "Open", "$"+formatPrice(quote.Open), quote.Open)
+	v.writePriceField(&content, "High", "$"+formatPrice(quote.High), quote.High)
+	v.writePriceField(&content, "Low", "$"+formatPrice(quote.Low), quote.Low)
+	v.writePriceField(&content, "Volume", formatVolume(quote.Volume, quote.Symbol, price), quote.Volume)
+	v.writePriceField(&content, "Prev Close", "$"+formatPrice(quote.PreviousClose), quote.PreviousClose)
+
+	return v.theme.Card().Render(content.String())
+}
+
+// renderIndicatorsCard renders the technical indicators in a card.
+func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingDay string) string {
+	var content strings.Builder
+
+	// Header
+	content.WriteString(v.theme.CardHeader().Render("Technical Indicators"))
+	content.WriteString("\n")
+
+	// Divider
+	boxWidth := v.calculateBoxWidth()
+	content.WriteString(v.theme.Divider().Render(strings.Repeat("─", boxWidth)))
+	content.WriteString("\n\n")
+
+	// RSI with progress bar
+	content.WriteString(v.renderRSIBar(indicators.RSI))
+	content.WriteString("\n\n")
+
+	// EMA values
+	content.WriteString(fmt.Sprintf("%-14s$%s\n", v.theme.Muted().Render("EMA(10):"), humanizeFloat(indicators.EMAFast, 2)))
+	content.WriteString(fmt.Sprintf("%-14s$%s\n", v.theme.Muted().Render("EMA(20):"), humanizeFloat(indicators.EMASlow, 2)))
+
+	// Trend signal with icon
+	trendStyle, trendSymbol := v.getTrendStyleAndSymbol(indicators.Signal)
+	content.WriteString(fmt.Sprintf("%-14s%s %s\n",
+		v.theme.Muted().Render("Trend:"),
+		trendStyle.Render(trendSymbol),
+		trendStyle.Render(indicators.Signal.String())))
+
+	// Last updated
+	if lastTradingDay != "" {
+		content.WriteString("\n")
+		content.WriteString(v.theme.Muted().Render("Last updated: " + lastTradingDay))
+	}
+
+	return v.theme.Card().Render(content.String())
+}
+
+// renderRSIBar renders an RSI progress bar with zone markers.
+func (v *View) renderRSIBar(rsi float64) string {
+	var content strings.Builder
+
+	// RSI label
+	rsiValuation := getRSIValuation(rsi)
+	valuationStyle := v.getValuationStyle(rsiValuation)
+	content.WriteString(fmt.Sprintf("%-14s%.1f  — %s\n",
+		v.theme.Muted().Render("RSI(14):"),
+		rsi,
+		valuationStyle.Render(rsiValuation)))
+
+	// Progress bar
+	barWidth := 40
+	filledWidth := int(rsi / 100 * float64(barWidth))
+	if filledWidth > barWidth {
+		filledWidth = barWidth
+	}
+
+	// Determine bar color
+	var barStyle lipgloss.Style
+	switch {
+	case rsi < 30:
+		barStyle = v.theme.Bullish()
+	case rsi > 70:
+		barStyle = v.theme.Bearish()
+	default:
+		barStyle = v.theme.Accent()
+	}
+
+	// Build bar: filled portion + empty portion
+	filled := strings.Repeat("█", filledWidth)
+	empty := strings.Repeat("░", barWidth-filledWidth)
+	bar := barStyle.Render(filled) + v.theme.Muted().Render(empty)
+
+	content.WriteString("  " + bar + "\n")
+
+	// Zone markers
+	content.WriteString("  " + v.theme.Muted().Render("0       30       70      100"))
+
+	return content.String()
+}
+
+// writePriceField writes a price field line with muted label.
+func (v *View) writePriceField(content *strings.Builder, label, value, condition string) {
+	if condition != "" {
+		content.WriteString(fmt.Sprintf("%-14s%s\n", v.theme.Muted().Render(label+":"), value))
+	}
 }
 
 // buildQuoteContent builds the content string for the quote box.
@@ -436,30 +644,30 @@ func (v *View) centerBox(box string) string {
 
 // renderShortcuts renders keyboard shortcut hints.
 func (v *View) renderShortcuts() string {
-	shortcuts := []string{
-		"Enter: Submit",
-		"Esc: Clear",
-		"↑/↓: History",
-		"r: Refresh",
-		"1-4: Tabs",
-		"q: Quit",
+	shortcuts := []struct {
+		key  string
+		desc string
+	}{
+		{"Enter", "submit"},
+		{"Esc", "clear"},
+		{"↑/↓", "history"},
+		{"r", "refresh"},
+		{"1-4", "tabs"},
+		{"q", "quit"},
 	}
 
-	var result string
-	for i, shortcut := range shortcuts {
-		if i > 0 {
-			result += "  │  "
-		}
-		result += shortcut
+	var parts []string
+	for _, sc := range shortcuts {
+		parts = append(parts, v.theme.Accent().Render(sc.key)+" "+v.theme.Muted().Render(sc.desc))
 	}
 
-	return result
+	return strings.Join(parts, "  ·  ")
 }
 
 // parseChange parses the change and change percent, returns values.
 func parseChange(changeStr, changePercentStr string) (float64, string) {
 	if changeStr == "" {
-		return 0, "--"
+		return 0, "—"
 	}
 
 	change, err := strconv.ParseFloat(changeStr, 64)
@@ -468,7 +676,7 @@ func parseChange(changeStr, changePercentStr string) (float64, string) {
 	}
 
 	if changePercentStr == "" {
-		return change, "--"
+		return change, "—"
 	}
 
 	// Keep % sign for display
@@ -479,7 +687,7 @@ func parseChange(changeStr, changePercentStr string) (float64, string) {
 // For crypto, also displays USD volume.
 func formatVolume(volumeStr, symbol string, price float64) string {
 	if volumeStr == "" {
-		return "--"
+		return "—"
 	}
 
 	vol, err := strconv.ParseFloat(volumeStr, 64)
@@ -519,7 +727,7 @@ func formatFloat(f float64, decimals int) string {
 // formatPrice formats a price string with 2 decimal places and comma separators.
 func formatPrice(s string) string {
 	if s == "" {
-		return "--"
+		return "—"
 	}
 	val, err := strconv.ParseFloat(s, 64)
 	if err != nil {
@@ -558,7 +766,7 @@ func humanizeFloat(val float64, decimals int) string {
 // formatPercent formats a percentage string with 2 decimal places.
 func formatPercent(s string) string {
 	if s == "" {
-		return "--"
+		return "—"
 	}
 	// Remove % sign, parse, reformat with 2 decimals
 	clean := strings.TrimSuffix(s, "%")

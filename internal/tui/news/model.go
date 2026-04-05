@@ -12,8 +12,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/owner/finterm/internal/alphavantage"
-	"github.com/owner/finterm/internal/tui/components"
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/tui/components"
 )
 
 // Filter represents the news filter type.

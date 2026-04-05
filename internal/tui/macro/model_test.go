@@ -9,8 +9,8 @@ import (
 
 	"github.com/charmbracelet/bubbletea"
 
-	"github.com/owner/finterm/internal/alphavantage"
-	"github.com/owner/finterm/internal/cache"
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/cache"
 )
 
 // mockMacroClient is a mock implementation of Client for testing.

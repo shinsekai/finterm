@@ -13,12 +13,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/owner/finterm/internal/alphavantage"
-	"github.com/owner/finterm/internal/cache"
-	"github.com/owner/finterm/internal/config"
-	"github.com/owner/finterm/internal/domain/trend"
-	"github.com/owner/finterm/internal/domain/trend/indicators"
-	"github.com/owner/finterm/internal/tui"
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/cache"
+	"github.com/shinsekai/finterm/internal/config"
+	"github.com/shinsekai/finterm/internal/domain/trend"
+	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/tui"
 	"time"
 )
 

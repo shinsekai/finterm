@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/owner/finterm/internal/config"
-	"github.com/owner/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/config"
+	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 )
 
 // Result contains the complete analysis result for a symbol.

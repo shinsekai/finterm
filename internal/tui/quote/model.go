@@ -11,10 +11,10 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/owner/finterm/internal/alphavantage"
-	trenddomain "github.com/owner/finterm/internal/domain/trend"
-	"github.com/owner/finterm/internal/domain/trend/indicators"
-	"github.com/owner/finterm/internal/tui/components"
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	trenddomain "github.com/shinsekai/finterm/internal/domain/trend"
+	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/tui/components"
 )
 
 // State represents the model state.

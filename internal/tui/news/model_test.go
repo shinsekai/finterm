@@ -10,7 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/owner/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/alphavantage"
 )
 
 // mockClient is a mock implementation of Client for testing.

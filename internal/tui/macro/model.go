@@ -8,9 +8,9 @@ import (
 
 	"github.com/charmbracelet/bubbletea"
 
-	"github.com/owner/finterm/internal/alphavantage"
-	"github.com/owner/finterm/internal/cache"
-	"github.com/owner/finterm/internal/tui/components"
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/cache"
+	"github.com/shinsekai/finterm/internal/tui/components"
 )
 
 // PanelState represents the loading state of a data panel.

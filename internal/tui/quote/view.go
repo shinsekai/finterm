@@ -9,9 +9,9 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/owner/finterm/internal/alphavantage"
-	trenddomain "github.com/owner/finterm/internal/domain/trend"
-	"github.com/owner/finterm/internal/tui/components"
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	trenddomain "github.com/shinsekai/finterm/internal/domain/trend"
+	"github.com/shinsekai/finterm/internal/tui/components"
 )
 
 // Theme defines the interface for theme styling.

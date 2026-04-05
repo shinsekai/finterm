@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/owner/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/alphavantage"
 )
 
 // RSIResponse defines the interface for RSI responses from Alpha Vantage.

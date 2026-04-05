@@ -14,7 +14,3 @@ linters:
     - gocyclo
     - gocritic
     - revive
-
-linters_settings:
-  gocyclo:
-    min-complexity: 15

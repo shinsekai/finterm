@@ -147,6 +147,7 @@ func TestTrendModel_View_LoadedState(t *testing.T) {
 	// Set row to loaded state with result
 	result := &trenddomain.Result{
 		Symbol:  "AAPL",
+		Price:   155.50,
 		RSI:     50.5,
 		EMAFast: 150.25,
 		EMASlow: 145.75,
@@ -164,6 +165,7 @@ func TestTrendModel_View_LoadedState(t *testing.T) {
 	assert.Contains(t, rendered, "50.50", "View should contain RSI value")
 	assert.Contains(t, rendered, "150.25", "View should contain EMA fast value")
 	assert.Contains(t, rendered, "145.75", "View should contain EMA slow value")
+	assert.Contains(t, rendered, "$155.50", "View should contain dollar-prefixed price")
 }
 
 // TestTrendModel_View_MixedState verifies rendering with mixed loading/loaded/error states.
@@ -233,17 +235,19 @@ func TestTrendModel_View_ActiveRow(t *testing.T) {
 	model.activeRow = 0
 	view := NewView(model).SetTheme(&mockTheme{})
 	rendered := view.Render()
-	assert.Contains(t, rendered, "AAPL", "View should contain AAPL")
+	assert.Contains(t, rendered, "▸ AAPL", "View should contain cursor marker before active symbol")
+	assert.NotContains(t, rendered, "▸ MSFT", "View should not contain cursor before non-active MSFT")
 
 	// Test active row at index 1
 	model.activeRow = 1
 	rendered = NewView(model).SetTheme(&mockTheme{}).Render()
-	assert.Contains(t, rendered, "MSFT", "View should contain MSFT")
+	assert.Contains(t, rendered, "▸ MSFT", "View should contain cursor marker before active MSFT")
+	assert.NotContains(t, rendered, "▸ AAPL", "View should not contain cursor before non-active AAPL")
 
 	// Test active row at index 2
 	model.activeRow = 2
 	rendered = NewView(model).SetTheme(&mockTheme{}).Render()
-	assert.Contains(t, rendered, "GOOGL", "View should contain GOOGL")
+	assert.Contains(t, rendered, "▸ GOOGL", "View should contain cursor marker before active GOOGL")
 }
 
 // TestTrendModel_View_BearishSignal verifies rendering of bearish signal.
@@ -541,4 +545,300 @@ func TestTrendView_TitleWithIcon(t *testing.T) {
 	title := view.renderTitle()
 	assert.Contains(t, title, "◆", "Title should contain diamond icon")
 	assert.Contains(t, title, "Trend Analysis", "Title should contain text")
+}
+
+// TestTrendView_SummaryBar_Counts verifies signal summary bar shows correct counts.
+func TestTrendView_SummaryBar_Counts(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
+
+	// Set up 3 bullish, 2 bearish (no neutral signal exists in domain)
+	signals := []trenddomain.Signal{
+		trenddomain.Bullish,
+		trenddomain.Bullish,
+		trenddomain.Bullish,
+		trenddomain.Bearish,
+		trenddomain.Bearish,
+	}
+
+	for i, signal := range signals {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:  model.rows[i].Symbol,
+			Signal:  signal,
+			Price:   100.0,
+			RSI:     50.0,
+			EMAFast: 100.0,
+			EMASlow: 90.0,
+		}
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	summary := view.renderSummary()
+
+	assert.Contains(t, summary, "3 ▲", "Summary should show 3 bullish signals")
+	assert.Contains(t, summary, "2 ▼", "Summary should show 2 bearish signals")
+}
+
+// TestTrendView_SummaryBar_WithPending verifies pending count is shown during loading.
+func TestTrendView_SummaryBar_WithPending(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "BTC")
+
+	// Set 2 loaded, 1 loading
+	model.rows[0].State = StateLoaded
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:  "AAPL",
+		Signal:  trenddomain.Bullish,
+		Price:   100.0,
+		RSI:     50.0,
+		EMAFast: 100.0,
+		EMASlow: 90.0,
+	}
+	model.rows[1].State = StateLoaded
+	model.rows[1].Result = &trenddomain.Result{
+		Symbol:  "MSFT",
+		Signal:  trenddomain.Bearish,
+		Price:   100.0,
+		RSI:     50.0,
+		EMAFast: 100.0,
+		EMASlow: 90.0,
+	}
+	// rows[2] stays in loading state
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	summary := view.renderSummary()
+
+	assert.Contains(t, summary, "1 ▲", "Summary should show 1 bullish signal")
+	assert.Contains(t, summary, "1 ▼", "Summary should show 1 bearish signal")
+	assert.Contains(t, summary, "1 pending", "Summary should show 1 pending")
+}
+
+// TestTrendView_SummaryBar_HiddenWhenEmpty verifies summary bar is hidden when watchlist is empty.
+func TestTrendView_SummaryBar_HiddenWhenEmpty(t *testing.T) {
+	model := NewModel()
+	model.Configure(
+		context.Background(),
+		&viewMockEngine{},
+		&config.WatchlistConfig{Equities: []string{}, Crypto: []string{}},
+		indicators.NewAssetClassDetector([]string{}),
+	)
+
+	view := NewView(*model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	// Summary bar should not be rendered (no row data)
+	// Verify we still get a valid render, just without summary
+	assert.Contains(t, rendered, "Trend Analysis", "View should contain title")
+	assert.NotContains(t, rendered, "▲", "View should not contain signal markers when empty")
+}
+
+// TestTrendView_ActiveRowCursor verifies cursor marker is only on active row.
+func TestTrendView_ActiveRowCursor(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL")
+
+	// Set all rows to loaded
+	for i := range model.rows {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:  model.rows[i].Symbol,
+			Signal:  trenddomain.Bullish,
+			Price:   100.0,
+			RSI:     50.0,
+			EMAFast: 100.0,
+			EMASlow: 90.0,
+		}
+	}
+
+	model.activeRow = 1
+	view := NewView(model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	// Active row should have cursor marker
+	assert.Contains(t, rendered, "▸ MSFT", "Active row should have cursor marker")
+	// Non-active rows should have spacer
+	assert.Contains(t, rendered, "  AAPL", "Non-active row should have spacer")
+	assert.Contains(t, rendered, "  GOOGL", "Non-active row should have spacer")
+}
+
+// TestTrendView_PriceDollarPrefix verifies prices show dollar sign prefix.
+func TestTrendView_PriceDollarPrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		price    float64
+		expected string
+	}{
+		{"Normal price", 155.50, "$155.50"},
+		{"Small price (crypto)", 0.001234, "$0.001234"},
+		{"Zero price", 0.0, "—"},
+		{"Large price", 1234.56, "$1,234.56"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := newTestModelForView("TEST")
+			model.rows[0].State = StateLoaded
+			model.rows[0].Result = &trenddomain.Result{
+				Symbol:  "TEST",
+				Price:   tt.price,
+				RSI:     50.0,
+				EMAFast: 100.0,
+				EMASlow: 90.0,
+				Signal:  trenddomain.Bullish,
+			}
+
+			view := NewView(model).SetTheme(&mockTheme{})
+			rendered := view.Render()
+			assert.Contains(t, rendered, tt.expected, "View should contain dollar-prefixed price")
+		})
+	}
+}
+
+// TestTrendView_LoadingProgress verifies loading progress is shown in subtitle.
+func TestTrendView_LoadingProgress(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL", "NVDA")
+
+	// Load first 2, keep 2 in loading state
+	model.rows[0].State = StateLoaded
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:  "AAPL",
+		Signal:  trenddomain.Bullish,
+		Price:   100.0,
+		RSI:     50.0,
+		EMAFast: 100.0,
+		EMASlow: 90.0,
+	}
+	model.rows[1].State = StateLoaded
+	model.rows[1].Result = &trenddomain.Result{
+		Symbol:  "MSFT",
+		Signal:  trenddomain.Bullish,
+		Price:   100.0,
+		RSI:     50.0,
+		EMAFast: 100.0,
+		EMASlow: 90.0,
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	title := view.renderTitle()
+
+	assert.Contains(t, title, "Loading 2/4…", "Title should show loading progress")
+}
+
+// TestTrendView_LoadingProgress_AllLoaded verifies normal subtitle when all loaded.
+func TestTrendView_LoadingProgress_AllLoaded(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT")
+
+	for i := range model.rows {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:  model.rows[i].Symbol,
+			Signal:  trenddomain.Bullish,
+			Price:   100.0,
+			RSI:     50.0,
+			EMAFast: 100.0,
+			EMASlow: 90.0,
+		}
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	title := view.renderTitle()
+
+	assert.Contains(t, title, "2 symbols", "Title should show symbol count when all loaded")
+	assert.NotContains(t, title, "Loading", "Title should not show loading when all loaded")
+}
+
+// TestTrendView_SectionSeparator_MixedWatchlist verifies separator appears between equities and crypto.
+func TestTrendView_SectionSeparator_MixedWatchlist(t *testing.T) {
+	model := NewModel()
+	model.Configure(
+		context.Background(),
+		&viewMockEngine{},
+		&config.WatchlistConfig{Equities: []string{"AAPL", "MSFT"}, Crypto: []string{"BTC", "ETH"}},
+		indicators.NewAssetClassDetector([]string{}),
+	)
+
+	for i := range model.rows {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:  model.rows[i].Symbol,
+			Signal:  trenddomain.Bullish,
+			Price:   100.0,
+			RSI:     50.0,
+			EMAFast: 100.0,
+			EMASlow: 90.0,
+		}
+	}
+
+	view := NewView(*model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	assert.Contains(t, rendered, "Crypto", "View should contain crypto separator")
+}
+
+// TestTrendView_SectionSeparator_EquitiesOnly verifies no separator when only equities.
+func TestTrendView_SectionSeparator_EquitiesOnly(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL")
+
+	for i := range model.rows {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:  model.rows[i].Symbol,
+			Signal:  trenddomain.Bullish,
+			Price:   100.0,
+			RSI:     50.0,
+			EMAFast: 100.0,
+			EMASlow: 90.0,
+		}
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	assert.NotContains(t, rendered, "Crypto", "View should not contain crypto separator when only equities")
+}
+
+// TestTrendView_SectionSeparator_CryptoOnly verifies no separator when only crypto.
+func TestTrendView_SectionSeparator_CryptoOnly(t *testing.T) {
+	model := NewModel()
+	model.Configure(
+		context.Background(),
+		&viewMockEngine{},
+		&config.WatchlistConfig{Equities: []string{}, Crypto: []string{"BTC", "ETH"}},
+		indicators.NewAssetClassDetector([]string{}),
+	)
+
+	for i := range model.rows {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:  model.rows[i].Symbol,
+			Signal:  trenddomain.Bullish,
+			Price:   0.001234,
+			RSI:     50.0,
+			EMAFast: 100.0,
+			EMASlow: 90.0,
+		}
+	}
+
+	view := NewView(*model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	assert.NotContains(t, rendered, "Crypto", "View should not contain crypto separator when only crypto")
+}
+
+// TestTrendView_TableContainer verifies table is wrapped in bordered container.
+func TestTrendView_TableContainer(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	model.rows[0].State = StateLoaded
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:  "AAPL",
+		Signal:  trenddomain.Bullish,
+		Price:   100.0,
+		RSI:     50.0,
+		EMAFast: 100.0,
+		EMASlow: 90.0,
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	// Check for rounded border characters from lipgloss.RoundedBorder
+	assert.Contains(t, rendered, "╭", "View should contain rounded border corner")
 }

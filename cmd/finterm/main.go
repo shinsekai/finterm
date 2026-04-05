@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"syscall"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -19,10 +20,21 @@ import (
 	"github.com/shinsekai/finterm/internal/domain/trend"
 	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 	"github.com/shinsekai/finterm/internal/tui"
-	"time"
+)
+
+// Build-time variables set via ldflags.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
 )
 
 func main() {
+	// Handle version flag early, before config loading
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		fmt.Printf("finterm %s (commit: %s, built: %s)\n", version, commit, date)
+		os.Exit(0)
+	}
 	// Load configuration
 	cfgPath := getConfigPath()
 	cfg, err := config.Load(cfgPath)

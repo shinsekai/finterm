@@ -90,7 +90,7 @@ func main() {
 		cfg,
 		detector,
 		cryptoFetcher,
-		avClient,  // TimeSeriesClient for equity BLITZ computation
+		avClient,   // TimeSeriesClient for equity BLITZ computation
 		cacheStore, // Cache for time series data
 	)
 

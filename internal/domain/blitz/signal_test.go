@@ -121,9 +121,11 @@ func TestCompute_HoldBehavior(t *testing.T) {
 	for i := 10; i < 20; i++ {
 		if result.Scores[i] == Hold && result.Scores[i-1] == Long {
 			// This is expected - Hold maintains previous Long
-		} else if result.Scores[i] == Long || result.Scores[i] == Short {
+			continue
+		}
+		if result.Scores[i] == Long || result.Scores[i] == Short {
 			// Also valid - signal continues
-			_ = result.Scores[i]
+			continue
 		}
 	}
 

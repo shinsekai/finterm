@@ -367,6 +367,29 @@ func (m Model) GetSignalCounts() (bullish, bearish, neutral int) {
 	return b, br, n
 }
 
+// GetBlitzCounts returns the count of LONG, SHORT, and HOLD BLITZ signals
+// across all loaded rows. Loading and error rows are ignored.
+func (m Model) GetBlitzCounts() (long, short, hold int) {
+	var l, s, h int
+	for _, row := range m.rows {
+		if row.State != StateLoaded && row.State != StateCached {
+			continue
+		}
+		if row.Result == nil {
+			continue
+		}
+		switch row.Result.BlitzScore {
+		case 1:
+			l++
+		case -1:
+			s++
+		default:
+			h++
+		}
+	}
+	return l, s, h
+}
+
 // KeyBindings returns the keyboard bindings for the trend view.
 func (m Model) KeyBindings() []components.KeyBinding {
 	return []components.KeyBinding{

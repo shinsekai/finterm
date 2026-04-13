@@ -105,6 +105,7 @@ func (v *View) renderTitle() string {
 // renderSummary renders the signal summary bar.
 func (v *View) renderSummary() string {
 	bullish, bearish, neutral := v.model.GetSignalCounts()
+	long, short, hold := v.model.GetBlitzCounts()
 
 	var summary strings.Builder
 
@@ -135,6 +136,32 @@ func (v *View) renderSummary() string {
 			summary.WriteString("  ")
 		}
 		summary.WriteString(v.theme.Muted().Render(fmt.Sprintf("· %d pending", pendingCount)))
+	}
+
+	// BLITZ summary line (on a new line)
+	if long > 0 || short > 0 || hold > 0 {
+		var blitz strings.Builder
+		blitz.WriteString("BLITZ: ")
+		if long > 0 {
+			blitz.WriteString(v.theme.Bullish().Render(fmt.Sprintf("%d LONG", long)))
+		}
+		if short > 0 {
+			if blitz.Len() > 7 { // "BLITZ: " length
+				blitz.WriteString("  ")
+			}
+			blitz.WriteString(v.theme.Bearish().Render(fmt.Sprintf("%d SHORT", short)))
+		}
+		if hold > 0 {
+			if blitz.Len() > 7 { // "BLITZ: " length
+				blitz.WriteString("  ")
+			}
+			blitz.WriteString(v.theme.Muted().Render(fmt.Sprintf("%d HOLD", hold)))
+		}
+
+		if summary.Len() > 0 {
+			summary.WriteString("\n")
+		}
+		summary.WriteString(v.theme.Muted().Render(blitz.String()))
 	}
 
 	return summary.String()
@@ -188,6 +215,13 @@ func (v *View) buildColumns() []components.Column {
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
+			Title:       "BLITZ",
+			Width:       10,
+			Alignment:   components.AlignCenter,
+			Style:       v.theme.TableRow(),
+			HeaderStyle: v.theme.TableHeader(),
+		},
+		{
 			Title:       "PRICE",
 			Width:       14,
 			Alignment:   components.AlignRight,
@@ -196,21 +230,21 @@ func (v *View) buildColumns() []components.Column {
 		},
 		{
 			Title:       "RSI",
-			Width:       8,
+			Width:       7,
 			Alignment:   components.AlignRight,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
 			Title:       "EMA FAST",
-			Width:       12,
+			Width:       11,
 			Alignment:   components.AlignRight,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
 			Title:       "EMA SLOW",
-			Width:       12,
+			Width:       11,
 			Alignment:   components.AlignRight,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
@@ -261,7 +295,7 @@ func (v *View) buildTableRows(rows []RowData) []components.Row {
 	cryptoStartIndex := v.model.GetCryptoStartIndex()
 	if cryptoStartIndex > 0 && cryptoStartIndex < len(rows) {
 		// Insert separator at the crypto start position
-		separatorCells := make([]components.Cell, 7)
+		separatorCells := make([]components.Cell, 8)
 		separatorCells[0].Text = v.theme.Divider().Render("── Crypto ──")
 		// All other cells remain empty
 
@@ -304,6 +338,7 @@ func (v *View) buildLoadingCells(row RowData) []components.Cell {
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -314,6 +349,7 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: v.theme.Accent().Render(result.Symbol)},
 		{Text: v.renderSignalBadge(result.Signal)},
+		{Text: v.renderBlitzBadge(result.BlitzScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
 		{Text: FormatValue(result.EMAFast, 2)},
@@ -332,6 +368,7 @@ func (v *View) buildCachedCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: symbolWithBadge},
 		{Text: v.renderSignalBadge(result.Signal)},
+		{Text: v.renderBlitzBadge(result.BlitzScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
 		{Text: FormatValue(result.EMAFast, 2)},
@@ -356,6 +393,7 @@ func (v *View) buildErrorCells(row RowData) []components.Cell {
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -364,6 +402,7 @@ func (v *View) buildUnknownCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
 		{Text: v.theme.Muted().Render("Unknown")},
+		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
@@ -390,6 +429,18 @@ func (v *View) renderSignalBadge(signal trenddomain.Signal) string {
 		return v.theme.BullishBadge().Render("▲ BULL")
 	case trenddomain.Bearish:
 		return v.theme.BearishBadge().Render("▼ BEAR")
+	default:
+		return v.theme.NeutralBadge().Render("─ HOLD")
+	}
+}
+
+// renderBlitzBadge renders a BLITZ score as a colored badge.
+func (v *View) renderBlitzBadge(blitzScore int) string {
+	switch blitzScore {
+	case 1:
+		return v.theme.BullishBadge().Render("▲ LONG")
+	case -1:
+		return v.theme.BearishBadge().Render("▼ SHORT")
 	default:
 		return v.theme.NeutralBadge().Render("─ HOLD")
 	}

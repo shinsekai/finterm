@@ -524,3 +524,92 @@ func TestTrendModel_GetSignalCounts_EmptyRows(t *testing.T) {
 	assert.Equal(t, 0, bearish, "Should have 0 bearish signals")
 	assert.Equal(t, 0, neutral, "Should have 0 neutral signals")
 }
+
+// TestTrendModel_GetBlitzCounts_MixedSignals verifies GetBlitzCounts correctly
+// counts LONG, SHORT, and HOLD BLITZ signals.
+func TestTrendModel_GetBlitzCounts_MixedSignals(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
+
+	// Set up 3 LONG, 2 SHORT
+	blitzScores := []int{1, 1, 0, -1, -1}
+	signals := []trenddomain.Signal{
+		trenddomain.Bullish,
+		trenddomain.Bullish,
+		trenddomain.Bullish,
+		trenddomain.Bearish,
+		trenddomain.Bearish,
+	}
+
+	for i, score := range blitzScores {
+		result := &trenddomain.Result{
+			Symbol:     model.rows[i].Symbol,
+			Signal:     signals[i],
+			BlitzScore: score,
+		}
+		updatedM, _ := model.Update(TrendDataMsg{Symbol: model.rows[i].Symbol, Result: result})
+		model = asModel(t, updatedM)
+	}
+
+	long, short, hold := model.GetBlitzCounts()
+
+	assert.Equal(t, 2, long, "Should count 2 LONG signals")
+	assert.Equal(t, 2, short, "Should count 2 SHORT signals")
+	assert.Equal(t, 1, hold, "Should count 1 HOLD signal")
+}
+
+// TestTrendModel_GetBlitzCounts_IgnoresLoadingRows verifies GetBlitzCounts
+// ignores rows that are still loading or in error state.
+func TestTrendModel_GetBlitzCounts_IgnoresLoadingRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL")
+
+	// Set only one row to loaded
+	result := &trenddomain.Result{Symbol: "AAPL", Signal: trenddomain.Bullish, BlitzScore: 1}
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: result})
+	model = asModel(t, updatedM)
+
+	// Set one row to error
+	err := errors.New("network error")
+	updatedM, _ = model.Update(TrendErrorMsg{Symbol: "MSFT", Err: err})
+	model = asModel(t, updatedM)
+
+	// GOOGL remains in loading state
+
+	long, short, hold := model.GetBlitzCounts()
+
+	assert.Equal(t, 1, long, "Should count 1 LONG signal")
+	assert.Equal(t, 0, short, "Should have 0 SHORT signals")
+	assert.Equal(t, 0, hold, "Should have 0 HOLD signals")
+}
+
+// TestTrendModel_GetBlitzCounts_EmptyRows verifies GetBlitzCounts returns
+// all zeros when there are no loaded rows.
+func TestTrendModel_GetBlitzCounts_EmptyRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{})
+
+	// No rows at all
+	long, short, hold := model.GetBlitzCounts()
+
+	assert.Equal(t, 0, long, "Should have 0 LONG signals")
+	assert.Equal(t, 0, short, "Should have 0 SHORT signals")
+	assert.Equal(t, 0, hold, "Should have 0 HOLD signals")
+}
+
+// TestTrendModel_GetBlitzCounts_CachedRows verifies GetBlitzCounts
+// includes cached rows in the count.
+func TestTrendModel_GetBlitzCounts_CachedRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL")
+
+	// Set row to loaded
+	result := &trenddomain.Result{Symbol: "AAPL", Signal: trenddomain.Bullish, BlitzScore: 1}
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: result})
+	model = asModel(t, updatedM)
+
+	// Manually set to cached state
+	model.rows[0].State = StateCached
+
+	long, short, hold := model.GetBlitzCounts()
+
+	assert.Equal(t, 1, long, "Should count cached row as LONG")
+	assert.Equal(t, 0, short, "Should have 0 SHORT signals")
+	assert.Equal(t, 0, hold, "Should have 0 HOLD signals")
+}

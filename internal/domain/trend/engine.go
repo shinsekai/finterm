@@ -4,10 +4,14 @@ package trend
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/cache"
 	"github.com/shinsekai/finterm/internal/config"
+	"github.com/shinsekai/finterm/internal/domain/blitz"
 	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 )
 
@@ -27,11 +31,23 @@ type Result struct {
 	Signal Signal
 	// Valuation is the valuation assessment based on RSI.
 	Valuation string
+	// BlitzScore is the BLITZ trending system signal: +1 (Long), -1 (Short), or 0 (Hold).
+	BlitzScore int
+	// BlitzTSI is the latest TSI (Pearson correlation) value from BLITZ.
+	BlitzTSI float64
+	// BlitzRSISmooth is the latest smoothed RSI value from BLITZ.
+	BlitzRSISmooth float64
 }
 
 // CryptoDataFetcher fetches OHLCV data for cryptocurrency symbols.
 type CryptoDataFetcher interface {
 	FetchCryptoOHLCV(ctx context.Context, symbol string) ([]indicators.OHLCV, error)
+}
+
+// TimeSeriesClient fetches daily time series data for equities.
+// The concrete implementation is *alphavantage.Client from the alphavantage package.
+type TimeSeriesClient interface {
+	GetDailyTimeSeries(ctx context.Context, symbol, outputsize string) (*alphavantage.TimeSeriesDaily, error)
 }
 
 // Engine orchestrates trend analysis by routing to the correct indicator path.
@@ -51,11 +67,17 @@ type Engine struct {
 	detector *indicators.AssetClassDetector
 	// cryptoFetcher fetches OHLCV data for crypto symbols.
 	cryptoFetcher CryptoDataFetcher
+	// timeSeriesClient fetches daily time series for equities (for BLITZ computation).
+	timeSeriesClient TimeSeriesClient
+	// cache is used to cache time series data for BLITZ computation.
+	cache *cache.Store
 }
 
 // New creates a new Engine with the provided indicators and configuration.
 // The detector determines asset class from the symbol and routes to the correct indicator path.
 // The cryptoFetcher provides OHLCV data for crypto symbols when needed.
+// The timeSeriesClient provides daily time series for equities (BLITZ computation).
+// The cache is used to cache time series data.
 func New(
 	remoteRSI, remoteEMA indicators.Indicator,
 	localRSI *indicators.LocalRSI,
@@ -63,15 +85,19 @@ func New(
 	cfg *config.Config,
 	detector *indicators.AssetClassDetector,
 	cryptoFetcher CryptoDataFetcher,
+	timeSeriesClient TimeSeriesClient,
+	cacheStore *cache.Store,
 ) *Engine {
 	return &Engine{
-		remoteRSI:     remoteRSI,
-		remoteEMA:     remoteEMA,
-		localRSI:      localRSI,
-		localEMA:      localEMA,
-		cfg:           cfg,
-		detector:      detector,
-		cryptoFetcher: cryptoFetcher,
+		remoteRSI:        remoteRSI,
+		remoteEMA:        remoteEMA,
+		localRSI:         localRSI,
+		localEMA:         localEMA,
+		cfg:              cfg,
+		detector:         detector,
+		cryptoFetcher:    cryptoFetcher,
+		timeSeriesClient: timeSeriesClient,
+		cache:            cacheStore,
 	}
 }
 
@@ -85,12 +111,12 @@ func New(
 // is excluded to prevent repainting.
 //
 // Returns:
-//   - Result with RSI, EMA values, signal, and valuation
-//   - Error if any indicator computation fails
+//   - Result with RSI, EMA values, signal, valuation, and BLITZ score
+//   - Error if any indicator computation fails (BLITZ failures are logged but don't fail the analysis)
 //
 // The function is well-structured with clear separation between equity and crypto paths.
 //
-//nolint:gocyclo // Complexity 17 due to switch on asset class with multiple operations
+//nolint:gocyclo // Complexity 20 due to switch on asset class with BLITZ integration
 func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicators.AssetClass) (*Result, error) {
 	if symbol == "" {
 		return nil, fmt.Errorf("symbol cannot be empty")
@@ -99,6 +125,8 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	var rsiDataPoints, emaFastDataPoints, emaSlowDataPoints []indicators.DataPoint
 	var price float64
 	var err error
+	var blitzScore int
+	var blitzTSI, blitzRSISmooth float64
 
 	// Route to appropriate indicator path based on asset class
 	switch assetClass {
@@ -130,6 +158,43 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 		// For equities, use EMA fast as price proxy (based on close prices)
 		if len(emaFastDataPoints) > 0 {
 			price = emaFastDataPoints[0].Value
+		}
+
+		// Compute BLITZ score for equities using daily time series
+		if e.timeSeriesClient != nil {
+			cacheKey := cache.Key("timeseries", "daily", symbol)
+			var tsData *alphavantage.TimeSeriesDaily
+
+			// Try to get from cache first
+			if cached, ok := e.cache.Get(cacheKey); ok {
+				if ts, ok := cached.(*alphavantage.TimeSeriesDaily); ok {
+					tsData = ts
+				}
+			}
+
+			// If not in cache, fetch from API
+			if tsData == nil {
+				tsData, err = e.timeSeriesClient.GetDailyTimeSeries(ctx, symbol, "compact")
+				if err != nil {
+					// BLITZ computation failed - log and continue with default values
+					fmt.Printf("warning: failed to fetch time series for BLITZ computation for %s: %v\n", symbol, err)
+					blitzScore, blitzTSI, blitzRSISmooth = 0, 0, 0
+				} else {
+					// Cache the result
+					e.cache.Set(cacheKey, tsData, e.cfg.Cache.DailyTTL)
+				}
+			}
+
+			// Extract close prices and compute BLITZ
+			if tsData != nil {
+				closes, err := extractClosePricesFromTimeSeries(tsData)
+				if err != nil {
+					fmt.Printf("warning: failed to extract close prices for BLITZ computation for %s: %v\n", symbol, err)
+					blitzScore, blitzTSI, blitzRSISmooth = 0, 0, 0
+				} else {
+					blitzScore, blitzTSI, blitzRSISmooth = computeBlitz(closes)
+				}
+			}
 		}
 
 	case indicators.Crypto:
@@ -168,6 +233,13 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 			return nil, fmt.Errorf("computing local EMA slow for %s: %w", symbol, err)
 		}
 
+		// Compute BLITZ score for crypto using existing OHLCV data
+		closes := make([]float64, len(ohlcvData))
+		for i, ohlcv := range ohlcvData {
+			closes[i] = ohlcv.Close
+		}
+		blitzScore, blitzTSI, blitzRSISmooth = computeBlitz(closes)
+
 	default:
 		return nil, fmt.Errorf("unsupported asset class: %v", assetClass)
 	}
@@ -196,13 +268,16 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	valuation := computeValuation(rsi, e.cfg.Valuation)
 
 	return &Result{
-		Symbol:    strings.ToUpper(symbol),
-		Price:     price,
-		RSI:       rsi,
-		EMAFast:   emaFast,
-		EMASlow:   emaSlow,
-		Signal:    signal,
-		Valuation: valuation,
+		Symbol:         strings.ToUpper(symbol),
+		Price:          price,
+		RSI:            rsi,
+		EMAFast:        emaFast,
+		EMASlow:        emaSlow,
+		Signal:         signal,
+		Valuation:      valuation,
+		BlitzScore:     blitzScore,
+		BlitzTSI:       blitzTSI,
+		BlitzRSISmooth: blitzRSISmooth,
 	}, nil
 }
 
@@ -224,6 +299,59 @@ func computeValuation(rsi float64, val config.ValuationConfig) string {
 	default:
 		return "Overbought"
 	}
+}
+
+// extractClosePricesFromTimeSeries extracts close prices from a TimeSeriesDaily response.
+// The response contains dates as string keys with values sorted newest-first.
+// This function returns closes sorted oldest-first for BLITZ computation.
+func extractClosePricesFromTimeSeries(ts *alphavantage.TimeSeriesDaily) ([]float64, error) {
+	if ts == nil || len(ts.TimeSeries) == 0 {
+		return nil, fmt.Errorf("empty time series data")
+	}
+
+	// The time series map has date string keys, sorted newest-first
+	// We need to sort them oldest-first and extract close prices
+	dates := make([]string, 0, len(ts.TimeSeries))
+	for date := range ts.TimeSeries {
+		dates = append(dates, date)
+	}
+
+	// Sort dates (they're in YYYY-MM-DD format, so string comparison works)
+	for i := 0; i < len(dates); i++ {
+		for j := i + 1; j < len(dates); j++ {
+			if dates[i] > dates[j] {
+				dates[i], dates[j] = dates[j], dates[i]
+			}
+		}
+	}
+
+	// Extract close prices in sorted order
+	closes := make([]float64, 0, len(dates))
+	for _, date := range dates {
+		entry := ts.TimeSeries[date]
+		closePrice, err := strconv.ParseFloat(entry.Close, 64)
+		if err != nil {
+			continue
+		}
+		closes = append(closes, closePrice)
+	}
+
+	if len(closes) == 0 {
+		return nil, fmt.Errorf("no valid close prices found in time series")
+	}
+
+	return closes, nil
+}
+
+// computeBlitz computes BLITZ signal from close prices.
+// Returns score=0 if computation fails (e.g., insufficient data).
+func computeBlitz(closes []float64) (score int, tsi, rsiSmooth float64) {
+	blitzResult, err := blitz.ComputeSingle(closes)
+	if err != nil {
+		// BLITZ computation failed - return default values
+		return 0, 0, 0
+	}
+	return int(blitzResult.Current), blitzResult.TSI, blitzResult.RSISmooth
 }
 
 // AnalyzeWithSymbolDetection performs trend analysis with automatic asset class detection.

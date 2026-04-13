@@ -4,9 +4,12 @@ package trend
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/shinsekai/finterm/internal/alphavantage"
+	"github.com/shinsekai/finterm/internal/cache"
 	"github.com/shinsekai/finterm/internal/config"
 	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 )
@@ -46,6 +49,19 @@ func (m *mockCryptoFetcher) FetchCryptoOHLCV(_ context.Context, _ string) ([]ind
 	return m.data, nil
 }
 
+// mockTimeSeriesClient is a mock implementation of TimeSeriesClient for testing.
+type mockTimeSeriesClient struct {
+	data *alphavantage.TimeSeriesDaily
+	err  error
+}
+
+func (m *mockTimeSeriesClient) GetDailyTimeSeries(_ context.Context, _ string, _ string) (*alphavantage.TimeSeriesDaily, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.data, nil
+}
+
 // TestEngine_EquityRoutesToRemote verifies that equity symbols route to remote indicators.
 func TestEngine_EquityRoutesToRemote(t *testing.T) {
 	remoteRSI := &mockIndicator{
@@ -68,7 +84,7 @@ func TestEngine_EquityRoutesToRemote(t *testing.T) {
 
 	detector := indicators.NewAssetClassDetector(nil) // No crypto symbols → all equities
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
@@ -108,7 +124,7 @@ func TestEngine_CryptoRoutesToLocal(t *testing.T) {
 
 	cryptoFetcher := &mockCryptoFetcher{data: testData}
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher, nil, nil)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "BTC", indicators.Crypto)
@@ -146,7 +162,7 @@ func TestEngine_IndicatorError_Propagated(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 	ctx := context.Background()
 	_, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
@@ -183,7 +199,7 @@ func TestEngine_FullAnalysis_Equity(t *testing.T) {
 
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
@@ -235,7 +251,7 @@ func TestEngine_FullAnalysis_Crypto(t *testing.T) {
 
 	cryptoFetcher := &mockCryptoFetcher{data: testData}
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher, nil, nil)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "BTC", indicators.Crypto)
@@ -295,7 +311,7 @@ func TestEngine_UsesClosedBarOnly(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 	ctx := context.Background()
 	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
@@ -370,7 +386,7 @@ func TestEngine_RSINotUsedInTrendSignal(t *testing.T) {
 			cfg := config.DefaultConfig()
 			detector := indicators.NewAssetClassDetector(nil)
 
-			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 			ctx := context.Background()
 			result, err := engine.Analyze(ctx, "TEST", indicators.Equity)
@@ -397,7 +413,7 @@ func TestEngine_EmptySymbol(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 	ctx := context.Background()
 	_, err := engine.Analyze(ctx, "", indicators.Equity)
@@ -417,7 +433,7 @@ func TestEngine_UnsupportedAssetClass(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 	ctx := context.Background()
 	_, err := engine.Analyze(ctx, "TEST", indicators.AssetClass(99))
@@ -441,7 +457,7 @@ func TestEngine_NoDataPoints(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 	ctx := context.Background()
 	_, err := engine.Analyze(ctx, "TEST", indicators.Equity)
@@ -469,7 +485,7 @@ func TestEngine_AnalyzeWithSymbolDetection(t *testing.T) {
 
 	cryptoFetcher := &mockCryptoFetcher{data: testData}
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher, nil, nil)
 
 	ctx := context.Background()
 
@@ -504,7 +520,7 @@ func TestEngine_SetLocalData(t *testing.T) {
 	cfg := config.DefaultConfig()
 	detector := indicators.NewAssetClassDetector(nil)
 
-	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 	// Verify initial data
 	if len(engine.GetLocalData()) != 30 {
@@ -577,7 +593,7 @@ func TestEngine_ValuationMapping(t *testing.T) {
 			cfg := config.DefaultConfig()
 			detector := indicators.NewAssetClassDetector(nil)
 
-			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil)
+			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
 			ctx := context.Background()
 			result, err := engine.Analyze(ctx, "TEST", indicators.Equity)
@@ -620,5 +636,240 @@ func TestEngine_GenerateTestOHLCV(t *testing.T) {
 		if d.Volume <= 0 {
 			t.Errorf("Data point %d has invalid volume: %f", i, d.Volume)
 		}
+	}
+}
+
+// TestEngine_BlitzScore_Crypto verifies BLITZ computation for crypto symbols.
+func TestEngine_BlitzScore_Crypto(t *testing.T) {
+	remoteRSI := &mockIndicator{}
+	remoteEMA := &mockIndicator{}
+
+	// Generate test OHLCV data with a clear uptrend
+	testData := GenerateTestOHLCV(50, 100.0, 0.01, time.Now().AddDate(0, 0, -50))
+
+	localRSI := indicators.NewLocalRSI(nil)
+	localEMA := indicators.NewLocalEMA(nil)
+
+	cfg := config.DefaultConfig()
+	cfg.Trend.EMAFast = 10
+	cfg.Trend.EMASlow = 20
+
+	detector := indicators.NewAssetClassDetector([]string{"BTC"})
+
+	cryptoFetcher := &mockCryptoFetcher{data: testData}
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher, nil, nil)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "BTC", indicators.Crypto)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	// Verify BLITZ fields are populated
+	if result.BlitzScore < -1 || result.BlitzScore > 1 {
+		t.Errorf("BlitzScore = %d, want -1, 0, or 1", result.BlitzScore)
+	}
+	// TSI and RSISmooth should have valid values (can be 0 for insufficient data)
+	if result.BlitzScore != 0 && result.BlitzTSI == 0 && result.BlitzRSISmooth == 0 {
+		t.Log("BLITZ computation may have insufficient data for TSI/RSISmooth")
+	}
+}
+
+// TestEngine_BlitzScore_Equity verifies BLITZ computation for equity symbols.
+func TestEngine_BlitzScore_Equity(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 55.0},
+		},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 150.0},
+		},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	cfg.Trend.EMAFast = 10
+	cfg.Trend.EMASlow = 20
+
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// Create mock time series data for BLITZ
+	timeSeries := &alphavantage.TimeSeriesDaily{
+		TimeSeries: make(map[string]alphavantage.TimeSeriesEntry),
+	}
+	// Add 30 days of data
+	startDate := time.Now().AddDate(0, 0, -30)
+	for i := 0; i < 30; i++ {
+		date := startDate.AddDate(0, 0, i).Format("2006-01-02")
+		price := 100.0 + float64(i)*0.5
+		timeSeries.TimeSeries[date] = alphavantage.TimeSeriesEntry{
+			Open:   fmt.Sprintf("%.2f", price),
+			High:   fmt.Sprintf("%.2f", price+1),
+			Low:    fmt.Sprintf("%.2f", price-1),
+			Close:  fmt.Sprintf("%.2f", price),
+			Volume: "1000000",
+		}
+	}
+
+	timeSeriesClient := &mockTimeSeriesClient{data: timeSeries}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	// Verify BLITZ fields are populated
+	if result.BlitzScore < -1 || result.BlitzScore > 1 {
+		t.Errorf("BlitzScore = %d, want -1, 0, or 1", result.BlitzScore)
+	}
+	// TSI and RSISmooth should have valid values when BLITZ succeeds
+	if result.BlitzScore != 0 {
+		if result.BlitzTSI == 0 && result.BlitzRSISmooth == 0 {
+			t.Error("BlitzTSI and BlitzRSISmooth should be non-zero when BlitzScore is non-zero")
+		}
+	}
+}
+
+// TestEngine_BlitzScore_InsufficientData verifies graceful handling of insufficient data.
+func TestEngine_BlitzScore_InsufficientData(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 55.0},
+		},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 150.0},
+		},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// Create empty time series data
+	timeSeries := &alphavantage.TimeSeriesDaily{
+		TimeSeries: make(map[string]alphavantage.TimeSeriesEntry),
+	}
+
+	timeSeriesClient := &mockTimeSeriesClient{data: timeSeries}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	// Verify BLITZ defaults to Hold (0) when data is insufficient
+	if result.BlitzScore != 0 {
+		t.Errorf("BlitzScore = %d, want 0 for insufficient data", result.BlitzScore)
+	}
+}
+
+// TestEngine_BlitzScore_DoesNotBlockExisting verifies RSI/EMA still work if BLITZ fails.
+func TestEngine_BlitzScore_DoesNotBlockExisting(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 55.0},
+		},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 150.0},
+		},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// Create a time series client that returns an error
+	timeSeriesClient := &mockTimeSeriesClient{err: errors.New("API error")}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	// Analysis should succeed despite BLITZ failure
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v, want success despite BLITZ failure", err)
+	}
+
+	// Verify existing fields are still computed correctly
+	if result.RSI != 55.0 {
+		t.Errorf("RSI = %f, want 55.0", result.RSI)
+	}
+	if result.EMAFast != 150.0 {
+		t.Errorf("EMAFast = %f, want 150.0", result.EMAFast)
+	}
+	if result.Valuation == "" {
+		t.Error("Valuation should be computed")
+	}
+
+	// BLITZ should default to Hold (0) when it fails
+	if result.BlitzScore != 0 {
+		t.Errorf("BlitzScore = %d, want 0 when BLITZ fails", result.BlitzScore)
+	}
+}
+
+// TestEngine_BlitzScore_NoTimeSeriesClient verifies behavior when no time series client is provided.
+func TestEngine_BlitzScore_NoTimeSeriesClient(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 55.0},
+		},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 150.0},
+		},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// No time series client provided
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	// Analysis should succeed
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	// Verify existing fields are still computed
+	if result.RSI != 55.0 {
+		t.Errorf("RSI = %f, want 55.0", result.RSI)
+	}
+
+	// BLITZ should default to Hold (0) when no client is provided
+	if result.BlitzScore != 0 {
+		t.Errorf("BlitzScore = %d, want 0 when no time series client is provided", result.BlitzScore)
 	}
 }

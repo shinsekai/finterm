@@ -500,38 +500,51 @@ func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingD
 	content.WriteString(v.renderRSIBar(indicators.RSI))
 	content.WriteString("\n\n")
 
-	// EMA values
-	fmt.Fprintf(&content, "%-14s$%s\n", v.theme.Muted().Render("EMA(10):"), humanizeFloat(indicators.EMAFast, 2))
-	fmt.Fprintf(&content, "%-14s$%s\n", v.theme.Muted().Render("EMA(20):"), humanizeFloat(indicators.EMASlow, 2))
+	// Signal Systems section
+	fmt.Fprintf(&content, "%s\n", v.theme.Muted().Render("─ Signal Systems ──"))
+	content.WriteString("\n")
 
-	// EMA crossover delta
-	delta := indicators.EMAFast - indicators.EMASlow
-	switch {
-	case delta > 0:
-		fmt.Fprintf(&content, "%-14s%s\n",
-			v.theme.Muted().Render(""),
-			v.theme.Bullish().Render(fmt.Sprintf("  ▲ EMA(10) above EMA(20) by $%s", humanizeFloat(delta, 2))))
-	case delta < 0:
-		fmt.Fprintf(&content, "%-14s%s\n",
-			v.theme.Muted().Render(""),
-			v.theme.Bearish().Render(fmt.Sprintf("  ▼ EMA(10) below EMA(20) by $%s", humanizeFloat(math.Abs(delta), 2))))
-	default:
-		fmt.Fprintf(&content, "%-14s%s\n",
-			v.theme.Muted().Render(""),
-			v.theme.Neutral().Render("  ─ EMAs converged"))
-	}
+	// FTEMA badge
+	fmt.Fprintf(&content, "%-14s%s\n",
+		v.theme.Muted().Render("FTEMA"),
+		v.renderFTEMABadge(indicators.Signal))
 
-	// Trend signal with badge
-	var badge string
-	switch indicators.Signal {
-	case trenddomain.Bullish:
-		badge = v.theme.BullishBadge().Render("▲ BULL")
-	case trenddomain.Bearish:
-		badge = v.theme.BearishBadge().Render("▼ BEAR")
-	default:
-		badge = v.theme.NeutralBadge().Render("─ HOLD")
+	// BLITZ badge
+	fmt.Fprintf(&content, "%-14s%s\n",
+		v.theme.Muted().Render("BLITZ"),
+		v.renderBlitzBadge(indicators.BlitzScore))
+
+	// DESTINY badge
+	fmt.Fprintf(&content, "%-14s%s\n",
+		v.theme.Muted().Render("DESTINY"),
+		v.renderDestinyBadge(indicators.DestinyScore))
+
+	// Composite section
+	fmt.Fprintf(&content, "\n%s\n", v.theme.Muted().Render("─ Composite ────"))
+	content.WriteString("\n")
+
+	// TPI value
+	tpiStyle := v.theme.Muted()
+	if indicators.TPI > 0 {
+		tpiStyle = v.theme.Bullish()
+	} else if indicators.TPI < 0 {
+		tpiStyle = v.theme.Bearish()
 	}
-	fmt.Fprintf(&content, "%-14s%s\n", v.theme.Muted().Render("Trend:"), badge)
+	fmt.Fprintf(&content, "%-14s%s\n",
+		v.theme.Muted().Render("TPI"),
+		tpiStyle.Render(fmt.Sprintf("%+.2f", indicators.TPI)))
+
+	// TPI gauge
+	fmt.Fprintf(&content, "              %s\n", v.renderTPIGauge(indicators.TPI))
+
+	// TPI signal
+	tpiSignalStyle := v.theme.Muted()
+	if indicators.TPI > 0 {
+		tpiSignalStyle = v.theme.Bullish()
+	}
+	fmt.Fprintf(&content, "%-14s%s\n",
+		v.theme.Muted().Render("Signal"),
+		tpiSignalStyle.Render(indicators.TPISignal))
 
 	// Last updated
 	if lastTradingDay != "" {
@@ -540,6 +553,112 @@ func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingD
 	}
 
 	return v.theme.Card().Render(content.String())
+}
+
+// renderFTEMABadge renders FTEMA (EMA crossover) as a colored badge.
+func (v *View) renderFTEMABadge(signal trenddomain.Signal) string {
+	switch signal {
+	case trenddomain.Bullish:
+		return v.theme.BullishBadge().Render("▲ BULL")
+	case trenddomain.Bearish:
+		return v.theme.BearishBadge().Render("▼ BEAR")
+	default:
+		return v.theme.NeutralBadge().Render("─ HOLD")
+	}
+}
+
+// renderBlitzBadge renders a BLITZ score as a colored badge.
+func (v *View) renderBlitzBadge(blitzScore int) string {
+	switch blitzScore {
+	case 1:
+		return v.theme.BullishBadge().Render("▲ LONG")
+	case -1:
+		return v.theme.BearishBadge().Render("▼ SHORT")
+	default:
+		return v.theme.NeutralBadge().Render("─ HOLD")
+	}
+}
+
+// renderDestinyBadge renders a DESTINY score as a colored badge.
+func (v *View) renderDestinyBadge(destinyScore int) string {
+	switch destinyScore {
+	case 1:
+		return v.theme.BullishBadge().Render("▲ LONG")
+	case -1:
+		return v.theme.BearishBadge().Render("▼ SHORT")
+	default:
+		return v.theme.NeutralBadge().Render("○ HOLD")
+	}
+}
+
+// renderTPIGauge renders TPI as a horizontal gauge bar.
+// Gauge is 10 chars wide: left half (0-4) is bearish, center (5) is neutral, right half (6-9) is bullish.
+// For TPI > 0: fill from center rightward with "▓" in bullish color, "░" in muted.
+// For TPI <= 0: fill from center leftward with "▓" in bearish color, "░" in muted.
+func (v *View) renderTPIGauge(tpi float64) string {
+	// Clamp TPI to [-1, 1]
+	switch {
+	case tpi > 1:
+		tpi = 1
+	case tpi < -1:
+		tpi = -1
+	}
+
+	// Build gauge: 10 characters
+	// Positions: 0 1 2 3 4 5 6 7 8 9
+	// Center is at position 5
+	gauge := make([]rune, 10)
+
+	// Fill with empty blocks first
+	for i := range gauge {
+		gauge[i] = '░'
+	}
+
+	// Calculate filled positions
+	// TPI = 1 -> fill all positions 0-9 (full bar)
+	// TPI = 0 -> fill position 5 only (center)
+	// TPI = -1 -> fill all positions 0-9 (full bar, but bearish color)
+	var filledCount int
+	switch {
+	case tpi >= 0:
+		// Positive: fill from center (5) rightward
+		// TPI = 0.5 -> 5 filled positions (5, 6, 7, 8, 9)
+		// TPI = 1 -> 10 filled positions (0-9)
+		filledCount = 5 + int(tpi*5) // 5 to 10
+		for i := 5; i < filledCount && i < 10; i++ {
+			gauge[i] = '▓'
+		}
+	default:
+		// Negative: fill from center (5) leftward
+		// TPI = -0.5 -> 5 filled positions (4, 3, 2, 1, 0)
+		// TPI = -1 -> 10 filled positions (0-9)
+		filledCount = 5 + int(-tpi*5) // 5 to 10
+		lowerBound := 5 - filledCount
+		if lowerBound < 0 {
+			lowerBound = 0
+		}
+		for i := 4; i >= lowerBound; i-- {
+			gauge[i] = '▓'
+		}
+	}
+
+	// Apply color styling
+	var gaugeStyle lipgloss.Style
+	switch {
+	case tpi > 0:
+		gaugeStyle = v.theme.Bullish()
+	case tpi < 0:
+		gaugeStyle = v.theme.Bearish()
+	default:
+		gaugeStyle = v.theme.Muted()
+	}
+
+	gaugeStr := string(gauge)
+	if tpi > 0 || tpi < 0 {
+		gaugeStr = gaugeStyle.Render(gaugeStr)
+	}
+
+	return gaugeStr
 }
 
 // renderRSIBar renders an RSI progress bar with zone markers.

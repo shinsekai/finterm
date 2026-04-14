@@ -8,7 +8,7 @@
   <a href="https://goreportcard.com/report/github.com/shinsekai/finterm"><img src="https://goreportcard.com/badge/github.com/shinsekai/finterm" alt="Go Report Card"></a>
   <a href="https://github.com/shinsekai/finterm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/shinsekai/finterm" alt="License"></a>
   <a href="https://github.com/shinsekai/finterm/releases/latest"><img src="https://img.shields.io/github/v/release/shinsekai/finterm?include_prereleases" alt="Release"></a>
-  <img src="https://img.shields.io/badge/go-%3E%3D1.24-blue?logo=go" alt="Go Version">
+  <img src="https://img.shields.io/badge/go-%3E%3D1.26-blue?logo=go" alt="Go Version">
 </p>
 
 <p align="center">
@@ -128,7 +128,7 @@ For equities, RSI and EMA are fetched from Alpha Vantage's server-side endpoints
 
 ## Requirements
 
-- **Go 1.24+**
+- **Go 1.26+**
 - **Alpha Vantage API key** — [get one here](https://www.alphavantage.co/support/#api-key) (paid tier recommended for 75 req/min)
 - A terminal with 256-color support (iTerm2, Alacritty, kitty, Windows Terminal, etc.)
 

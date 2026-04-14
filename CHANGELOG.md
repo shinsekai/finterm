@@ -9,12 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - DESTINY trend following system — consensus-based scoring using 7 moving averages
-  - Trend Probability Indicator (TPI): average direction of SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA
+  - Trend Probability Indicator (TPI): average direction score of SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA
   - Dynamic RSI with threshold confirmation (length 18, threshold 56)
-  - Asymmetric signal logic: LONG requires consensus + RSI, SHORT can fire on TPI alone
+  - Asymmetric signal logic: LONG requires TPI consensus + RSI confirmation (AND), SHORT can fire on TPI alone (OR)
+  - Latching score: holds LONG (+1) or SHORT (-1) until the opposite signal fires
 - DESTINY column in trend tab showing ▲ LONG / ▼ SHORT / ○ HOLD badges
-- DESTINY summary counts in the trend summary bar (e.g., "DESTINY: 3 LONG  2 SHORT  1 HOLD")
-- New dynamic MA primitives: WMA, DEMA, TEMA, HMA (Hull), LSMA (Least Squares)
+- DESTINY summary counts in the trend summary bar
+- New dynamic moving average primitives in `internal/domain/blitz/`:
+  - `DynamicWMA` — Weighted MA with linearly decreasing weights (`weight = len - i`)
+  - `DynamicDEMA` — Double EMA for lag reduction (`2 × EMA - EMA(EMA)`)
+  - `DynamicTEMA` — Triple EMA for further lag reduction (`3 × (ema1 - ema2) + ema3`)
+  - `DynamicHMA` — Hull MA for fast response (`WMA(2×WMA(half) - WMA(full), √len)`)
+  - `DynamicLSMA` — Least Squares MA via linear regression projection
+- DESTINY engine in `internal/domain/destiny/` with full test coverage
 - Configuration section for DESTINY parameters (ma_length, rsi_length, rsi_threshold, lsma_offset)
 
 ## [0.2.0] — 2026-04-14

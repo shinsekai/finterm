@@ -93,11 +93,20 @@ blitz:
   threshold: 48
 
 # DESTINY trend following system configuration.
+# Uses 7 moving averages (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA) to build a
+# Trend Probability Indicator (TPI), confirmed by Dynamic RSI.
 destiny:
-  ma_length: 45                    # Base period for 7 MAs (DEMA uses 2×, TEMA uses 3×)
-  rsi_length: 18                   # Dynamic RSI lookback period
-  rsi_threshold: 56                # RSI smooth threshold for signal confirmation
-  lsma_offset: 6                   # LSMA projection offset
+  # Base period for all 7 MAs. DEMA uses 2×, TEMA uses 3×.
+  ma_length: 45
+
+  # Dynamic RSI lookback period.
+  rsi_length: 18
+
+  # Smoothed RSI threshold for signal confirmation.
+  rsi_threshold: 56
+
+  # LSMA linear regression projection offset.
+  lsma_offset: 6
 
 # Cache TTL settings for different data types.
 cache:

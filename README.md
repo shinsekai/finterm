@@ -19,7 +19,7 @@
 
 ## What is Finterm?
 
-Finterm is a keyboard-driven financial analysis tool that runs entirely in your terminal. It provides EMA crossover trend signals, RSI-based valuation, macroeconomic indicators, and sentiment-scored news — all powered by the [Alpha Vantage](https://www.alphavantage.co/) API.
+Finterm is a keyboard-driven financial analysis tool that runs entirely in your terminal. It provides EMA crossover trend signals, the BLITZ multi-signal scoring system, RSI-based valuation, macroeconomic indicators, and sentiment-scored news — all powered by the [Alpha Vantage](https://www.alphavantage.co/) API.
 
 It's designed for traders and analysts who live in the terminal and want a fast, unified view of market data without leaving their workflow.
 
@@ -32,15 +32,19 @@ It's designed for traders and analysts who live in the terminal and want a fast,
 
 ## Features
 
-**Trend Following** — Watchlist table showing EMA(10)/EMA(20) crossover signals alongside RSI-based valuation for each ticker. Supports both equities and crypto.
+**Trend Following** — Watchlist table with two independent signal systems per ticker:
 
-```
- Ticker │ Price    │ EMA(10) │ EMA(20) │ Signal    │ RSI(14) │ Valuation
- ───────┼──────────┼─────────┼─────────┼───────────┼─────────┼────────────
- AAPL   │ $189.84  │ 188.20  │ 186.45  │ ▲ BULLISH │  52.3   │ Fair value
- BTC    │ $67,432  │ 66,800  │ 65,200  │ ▲ BULLISH │  48.7   │ Fair value
- ETH    │ $3,521   │  3,480  │  3,620  │ ▼ BEARISH │  29.5   │ Oversold
-```
+- **EMA Crossover** — Classic EMA(10)/EMA(20) trend direction. Bullish when fast crosses above slow.
+- **BLITZ System** — Multi-signal scoring engine combining trend strength (Pearson correlation), adaptive RSI momentum, and threshold confirmation. Produces LONG / SHORT / HOLD signals.
+
+Both signals are shown side by side. When they agree, conviction is high. When they diverge, it's a signal to be cautious.
+
+SYMBOL   SIGNAL     BLITZ     PRICE       RSI   EMA FAST   EMA SLOW  VALUATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AAPL     ▲ BULL     ▲ LONG    $189.84    52.3    $188.20    $186.45  ○ Fair val
+MSFT     ▼ BEAR     ▼ SHORT   $378.91    38.1    $375.10    $380.22  ◇ Underval
+BTC      ▲ BULL     ▲ LONG   $67,432    48.7  $66,800    $65,200    ○ Fair val
+ETH      ▼ BEAR     ○ HOLD    $3,521    29.5   $3,480     $3,620    ◆ Oversold
 
 **Quote Lookup** — Type any ticker to get real-time price, volume, change, and inline indicator analysis.
 
@@ -61,7 +65,7 @@ Finterm follows a strict layered architecture with clear dependency boundaries. 
 | Layer | Package | Responsibility |
 |---|---|---|
 | **Presentation** | `internal/tui/` | Bubbletea models, views, Lipgloss styling, tab routing |
-| **Domain** | `internal/domain/` | Indicator computation (RSI, EMA), trend scoring, valuation |
+| **Domain** | `internal/domain/` | Indicator computation (RSI, EMA), trend scoring, valuation, BLITZ engine |
 | **Data** | `internal/alphavantage/`, `internal/cache/` | HTTP client with rate limiting and retry, TTL cache |
 | **Config** | `internal/config/` | YAML + env var loading, validation |
 
@@ -76,8 +80,22 @@ The domain layer communicates with the data layer through interfaces — never c
 
 | Signal | Rule |
 |---|---|
-| **Trend** | `EMA(10) > EMA(20)` → Bullish, `EMA(10) < EMA(20)` → Bearish |
+| **EMA Trend** | `EMA(10) > EMA(20)` → Bullish, `EMA(10) < EMA(20)` → Bearish |
 | **Valuation** | RSI < 30 → Oversold, 30–45 → Undervalued, 45–55 → Fair, 55–70 → Overvalued, > 70 → Overbought |
+
+### BLITZ System
+
+The BLITZ trend following system uses three independent confirmations to generate high-conviction signals:
+
+| Component | Computation | Purpose |
+|---|---|---|
+| **TSI** | Pearson correlation of close vs bar index over 14 bars | Trend direction filter (+1 = up, -1 = down) |
+| **Dynamic RSI** | Wilder's RSI with adaptive lookback (`min(12, bars_available)`) | Momentum strength |
+| **RSI Smooth** | EMA of Dynamic RSI, same adaptive length | Noise reduction |
+
+**Signal rules**: LONG when `TSI > 0` AND `RSI Smooth is rising` AND `RSI Smooth > 48`. SHORT when `TSI < 0` AND `RSI Smooth is falling` AND `RSI Smooth < 48`. Score latches — holds until the opposite signal fires.
+
+**Dynamic length adaptation**: Unlike standard indicators that produce NaN for the first N bars, BLITZ adapts its lookback period to available data. At bar 5, a "12-period RSI" uses a 5-period lookback. This means signals start earlier with no warmup gap.
 
 ### Data Flow
 
@@ -89,7 +107,7 @@ For equities, RSI and EMA are fetched from Alpha Vantage's server-side endpoints
 
 ## Requirements
 
-- **Go 1.26+**
+- **Go 1.24+**
 - **Alpha Vantage API key** — [get one here](https://www.alphavantage.co/support/#api-key) (paid tier recommended for 75 req/min)
 - A terminal with 256-color support (iTerm2, Alacritty, kitty, Windows Terminal, etc.)
 
@@ -234,7 +252,8 @@ finterm/
 │   ├── domain/                      # Pure business logic
 │   │   ├── trend/                   # Trend engine + scoring
 │   │   │   └── indicators/          # RSI, EMA (local + remote)
-│   │   └── valuation/               # RSI-based valuation
+│   │   ├── valuation/               # RSI-based valuation
+│   │   └── blitz/                   # BLITZ trend following system
 │   ├── alphavantage/                # API client + typed models
 │   ├── cache/                       # In-memory TTL cache
 │   └── config/                      # YAML + env var loading
@@ -262,6 +281,10 @@ finterm/
 **Why bar close only?** Intra-bar computation causes "repainting" — a signal that appears mid-bar might vanish by the time the bar closes. Using completed bars only means every signal is final. This matches how TradingView strategies execute by default.
 
 **Why TradingView as the reference?** It's what most retail traders use. If Finterm's RSI says 52.3 and TradingView says 52.3 for the same data, trust is established immediately. The key subtlety: TradingView's RSI uses RMA smoothing (alpha = 1/length), not standard EMA smoothing (alpha = 2/(length+1)). Getting this wrong produces visibly different values.
+
+**Why two trend signals (EMA + BLITZ)?** They answer different questions at different speeds. EMA crossover is a simple, lagging trend direction indicator — it tells you which way the trend is pointing. BLITZ combines trend confirmation (Pearson correlation), momentum strength (adaptive RSI), and a threshold gate into a single score. It's faster to react (dynamic length adaptation) and more selective (three conditions must align). Showing both gives traders two perspectives: when they agree, conviction is high; when they diverge, it's a signal for caution.
+
+**Why does BLITZ use dynamic-length indicators?** Standard indicators produce NaN for the first N bars, which is fine on TradingView with thousands of bars but problematic when data is limited. The dynamic length pattern adapts: at bar 5, a "12-period RSI" uses a 5-period lookback. This is ported directly from the Pine Script `getDynamicLength()` pattern to preserve exact signal parity.
 
 ## License
 

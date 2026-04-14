@@ -19,7 +19,7 @@
 
 ## What is Finterm?
 
-Finterm is a keyboard-driven financial analysis tool that runs entirely in your terminal. It provides EMA crossover trend signals, the BLITZ multi-signal scoring system, RSI-based valuation, macroeconomic indicators, and sentiment-scored news — all powered by the [Alpha Vantage](https://www.alphavantage.co/) API.
+Finterm is a keyboard-driven financial analysis tool that runs entirely in your terminal. It provides three independent trend signal systems (EMA crossover, BLITZ, and DESTINY), RSI-based valuation, macroeconomic indicators, and sentiment-scored news — all powered by the [Alpha Vantage](https://www.alphavantage.co/) API.
 
 It's designed for traders and analysts who live in the terminal and want a fast, unified view of market data without leaving their workflow.
 
@@ -35,30 +35,17 @@ It's designed for traders and analysts who live in the terminal and want a fast,
 **Trend Following** — Watchlist table with three independent signal systems per ticker:
 
 - **EMA Crossover** — Classic EMA(10)/EMA(20) trend direction. Bullish when fast crosses above slow.
-- **BLITZ System** — Multi-signal scoring engine combining trend strength (Pearson correlation), adaptive RSI momentum, and threshold confirmation. Produces LONG / SHORT / HOLD signals.
-- **DESTINY System** — Consensus-based scoring using 7 moving averages (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA). Trend Probability Indicator (TPI) averages MA directions. Dynamic RSI with threshold confirmation.
+- **BLITZ System** — Correlation-based scoring combining TSI (Pearson correlation), adaptive RSI, and threshold confirmation. Fast, reactive signals.
+- **DESTINY System** — Consensus-based scoring using the Trend Probability Indicator (TPI): average direction of 7 moving averages (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA) confirmed by adaptive RSI. More conservative, high-conviction signals.
 
-All three signals are shown side by side. When they agree, conviction is high. When they diverge, it's a signal to be cautious.
+Three perspectives at a glance. When all agree, conviction is highest.
 
-SYMBOL   SIGNAL     BLITZ     DESTINY    PRICE       RSI   EMA FAST   EMA SLOW  VALUATION
-
-- **EMA Crossover** — Classic EMA(10)/EMA(20) trend direction. Bullish when fast crosses above slow.
-- **BLITZ System** — Multi-signal scoring engine combining trend strength (Pearson correlation), adaptive RSI momentum, and threshold confirmation. Produces LONG / SHORT / HOLD signals.
-- **DESTINY System** — Consensus-based scoring using 7 moving averages (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA). Trend Probability Indicator (TPI) averages MA directions. Dynamic RSI with threshold confirmation.
-
-All three signals are shown side by side. When they agree, conviction is high. When they diverge, it's a signal to be cautious.
-
-SYMBOL   SIGNAL     BLITZ     DESTINY    PRICE       RSI   EMA FAST   EMA SLOW  VALUATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-AAPL     ▲ BULL     ▲ LONG     ▲ LONG    $189.84    52.3    $188.20    $186.45  ○ Fair val
-MSFT     ▼ BEAR     ▼ SHORT    ○ HOLD    $378.91    38.1    $375.10    $380.22  ◇ Underval
-BTC      ▲ BULL     ▲ LONG     ▲ LONG   $67,432    48.7  $66,800    $65,200    ○ Fair val
-ETH      ▼ BEAR     ○ HOLD    ○ HOLD    $3,521    29.5   $3,480     $3,620    ◆ Oversold
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-AAPL     ▲ BULL     ▲ LONG     ▲ LONG    $189.84    52.3    $188.20    $186.45  ○ Fair val
-MSFT     ▼ BEAR     ▼ SHORT    ○ HOLD    $378.91    38.1    $375.10    $380.22  ◇ Underval
-BTC      ▲ BULL     ▲ LONG     ▲ LONG   $67,432    48.7  $66,800    $65,200    ○ Fair val
-ETH      ▼ BEAR     ○ HOLD    ○ HOLD    $3,521    29.5   $3,480     $3,620    ◆ Oversold
+SYMBOL   SIGNAL     BLITZ    DESTINY    PRICE       RSI   EMA FAST   EMA SLOW  VALUATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AAPL     ▲ BULL    ▲ LONG   ▲ LONG    $189.84    52.3    $188.20    $186.45  ○ Fair val
+MSFT     ▼ BEAR    ▼ SHORT  ▼ SHORT   $378.91    38.1    $375.10    $380.22  ◇ Underval
+BTC      ▲ BULL    ▲ LONG   ○ HOLD   $67,432    48.7  $66,800    $65,200    ○ Fair val
+ETH      ▼ BEAR    ○ HOLD   ▼ SHORT   $3,521    29.5   $3,480     $3,620    ◆ Oversold
 
 **Quote Lookup** — Type any ticker to get real-time price, volume, change, and inline indicator analysis.
 
@@ -79,7 +66,7 @@ Finterm follows a strict layered architecture with clear dependency boundaries. 
 | Layer | Package | Responsibility |
 |---|---|---|
 | **Presentation** | `internal/tui/` | Bubbletea models, views, Lipgloss styling, tab routing |
-| **Domain** | `internal/domain/` | Indicator computation (RSI, EMA), trend scoring, valuation, BLITZ engine |
+| **Domain** | `internal/domain/` | Indicator computation (RSI, EMA), trend scoring, valuation, BLITZ + DESTINY engines |
 | **Data** | `internal/alphavantage/`, `internal/cache/` | HTTP client with rate limiting and retry, TTL cache |
 | **Config** | `internal/config/` | YAML + env var loading, validation |
 
@@ -113,17 +100,23 @@ The BLITZ trend following system uses three independent confirmations to generat
 
 ### DESTINY System
 
-The DESTINY trend following system uses consensus from 7 moving averages combined with Dynamic RSI to generate high-conviction signals:
+The DESTINY trend following system uses a consensus of 7 moving averages to build the Trend Probability Indicator (TPI), confirmed by Dynamic RSI:
 
 | Component | Computation | Purpose |
 |---|---|---|
-| **TPI** | Average direction of 7 MAs (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA) | Trend consensus filter (-1 to +1) |
-| **Dynamic RSI** | Wilder's RSI with adaptive lookback (`min(18, bars_available)`) | Momentum strength |
-| **RSI Smooth** | EMA of Dynamic RSI, same adaptive length | Noise reduction |
+| **SMA** | Simple MA, period 45 | Baseline trend |
+| **EMA** | Exponential MA, period 45 | Responsive trend |
+| **DEMA** | Double EMA, period 90 | Lag-reduced trend |
+| **TEMA** | Triple EMA, period 135 | Minimal-lag trend |
+| **WMA** | Weighted MA, period 45 | Recency-biased trend |
+| **HMA** | Hull MA, period 45 | Fast-response trend |
+| **LSMA** | Least Squares MA, period 45, offset 6 | Regression-projected trend |
 
-**Signal rules**: LONG when `TPI > 0.5` AND `RSI Smooth is rising` AND `RSI Smooth > 56`. SHORT when `TPI < -0.5` OR (`RSI Smooth is falling` AND `RSI Smooth < 56`). Score latches — holds until the opposite signal fires. This asymmetric logic means SHORT can trigger based on TPI alone for early reversal detection.
+Each MA is scored: +1 (rising), -1 (falling), 0 (flat). The TPI is the average of all 7 scores, ranging from -1 to +1.
 
-**Dynamic length adaptation**: Unlike standard indicators that produce NaN for the first N bars, DESTINY adapts its lookback period to available data. At bar 5, a "18-period RSI" uses a 5-period lookback. This means signals start earlier with no warmup gap.
+**Signal rules**: LONG when `TPI > 0.5` AND `RSI Smooth is rising` AND `RSI Smooth > 56`. SHORT when `TPI < -0.5` OR (`RSI Smooth is falling` AND `RSI Smooth < 56`). The asymmetry is deliberate — entries require consensus, exits are more aggressive.
+
+**Dynamic length adaptation**: All 7 MAs and the RSI use the same adaptive-length pattern as BLITZ, allowing signals on limited data.
 
 ### Data Flow
 
@@ -292,7 +285,8 @@ finterm/
 │   │   ├── trend/                   # Trend engine + scoring
 │   │   │   └── indicators/          # RSI, EMA (local + remote)
 │   │   ├── valuation/               # RSI-based valuation
-│   │   └── blitz/                   # BLITZ trend following system
+│   │   ├── blitz/                   # BLITZ trend following + shared dynamic MA primitives
+│   │   └── destiny/                 # DESTINY trend following system
 │   ├── alphavantage/                # API client + typed models
 │   ├── cache/                       # In-memory TTL cache
 │   └── config/                      # YAML + env var loading
@@ -321,9 +315,9 @@ finterm/
 
 **Why TradingView as the reference?** It's what most retail traders use. If Finterm's RSI says 52.3 and TradingView says 52.3 for the same data, trust is established immediately. The key subtlety: TradingView's RSI uses RMA smoothing (alpha = 1/length), not standard EMA smoothing (alpha = 2/(length+1)). Getting this wrong produces visibly different values.
 
-**Why two trend signals (EMA + BLITZ)?** They answer different questions at different speeds. EMA crossover is a simple, lagging trend direction indicator — it tells you which way the trend is pointing. BLITZ combines trend confirmation (Pearson correlation), momentum strength (adaptive RSI), and a threshold gate into a single score. It's faster to react (dynamic length adaptation) and more selective (three conditions must align). Showing both gives traders two perspectives: when they agree, conviction is high; when they diverge, it's a signal for caution.
+**Why three trend signals (EMA + BLITZ + DESTINY)?** Each operates at a different speed and philosophy. EMA crossover is a simple, lagging binary — the trend is up or down. BLITZ uses Pearson correlation for trend direction and is fast and reactive (3 conditions, all AND). DESTINY polls 7 different moving averages for consensus and is more conservative — it waits for broad agreement before calling a trend. The asymmetric exit logic (OR for shorts) makes DESTINY quick to protect but slow to commit. Three signals, three speeds: when all agree, conviction is highest; when they diverge progressively, risk is rising.
 
-**Why three trend signals (EMA + BLITZ + DESTINY)?** Each system answers a different question at a different speed: EMA crossover is a simple lagging trend direction indicator; BLITZ combines trend strength, momentum, and threshold gates into a selective score; DESTINY uses consensus from 7 different moving averages combined with Dynamic RSI. The asymmetric signal logic (LONG requires consensus + RSI, SHORT can fire on TPI alone) provides early reversal detection. Showing all three gives traders multiple perspectives: when all agree, conviction is highest; when they diverge, it's a signal to be cautious.
+**Why 7 moving averages in DESTINY?** Each MA type captures a different aspect of trend: SMA is stable but laggy, EMA reacts faster, DEMA and TEMA progressively reduce lag, WMA biases toward recent prices, HMA is the fastest responder, and LSMA projects the regression line forward. Averaging their direction votes creates a "wisdom of the crowd" signal — if 5+ out of 7 agree the trend is up, it's probably up. The TPI (Trend Probability Indicator) quantifies this consensus as a single number from -1 to +1.
 
 **Why does BLITZ use dynamic-length indicators?** Standard indicators produce NaN for the first N bars, which is fine on TradingView with thousands of bars but problematic when data is limited. The dynamic length pattern adapts: at bar 5, a "12-period RSI" uses a 5-period lookback. This is ported directly from the Pine Script `getDynamicLength()` pattern to preserve exact signal parity.
 

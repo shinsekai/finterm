@@ -1023,3 +1023,82 @@ func TestEngine_DestinyFailure_DoesNotBlockOthers(t *testing.T) {
 		t.Errorf("DestinyScore = %d, want 0 when DESTINY fails", result.DestinyScore)
 	}
 }
+
+// TestEngine_TPIPopulated verifies that TPI and TPISignal are set after analysis.
+func TestEngine_TPIPopulated(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 55.0},
+		},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 150.0},
+		},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// Create mock time series data for BLITZ/DESTINY
+	timeSeries := &alphavantage.TimeSeriesDaily{
+		TimeSeries: make(map[string]alphavantage.TimeSeriesEntry),
+	}
+	// Add 50 days of data
+	startDate := time.Now().AddDate(0, 0, -50)
+	for i := 0; i < 50; i++ {
+		date := startDate.AddDate(0, 0, i).Format("2006-01-02")
+		price := 100.0 + float64(i)*0.5
+		timeSeries.TimeSeries[date] = alphavantage.TimeSeriesEntry{
+			Open:   fmt.Sprintf("%.2f", price),
+			High:   fmt.Sprintf("%.2f", price+1),
+			Low:    fmt.Sprintf("%.2f", price-1),
+			Close:  fmt.Sprintf("%.2f", price),
+			Volume: "1000000",
+		}
+	}
+
+	timeSeriesClient := &mockTimeSeriesClient{data: timeSeries}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	// Verify TPI is populated
+	if result.TPI == 0 && result.BlitzScore == 0 && result.DestinyScore == 0 {
+		t.Errorf("TPI = %f, want computed value (not default)", result.TPI)
+	}
+
+	// Verify TPI is within valid range [-1.0, 1.0]
+	if result.TPI < -1.0 || result.TPI > 1.0 {
+		t.Errorf("TPI = %f, want between -1.0 and 1.0", result.TPI)
+	}
+
+	// Verify TPISignal is set correctly based on TPI
+	if result.TPI > 0 && result.TPISignal != "LONG" {
+		t.Errorf("TPI = %f (> 0) but TPISignal = %q, want LONG", result.TPI, result.TPISignal)
+	}
+	if result.TPI <= 0 && result.TPISignal != "CASH" {
+		t.Errorf("TPI = %f (<= 0) but TPISignal = %q, want CASH", result.TPI, result.TPISignal)
+	}
+
+	// Verify TPI calculation: (emaSignal + blitzScore + destinyScore) / 3
+	expectedEma := 1.0
+	if result.Signal == Bearish {
+		expectedEma = -1.0
+	}
+	expectedTPI := (expectedEma + float64(result.BlitzScore) + float64(result.DestinyScore)) / 3.0
+	if result.TPI != expectedTPI {
+		t.Errorf("TPI = %f, want %f (computed from signal=%v, blitz=%d, destiny=%d)",
+			result.TPI, expectedTPI, result.Signal, result.BlitzScore, result.DestinyScore)
+	}
+}

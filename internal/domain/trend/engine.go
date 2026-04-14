@@ -25,10 +25,13 @@ type Result struct {
 	// RSI is the Relative Strength Index value from the last closed bar.
 	RSI float64
 	// EMAFast is the fast EMA value from the last closed bar.
+	// Kept for internal computation, just not displayed.
 	EMAFast float64
 	// EMASlow is the slow EMA value from the last closed bar.
+	// Kept for internal computation, just not displayed.
 	EMASlow float64
 	// Signal is the trend direction based on EMA crossover.
+	// Renamed to FTEMA in view.
 	Signal Signal
 	// Valuation is the valuation assessment based on RSI.
 	Valuation string
@@ -42,6 +45,11 @@ type Result struct {
 	DestinyScore     int     // +1 (long), -1 (short), 0 (hold)
 	DestinyTPI       float64 // Trend Probability Indicator value
 	DestinyRSISmooth float64 // Smoothed RSI from DESTINY
+	// TPI composite signal.
+	// TPI is the average of EMA signal, BLITZ, DESTINY (-1 to +1).
+	TPI float64
+	// TPISignal is the TPI signal label: "LONG" or "CASH".
+	TPISignal string
 }
 
 // CryptoDataFetcher fetches OHLCV data for cryptocurrency symbols.
@@ -279,6 +287,10 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	// Compute valuation from RSI
 	valuation := computeValuation(rsi, e.cfg.Valuation)
 
+	// Compute TPI composite signal
+	tpi := TPI(signal, blitzScore, destinyScore)
+	tpiSignal := TPISignal(tpi)
+
 	return &Result{
 		Symbol:           strings.ToUpper(symbol),
 		Price:            price,
@@ -293,6 +305,8 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 		DestinyScore:     destinyScore,
 		DestinyTPI:       destinyTPI,
 		DestinyRSISmooth: destinyRSISmooth,
+		TPI:              tpi,
+		TPISignal:        tpiSignal,
 	}, nil
 }
 

@@ -196,3 +196,84 @@ func TestSignal_String(t *testing.T) {
 		})
 	}
 }
+
+func TestTPI_AllBullish(t *testing.T) {
+	// TPI(Bullish, 1, 1) returns 1.0 (all agree long)
+	got := TPI(Bullish, 1, 1)
+	want := 1.0
+	if got != want {
+		t.Errorf("TPI(Bullish, 1, 1) = %f, want %f", got, want)
+	}
+}
+
+func TestTPI_AllBearish(t *testing.T) {
+	// TPI(Bearish, -1, -1) returns -1.0 (all agree short)
+	got := TPI(Bearish, -1, -1)
+	want := -1.0
+	if got != want {
+		t.Errorf("TPI(Bearish, -1, -1) = %f, want %f", got, want)
+	}
+}
+
+func TestTPI_Mixed_BullishMajority(t *testing.T) {
+	// TPI(Bullish, 1, 0) returns ~0.67 (2 of 3 long → LONG)
+	got := TPI(Bullish, 1, 0)
+	want := 2.0 / 3.0
+	if got != want {
+		t.Errorf("TPI(Bullish, 1, 0) = %f, want %f", got, want)
+	}
+}
+
+func TestTPI_Mixed_BearishMajority(t *testing.T) {
+	// TPI(Bearish, -1, 0) returns -0.67 (2 of 3 short → CASH)
+	got := TPI(Bearish, -1, 0)
+	want := -2.0 / 3.0
+	if got != want {
+		t.Errorf("TPI(Bearish, -1, 0) = %f, want %f", got, want)
+	}
+}
+
+func TestTPI_Neutral(t *testing.T) {
+	// TPI(Bullish, 0, -1) returns 0.0 (mixed → CASH)
+	got := TPI(Bullish, 0, -1)
+	want := 0.0
+	if got != want {
+		t.Errorf("TPI(Bullish, 0, -1) = %f, want %f", got, want)
+	}
+}
+
+func TestTPI_AllHold(t *testing.T) {
+	// TPI(Bearish, 0, 0) returns -0.33
+	got := TPI(Bearish, 0, 0)
+	want := -1.0 / 3.0
+	if got != want {
+		t.Errorf("TPI(Bearish, 0, 0) = %f, want %f", got, want)
+	}
+}
+
+func TestTPISignal_Positive(t *testing.T) {
+	// TPISignal returns "LONG" for positive
+	got := TPISignal(0.5)
+	want := "LONG"
+	if got != want {
+		t.Errorf("TPISignal(0.5) = %q, want %q", got, want)
+	}
+}
+
+func TestTPISignal_Zero(t *testing.T) {
+	// TPISignal returns "CASH" for zero
+	got := TPISignal(0.0)
+	want := "CASH"
+	if got != want {
+		t.Errorf("TPISignal(0.0) = %q, want %q", got, want)
+	}
+}
+
+func TestTPISignal_Negative(t *testing.T) {
+	// TPISignal returns "CASH" for negative
+	got := TPISignal(-0.5)
+	want := "CASH"
+	if got != want {
+		t.Errorf("TPISignal(-0.5) = %q, want %q", got, want)
+	}
+}

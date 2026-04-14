@@ -3,6 +3,8 @@ package blitz
 import (
 	"math"
 	"testing"
+
+	"github.com/shinsekai/finterm/internal/domain/dynamo"
 )
 
 // TestCompute_StrongUptrend verifies that a strong uptrend produces a Long signal.
@@ -243,7 +245,7 @@ func TestCompute_TSIReported(t *testing.T) {
 	}
 
 	// Compute TSI manually to verify
-	tsi := TSI(closes, cfg.TSIPeriod)
+	tsi := dynamo.TSI(closes, cfg.TSIPeriod)
 	expectedTSI := tsi[len(tsi)-1]
 
 	if result.TSI != expectedTSI {
@@ -271,8 +273,8 @@ func TestCompute_RSISmoothReported(t *testing.T) {
 	}
 
 	// Compute RSI and smoothed RSI manually to verify
-	rsi := DynamicRSI(closes, cfg.RSILength)
-	rsiSmooth := DynamicEMA(rsi, cfg.RSILength)
+	rsi := dynamo.DynamicRSI(closes, cfg.RSILength)
+	rsiSmooth := dynamo.DynamicEMA(rsi, cfg.RSILength)
 	expectedRSISmooth := rsiSmooth[len(rsiSmooth)-1]
 
 	if math.Abs(result.RSISmooth-expectedRSISmooth) > 0.0001 {
@@ -503,13 +505,13 @@ func TestDebug_UptrendValues(t *testing.T) {
 	cfg := DefaultConfig()
 
 	// Compute TSI
-	tsi := TSI(closes, cfg.TSIPeriod)
+	tsi := dynamo.TSI(closes, cfg.TSIPeriod)
 
 	// Compute RSI
-	rsi := DynamicRSI(closes, cfg.RSILength)
+	rsi := dynamo.DynamicRSI(closes, cfg.RSILength)
 
 	// Compute smoothed RSI
-	rsiSmooth := DynamicEMA(rsi, cfg.RSILength)
+	rsiSmooth := dynamo.DynamicEMA(rsi, cfg.RSILength)
 
 	t.Logf("Final values:")
 	t.Logf("  TSI: %.4f", tsi[len(tsi)-1])

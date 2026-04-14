@@ -1,11 +1,11 @@
-package blitz
+package dynamo
 
 import (
 	"math"
 	"testing"
 )
 
-// TestPearsonCorrelation_PerfectPositive verifies r = 1.0 for perfectly correlated data.
+// TestPearsonCorrelation_PerfectPositive verifies = r = 1.0 for perfectly correlated data.
 func TestPearsonCorrelation_PerfectPositive(t *testing.T) {
 	x := []float64{1, 2, 3, 4, 5}
 	y := []float64{1, 2, 3, 4, 5}
@@ -27,7 +27,7 @@ func TestPearsonCorrelation_PerfectPositive(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_PerfectNegative verifies r = -1.0 for perfectly anti-correlated data.
+// TestPearsonCorrelation_PerfectNegative verifies = r = -1.0 for perfectly anti-correlated data.
 func TestPearsonCorrelation_PerfectNegative(t *testing.T) {
 	x := []float64{1, 2, 3, 4, 5}
 	y := []float64{5, 4, 3, 2, 1}
@@ -41,7 +41,7 @@ func TestPearsonCorrelation_PerfectNegative(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_NoCorrelation verifies r for weakly correlated data.
+// TestPearsonCorrelation_NoCorrelation verifies = r for weakly correlated data.
 func TestPearsonCorrelation_NoCorrelation(t *testing.T) {
 	// Using data with weak correlation (not perfectly uncorrelated)
 	// x = [1, 2, 3, 4, 5]
@@ -67,7 +67,7 @@ func TestPearsonCorrelation_NoCorrelation(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_ConstantData verifies r = 0 with constant data (no div by zero).
+// TestPearsonCorrelation_ConstantData verifies = r = 0 with constant data (no div by zero).
 func TestPearsonCorrelation_ConstantData(t *testing.T) {
 	x := []float64{5, 5, 5, 5, 5}
 	y := []float64{1, 2, 3, 4, 5}
@@ -81,7 +81,7 @@ func TestPearsonCorrelation_ConstantData(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_InsufficientBars verifies bars before period return 0.
+// TestPearsonCorrelation_InsufficientBars verifies = bars before period return 0.
 func TestPearsonCorrelation_InsufficientBars(t *testing.T) {
 	x := []float64{1, 2, 3, 4, 5}
 	y := []float64{1, 2, 3, 4, 5}
@@ -102,7 +102,7 @@ func TestPearsonCorrelation_InsufficientBars(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_WindowSliding verifies correlation updates as window moves.
+// TestPearsonCorrelation_WindowSliding verifies = correlation updates as window moves.
 func TestPearsonCorrelation_WindowSliding(t *testing.T) {
 	x := []float64{1, 2, 3, 4, 5, 6, 7}
 	y := []float64{1, 2, 3, 4, 5, 6, 7}
@@ -123,7 +123,7 @@ func TestPearsonCorrelation_WindowSliding(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_EmptyInput verifies handling of empty input.
+// TestPearsonCorrelation_EmptyInput verifies = handling of empty input.
 func TestPearsonCorrelation_EmptyInput(t *testing.T) {
 	x := []float64{}
 	y := []float64{1, 2, 3}
@@ -136,7 +136,7 @@ func TestPearsonCorrelation_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_ScaledData verifies correlation is scale-invariant.
+// TestPearsonCorrelation_ScaledData verifies = correlation is scale-invariant.
 func TestPearsonCorrelation_ScaledData(t *testing.T) {
 	x1 := []float64{1, 2, 3, 4, 5}
 	y1 := []float64{1, 2, 3, 4, 5}
@@ -158,7 +158,7 @@ func TestPearsonCorrelation_ScaledData(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_ShiftedData verifies correlation is shift-invariant.
+// TestPearsonCorrelation_ShiftedData verifies = correlation is shift-invariant.
 func TestPearsonCorrelation_ShiftedData(t *testing.T) {
 	x1 := []float64{1, 2, 3, 4, 5}
 	y1 := []float64{1, 2, 3, 4, 5}
@@ -180,7 +180,7 @@ func TestPearsonCorrelation_ShiftedData(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_BothConstant verifies r = 0 when both series are constant.
+// TestPearsonCorrelation_BothConstant verifies = r = 0 when both series are constant.
 func TestPearsonCorrelation_BothConstant(t *testing.T) {
 	x := []float64{5, 5, 5, 5, 5}
 	y := []float64{3, 3, 3, 3, 3}
@@ -194,7 +194,7 @@ func TestPearsonCorrelation_BothConstant(t *testing.T) {
 	}
 }
 
-// TestPearsonCorrelation_DifferentLengths verifies handling of different length slices.
+// TestPearsonCorrelation_DifferentLengths verifies = handling of different length slices.
 func TestPearsonCorrelation_DifferentLengths(t *testing.T) {
 	x := []float64{1, 2, 3, 4, 5, 6, 7}
 	y := []float64{1, 2, 3}
@@ -225,7 +225,7 @@ func TestPearsonCorrelation_DifferentLengths(t *testing.T) {
 	}
 }
 
-// TestTSI_RisingPrices verifies TSI > 0 for rising prices.
+// TestTSI_RisingPrices verifies = TSI > 0 for rising prices.
 func TestTSI_RisingPrices(t *testing.T) {
 	closes := []float64{100, 110, 120, 130, 140, 150, 160, 170, 180, 190}
 	period := 5
@@ -250,7 +250,7 @@ func TestTSI_RisingPrices(t *testing.T) {
 	}
 }
 
-// TestTSI_FallingPrices verifies TSI < 0 for falling prices.
+// TestTSI_FallingPrices verifies = TSI < 0 for falling prices.
 func TestTSI_FallingPrices(t *testing.T) {
 	closes := []float64{200, 190, 180, 170, 160, 150, 140, 130, 120, 110}
 	period := 5
@@ -268,9 +268,9 @@ func TestTSI_FallingPrices(t *testing.T) {
 	}
 }
 
-// TestTSI_FlatPrices verifies TSI ≈ 0 for flat prices.
+// TestTSI_FlatPrices verifies = TSI ≈ 0 for flat prices.
 func TestTSI_FlatPrices(t *testing.T) {
-	closes := []float64{100, 100, 100, 100, 100, 100, 100, 100, 100, 100}
+	closes := []float64{100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}
 	period := 5
 
 	result := TSI(closes, period)
@@ -283,7 +283,7 @@ func TestTSI_FlatPrices(t *testing.T) {
 	}
 }
 
-// TestTSI_EmptyInput verifies handling of empty input.
+// TestTSI_EmptyInput verifies = handling of empty input.
 func TestTSI_EmptyInput(t *testing.T) {
 	closes := []float64{}
 	period := 5
@@ -295,7 +295,7 @@ func TestTSI_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestTSI_SingleBar verifies TSI with a single bar.
+// TestTSI_SingleBar verifies = TSI with a single bar.
 func TestTSI_SingleBar(t *testing.T) {
 	closes := []float64{100}
 	period := 5
@@ -311,7 +311,7 @@ func TestTSI_SingleBar(t *testing.T) {
 	}
 }
 
-// TestTSI_LinearTrend verifies TSI = 1.0 for perfect linear uptrend.
+// TestTSI_LinearTrend verifies = TSI = 1.0 for perfect linear uptrend.
 func TestTSI_LinearTrend(t *testing.T) {
 	// Perfect linear relationship: closes[i] = 100 + 10*i
 	closes := []float64{100, 110, 120, 130, 140, 150, 160, 170, 180, 190}
@@ -327,7 +327,7 @@ func TestTSI_LinearTrend(t *testing.T) {
 	}
 }
 
-// TestTSI_PeriodBoundary verifies TSI at period boundary.
+// TestTSI_PeriodBoundary verifies = TSI at period boundary.
 func TestTSI_PeriodBoundary(t *testing.T) {
 	closes := []float64{100, 110, 120, 130, 140}
 	period := 5
@@ -347,7 +347,7 @@ func TestTSI_PeriodBoundary(t *testing.T) {
 	}
 }
 
-// TestTSI_Volatility verifies TSI handles volatile data.
+// TestTSI_Volatility verifies = TSI handles volatile data.
 func TestTSI_Volatility(t *testing.T) {
 	// Noisy data with slight upward trend
 	closes := []float64{100, 105, 95, 110, 90, 115, 85, 120, 80, 125}
@@ -362,7 +362,7 @@ func TestTSI_Volatility(t *testing.T) {
 	}
 }
 
-// TestTSI_Precision verifies precision handling.
+// TestTSI_Precision verifies = precision handling.
 func TestTSI_Precision(t *testing.T) {
 	closes := []float64{100, 110.5, 120.25, 130.125, 140.0625}
 	period := 5
@@ -377,7 +377,7 @@ func TestTSI_Precision(t *testing.T) {
 	}
 }
 
-// TestTSI_SmallPeriod verifies TSI with small period.
+// TestTSI_SmallPeriod verifies = TSI with small period.
 func TestTSI_SmallPeriod(t *testing.T) {
 	closes := []float64{100, 110, 120, 130, 140}
 	period := 2

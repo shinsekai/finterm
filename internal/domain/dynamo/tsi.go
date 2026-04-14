@@ -1,5 +1,5 @@
-// Package blitz provides dynamic-length indicators for BLITZ analysis.
-package blitz
+// Package dynamo provides dynamic-length indicators for indicator analysis.
+package dynamo
 
 import "math"
 

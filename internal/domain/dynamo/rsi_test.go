@@ -1,11 +1,11 @@
-package blitz
+package dynamo
 
 import (
 	"math"
 	"testing"
 )
 
-// TestDynamicRSI_AllGains verifies RSI approaches 100 with all upward moves.
+// TestDynamicRSI_AllGains verifies = RSI approaches 100 with all upward moves.
 func TestDynamicRSI_AllGains(t *testing.T) {
 	closes := []float64{100, 110, 120, 130, 140, 150, 160, 170, 180, 190}
 	maxLength := 14
@@ -33,7 +33,7 @@ func TestDynamicRSI_AllGains(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_AllLosses verifies RSI approaches 0 with all downward moves.
+// TestDynamicRSI_AllLosses verifies = RSI approaches 0 with all downward moves.
 func TestDynamicRSI_AllLosses(t *testing.T) {
 	closes := []float64{200, 190, 180, 170, 160, 150, 140, 130, 120, 110}
 	maxLength := 14
@@ -61,7 +61,7 @@ func TestDynamicRSI_AllLosses(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_Alternating verifies RSI behavior with alternating up/down moves.
+// TestDynamicRSI_Alternating verifies = RSI behavior with alternating up/down moves.
 func TestDynamicRSI_Alternating(t *testing.T) {
 	closes := []float64{100, 110, 100, 110, 100, 110, 100, 110, 100, 110}
 	maxLength := 14
@@ -92,7 +92,7 @@ func TestDynamicRSI_Alternating(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_SingleBar verifies RSI[0] = 50.
+// TestDynamicRSI_SingleBar verifies = RSI[0] = 50.
 func TestDynamicRSI_SingleBar(t *testing.T) {
 	closes := []float64{100}
 	maxLength := 14
@@ -107,7 +107,7 @@ func TestDynamicRSI_SingleBar(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_Range verifies all values in [0, 100].
+// TestDynamicRSI_Range verifies = all values in [0, 100].
 func TestDynamicRSI_Range(t *testing.T) {
 	// Create noisy price data
 	closes := []float64{100, 105, 98, 110, 95, 115, 90, 120, 85, 125, 80, 130, 75, 135, 70}
@@ -122,7 +122,7 @@ func TestDynamicRSI_Range(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_NoWarmUp verifies values from bar 1 (no warm-up period needed).
+// TestDynamicRSI_NoWarmUp verifies = values from bar 1 (no warm-up period needed).
 func TestDynamicRSI_NoWarmUp(t *testing.T) {
 	closes := []float64{100, 105, 98, 110, 95}
 	maxLength := 14
@@ -145,7 +145,7 @@ func TestDynamicRSI_NoWarmUp(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_EmptyInput verifies handling of empty input.
+// TestDynamicRSI_EmptyInput verifies = handling of empty input.
 func TestDynamicRSI_EmptyInput(t *testing.T) {
 	closes := []float64{}
 	maxLength := 14
@@ -157,7 +157,7 @@ func TestDynamicRSI_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_KnownValues compares against hand-calculated values.
+// TestDynamicRSI_KnownValues compares = against hand-calculated values.
 func TestDynamicRSI_KnownValues(t *testing.T) {
 	// Simple case: 4 bars with alternating gains/losses
 	// With maxLength=2 and RMA seeding from first value:
@@ -182,7 +182,7 @@ func TestDynamicRSI_KnownValues(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_ConstantPrices verifies RSI stays at 50.
+// TestDynamicRSI_ConstantPrices verifies = RSI stays at 50.
 func TestDynamicRSI_ConstantPrices(t *testing.T) {
 	closes := []float64{100, 100, 100, 100, 100}
 	maxLength := 14
@@ -200,7 +200,7 @@ func TestDynamicRSI_ConstantPrices(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_SmallLength verifies behavior with small maxLength.
+// TestDynamicRSI_SmallLength verifies = behavior with small maxLength.
 func TestDynamicRSI_SmallLength(t *testing.T) {
 	closes := []float64{100, 110, 120, 130, 140}
 	maxLength := 2
@@ -221,7 +221,7 @@ func TestDynamicRSI_SmallLength(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_TwoBars verifies RSI with exactly 2 bars.
+// TestDynamicRSI_TwoBars verifies = RSI with exactly 2 bars.
 func TestDynamicRSI_TwoBars(t *testing.T) {
 	closes := []float64{100, 110}
 	maxLength := 14
@@ -239,7 +239,7 @@ func TestDynamicRSI_TwoBars(t *testing.T) {
 	}
 }
 
-// TestDynamicRSI_Precision verifies precision handling.
+// TestDynamicRSI_Precision verifies = precision handling.
 func TestDynamicRSI_Precision(t *testing.T) {
 	// Use specific values to verify precision
 	closes := []float64{100, 100.5, 99.5, 101, 99}

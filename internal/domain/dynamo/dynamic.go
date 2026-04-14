@@ -1,7 +1,7 @@
-// Package blitz provides dynamic-length moving average primitives for BLITZ indicators.
+// Package dynamo provides dynamic-length moving average primitives for indicator analysis.
 // These primitives adapt their lookback period based on how many bars are available,
 // which is essential for indicator warm-up and proper initialization.
-package blitz
+package dynamo
 
 import "math"
 

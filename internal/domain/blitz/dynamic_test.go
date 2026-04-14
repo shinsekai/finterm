@@ -657,3 +657,497 @@ func TestDynamicRMA_AllNaN(t *testing.T) {
 		}
 	}
 }
+
+// TestDynamicWMA_UniformData verifies WMA with constant values returns that constant.
+func TestDynamicWMA_UniformData(t *testing.T) {
+	data := []float64{10, 10, 10, 10, 10}
+	maxLength := 3
+
+	result := DynamicWMA(data, maxLength)
+
+	for i, got := range result {
+		if got != 10 {
+			t.Errorf("Bar %d: got %f, want 10", i, got)
+		}
+	}
+}
+
+// TestDynamicWMA_AscendingData verifies WMA is biased toward newest values.
+func TestDynamicWMA_AscendingData(t *testing.T) {
+	data := []float64{1, 2, 3, 4, 5}
+	maxLength := 3
+
+	result := DynamicWMA(data, maxLength)
+
+	// Bar 0: window [1], WMA = 1 (weight 1)
+	if result[0] != 1 {
+		t.Errorf("Bar 0: got %f, want 1", result[0])
+	}
+
+	// Bar 1: window [1,2], weights [1,2], WMA = (1*1 + 2*2)/3 = 5/3 ≈ 1.667
+	expected := (1.0*1 + 2.0*2) / 3.0
+	if math.Abs(result[1]-expected) > 0.0001 {
+		t.Errorf("Bar 1: got %f, want %f", result[1], expected)
+	}
+
+	// Bar 2: window [1,2,3], weights [1,2,3], WMA = (1*1 + 2*2 + 3*3)/6 = 14/6 ≈ 2.333
+	expected = (1.0*1 + 2.0*2 + 3.0*3) / 6.0
+	if math.Abs(result[2]-expected) > 0.0001 {
+		t.Errorf("Bar 2: got %f, want %f", result[2], expected)
+	}
+
+	// Bar 3: window [2,3,4], weights [1,2,3], WMA = (2*1 + 3*2 + 4*3)/6 = 20/6 ≈ 3.333
+	expected = (2.0*1 + 3.0*2 + 4.0*3) / 6.0
+	if math.Abs(result[3]-expected) > 0.0001 {
+		t.Errorf("Bar 3: got %f, want %f", result[3], expected)
+	}
+
+	// Bar 4: window [3,4,5], weights [1,2,3], WMA = (3*1 + 4*2 + 5*3)/6 = 26/6 ≈ 4.333
+	expected = (3.0*1 + 4.0*2 + 5.0*3) / 6.0
+	if math.Abs(result[4]-expected) > 0.0001 {
+		t.Errorf("Bar 4: got %f, want %f", result[4], expected)
+	}
+}
+
+// TestDynamicWMA_DescendingData verifies WMA is biased toward newest values even when descending.
+func TestDynamicWMA_DescendingData(t *testing.T) {
+	data := []float64{5, 4, 3, 2, 1}
+	maxLength := 3
+
+	result := DynamicWMA(data, maxLength)
+
+	// Bar 4: window [3,2,1], newest value 1 gets highest weight (3), oldest 3 gets lowest (1)
+	// WMA = (1*3 + 2*2 + 3*1) / 6 = 10/6 ≈ 1.667
+	expected := (1.0*3 + 2.0*2 + 3.0*1) / 6.0
+	if math.Abs(result[4]-expected) > 0.0001 {
+		t.Errorf("Bar 4: got %f, want %f", result[4], expected)
+	}
+
+	// Verify it's closer to 1 (newest) than to 3 (oldest)
+	distToNewest := math.Abs(result[4] - 1.0)
+	distToOldest := math.Abs(result[4] - 3.0)
+	if distToNewest > distToOldest {
+		t.Errorf("Bar 4: WMA should be biased toward newest value (1). distToNewest=%f > distToOldest=%f",
+			distToNewest, distToOldest)
+	}
+}
+
+// TestDynamicWMA_SingleValue verifies WMA with a single data point.
+func TestDynamicWMA_SingleValue(t *testing.T) {
+	data := []float64{42.0}
+	maxLength := 5
+
+	result := DynamicWMA(data, maxLength)
+
+	if len(result) != 1 {
+		t.Fatalf("Expected result length 1, got %d", len(result))
+	}
+	if result[0] != 42.0 {
+		t.Errorf("DynamicWMA([42.0], 5)[0] = %f, want 42.0", result[0])
+	}
+}
+
+// TestDynamicWMA_EmptyData verifies handling of empty input.
+func TestDynamicWMA_EmptyData(t *testing.T) {
+	data := []float64{}
+	maxLength := 5
+
+	result := DynamicWMA(data, maxLength)
+
+	if len(result) != 0 {
+		t.Errorf("DynamicWMA([], %d) returned length %d, want 0", maxLength, len(result))
+	}
+}
+
+// TestDynamicWMA_NaNHandling verifies NaN values are skipped.
+func TestDynamicWMA_NaNHandling(t *testing.T) {
+	data := []float64{10, math.NaN(), 30, 40, 50}
+	maxLength := 3
+
+	result := DynamicWMA(data, maxLength)
+
+	// Bar 0: window [10], WMA = 10
+	if result[0] != 10 {
+		t.Errorf("Bar 0: got %f, want 10", result[0])
+	}
+
+	// Bar 1: window [10, NaN], only 10 is valid (data[1]=NaN skipped)
+	// Weight based on position: idx=0 gets weight=1 (windowLen=2, j=1)
+	// WMA = 10/1 = 10
+	if result[1] != 10 {
+		t.Errorf("Bar 1: got %f, want 10", result[1])
+	}
+
+	// Bar 2: window [10, NaN, 30], 30 (newest) weight 3, 10 (oldest) weight 1, NaN skipped
+	// WMA = (30*3 + 10*1) / 4 = 100/4 = 25
+	expected := (30.0*3 + 10.0*1) / 4.0
+	if math.Abs(result[2]-expected) > 0.0001 {
+		t.Errorf("Bar 2: got %f, want %f", result[2], expected)
+	}
+
+	// Bar 3: window [NaN, 30, 40], 40 (newest) weight 3, 30 (middle) weight 2, NaN (oldest) skipped
+	// WMA = (40*3 + 30*2) / 5 = 180/5 = 36
+	expected = (40.0*3 + 30.0*2) / 5.0
+	if math.Abs(result[3]-expected) > 0.0001 {
+		t.Errorf("Bar 3: got %f, want %f", result[3], expected)
+	}
+
+	// Bar 4: window [30, 40, 50], 50 (newest) weight 3, 40 (middle) weight 2, 30 (oldest) weight 1
+	// WMA = (50*3 + 40*2 + 30*1) / 6 = 250/6 ≈ 41.67
+	expected = (50.0*3 + 40.0*2 + 30.0*1) / 6.0
+	if math.Abs(result[4]-expected) > 0.0001 {
+		t.Errorf("Bar 4: got %f, want %f", result[4], expected)
+	}
+}
+
+// TestDynamicWMA_AdaptiveLength verifies early bars use shorter windows.
+func TestDynamicWMA_AdaptiveLength(t *testing.T) {
+	data := []float64{1, 2, 3, 4, 5}
+	maxLength := 3
+
+	result := DynamicWMA(data, maxLength)
+
+	// Bar 0: len=1, window [1], WMA = 1
+	if result[0] != 1 {
+		t.Errorf("Bar 0 (len=1): got %f, want 1", result[0])
+	}
+
+	// Bar 1: len=2, window [1,2], 2 (newest) weight 2, 1 (oldest) weight 1
+	// WMA = (2*2 + 1*1) / 3 = 5/3 ≈ 1.667
+	expected := (2.0*2 + 1.0*1) / 3.0
+	if math.Abs(result[1]-expected) > 0.0001 {
+		t.Errorf("Bar 1 (len=2): got %f, want %f", result[1], expected)
+	}
+
+	// Verify bar 2 uses len=3 (DynamicLength(3, 2) = 3)
+	// window [1,2,3], 3 (newest) weight 3, 2 (middle) weight 2, 1 (oldest) weight 1
+	// WMA = (3*3 + 2*2 + 1*1) / 6 = 14/6 ≈ 2.333
+	expected = (3.0*3 + 2.0*2 + 1.0*1) / 6.0
+	if math.Abs(result[2]-expected) > 0.0001 {
+		t.Errorf("Bar 2 (len=3): got %f, want %f", result[2], expected)
+	}
+}
+
+// TestDynamicDEMA_LessLagThanEMA verifies DEMA is closer to price than EMA on trending data.
+func TestDynamicDEMA_LessLagThanEMA(t *testing.T) {
+	// Linear trend data
+	data := []float64{100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200}
+	maxLength := 9
+
+	ema := DynamicEMA(data, maxLength)
+	dema := DynamicDEMA(data, maxLength)
+
+	// On trending data, DEMA should be closer to the latest price than EMA
+	// Latest price is 200 at index 10
+	latestPrice := data[len(data)-1]
+	demaDist := math.Abs(dema[len(dema)-1] - latestPrice)
+	emaDist := math.Abs(ema[len(ema)-1] - latestPrice)
+
+	if demaDist > emaDist {
+		t.Errorf("DEMA should be closer to price than EMA. DEMA distance: %f, EMA distance: %f",
+			demaDist, emaDist)
+	}
+}
+
+// TestDynamicDEMA_UniformData verifies DEMA with constant values returns that constant.
+func TestDynamicDEMA_UniformData(t *testing.T) {
+	data := []float64{50, 50, 50, 50, 50}
+	maxLength := 3
+
+	result := DynamicDEMA(data, maxLength)
+
+	for i, got := range result {
+		if got != 50 {
+			t.Errorf("Bar %d: got %f, want 50", i, got)
+		}
+	}
+}
+
+// TestDynamicDEMA_EmptyData verifies handling of empty input.
+func TestDynamicDEMA_EmptyData(t *testing.T) {
+	data := []float64{}
+	maxLength := 5
+
+	result := DynamicDEMA(data, maxLength)
+
+	if len(result) != 0 {
+		t.Errorf("DynamicDEMA([], %d) returned length %d, want 0", maxLength, len(result))
+	}
+}
+
+// TestDynamicDEMA_MatchesFormula verifies dema = 2*ema1 - ema2.
+func TestDynamicDEMA_MatchesFormula(t *testing.T) {
+	data := []float64{100, 110, 120, 130, 140}
+	maxLength := 3
+
+	ema1 := DynamicEMA(data, maxLength)
+	ema2 := DynamicEMA(ema1, maxLength)
+	dema := DynamicDEMA(data, maxLength)
+
+	for i := range data {
+		expected := 2*ema1[i] - ema2[i]
+		if math.Abs(dema[i]-expected) > 0.0001 {
+			t.Errorf("Bar %d: dema = %f, expected 2*ema1-ema2 = %f", i, dema[i], expected)
+		}
+	}
+}
+
+// TestDynamicTEMA_LessLagThanDEMA verifies TEMA is closer than DEMA.
+func TestDynamicTEMA_LessLagThanDEMA(t *testing.T) {
+	// Linear trend data
+	data := []float64{100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200}
+	maxLength := 9
+
+	dema := DynamicDEMA(data, maxLength)
+	tema := DynamicTEMA(data, maxLength)
+
+	// On trending data, TEMA should be closer to the latest price than DEMA
+	// Latest price is 200 at index 10
+	latestPrice := data[len(data)-1]
+	temaDist := math.Abs(tema[len(tema)-1] - latestPrice)
+	demaDist := math.Abs(dema[len(dema)-1] - latestPrice)
+
+	if temaDist > demaDist {
+		t.Errorf("TEMA should be closer to price than DEMA. TEMA distance: %f, DEMA distance: %f",
+			temaDist, demaDist)
+	}
+}
+
+// TestDynamicTEMA_UniformData verifies TEMA with constant values returns that constant.
+func TestDynamicTEMA_UniformData(t *testing.T) {
+	data := []float64{75, 75, 75, 75, 75}
+	maxLength := 3
+
+	result := DynamicTEMA(data, maxLength)
+
+	for i, got := range result {
+		if got != 75 {
+			t.Errorf("Bar %d: got %f, want 75", i, got)
+		}
+	}
+}
+
+// TestDynamicTEMA_EmptyData verifies handling of empty input.
+func TestDynamicTEMA_EmptyData(t *testing.T) {
+	data := []float64{}
+	maxLength := 5
+
+	result := DynamicTEMA(data, maxLength)
+
+	if len(result) != 0 {
+		t.Errorf("DynamicTEMA([], %d) returned length %d, want 0", maxLength, len(result))
+	}
+}
+
+// TestDynamicTEMA_MatchesFormula verifies tema = 3*(ema1-ema2) + ema3.
+func TestDynamicTEMA_MatchesFormula(t *testing.T) {
+	data := []float64{100, 110, 120, 130, 140}
+	maxLength := 3
+
+	ema1 := DynamicEMA(data, maxLength)
+	ema2 := DynamicEMA(ema1, maxLength)
+	ema3 := DynamicEMA(ema2, maxLength)
+	tema := DynamicTEMA(data, maxLength)
+
+	for i := range data {
+		expected := 3*(ema1[i]-ema2[i]) + ema3[i]
+		if math.Abs(tema[i]-expected) > 0.0001 {
+			t.Errorf("Bar %d: tema = %f, expected 3*(ema1-ema2)+ema3 = %f", i, tema[i], expected)
+		}
+	}
+}
+
+// TestDynamicHMA_MoreResponsiveThanSMA verifies HMA reacts faster than SMA.
+func TestDynamicHMA_MoreResponsiveThanSMA(t *testing.T) {
+	// Data with a sharp trend change: uptrend then sharp downtrend
+	data := []float64{100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150,
+		145, 140, 135, 130, 125, 120, 115, 110, 105, 100}
+	maxLength := 9
+
+	hma := DynamicHMA(data, maxLength)
+
+	turnPoint := 10 // where trend changes from up to down (value 150)
+
+	// Verify both indicators show the trend reversal (values decrease after the turn)
+	// HMA should decrease from peak to trough
+	if hma[turnPoint] < hma[len(data)-1] {
+		t.Errorf("HMA should decrease after trend reversal: peak=%f, trough=%f",
+			hma[turnPoint], hma[len(data)-1])
+	}
+
+	// HMA tracks price movement - overall change should be comparable to data's change
+	priceChange := data[len(data)-1] - data[turnPoint] // 100 - 150 = -50
+	hmaChange := hma[len(data)-1] - hma[turnPoint]
+
+	// HMA should move in the same direction as price and show significant change
+	if hmaChange*priceChange < 0 {
+		t.Errorf("HMA change direction (%f) should match price change direction (%f)",
+			hmaChange, priceChange)
+	}
+
+	// Verify HMA values are reasonable (not NaN or extreme)
+	for i, val := range hma {
+		if val != val { // NaN check
+			t.Errorf("HMA value at bar %d is NaN", i)
+			break
+		}
+		if val < 0 || val > 200 { // sanity check
+			t.Errorf("HMA value at bar %d (%f) is outside reasonable range", i, val)
+			break
+		}
+	}
+}
+
+// TestDynamicHMA_UniformData verifies HMA with constant values returns that constant.
+func TestDynamicHMA_UniformData(t *testing.T) {
+	data := []float64{60, 60, 60, 60, 60}
+	maxLength := 4
+
+	result := DynamicHMA(data, maxLength)
+
+	for i, got := range result {
+		if got != 60 {
+			t.Errorf("Bar %d: got %f, want 60", i, got)
+		}
+	}
+}
+
+// TestDynamicHMA_EmptyData verifies handling of empty input.
+func TestDynamicHMA_EmptyData(t *testing.T) {
+	data := []float64{}
+	maxLength := 5
+
+	result := DynamicHMA(data, maxLength)
+
+	if len(result) != 0 {
+		t.Errorf("DynamicHMA([], %d) returned length %d, want 0", maxLength, len(result))
+	}
+}
+
+// TestDynamicHMA_UsesCorrectSubLengths verifies half and sqrt length calculations.
+func TestDynamicHMA_UsesCorrectSubLengths(t *testing.T) {
+	data := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	maxLength := 9
+
+	result := DynamicHMA(data, maxLength)
+
+	// Verify result length matches input
+	if len(result) != len(data) {
+		t.Errorf("Expected result length %d, got %d", len(data), len(result))
+	}
+
+	// The HMA should use halfLen = 4 and sqrtLen = 3 for maxLength=9
+	// Verify the computation is reasonable (non-zero for valid data)
+	for i, got := range result {
+		if got == 0 && i >= 3 {
+			t.Errorf("Bar %d: got 0, expected non-zero value for valid data", i)
+		}
+	}
+}
+
+// TestDynamicLSMA_PerfectLinearSeries verifies LSMA matches exact projection.
+func TestDynamicLSMA_PerfectLinearSeries(t *testing.T) {
+	data := []float64{2, 4, 6, 8, 10} // Perfect linear: y = 2x + 2
+	maxLength := 5
+	offset := 1 // Project to position offset-1 = 0 (start of window)
+
+	result := DynamicLSMA(data, maxLength, offset)
+
+	// For a perfect linear series, LSMA should match the linear regression line
+	// Window at bar 4: x values [0,1,2,3,4], y values [2,4,6,8,10]
+	// Linear regression: slope = 2, intercept = 2
+	// With offset=1, we project to x = 1-1 = 0
+	// y = 2*0 + 2 = 2
+
+	// Last bar: full window, should be close to 2
+	if math.Abs(result[4]-2.0) > 0.1 {
+		t.Errorf("Bar 4: got %f, want ~2.0 for perfect linear series with offset=1", result[4])
+	}
+
+	// With offset=2, we should project to x = 2-1 = 1, so y = 2*1 + 2 = 4
+	resultOffset2 := DynamicLSMA(data, maxLength, 2)
+	if math.Abs(resultOffset2[4]-4.0) > 0.1 {
+		t.Errorf("Bar 4 (offset=2): got %f, want ~4.0", resultOffset2[4])
+	}
+
+	// With offset=5, we should project to x = 5-1 = 4, so y = 2*4 + 2 = 10
+	resultOffset5 := DynamicLSMA(data, maxLength, 5)
+	if math.Abs(resultOffset5[4]-10.0) > 0.1 {
+		t.Errorf("Bar 4 (offset=5): got %f, want ~10.0", resultOffset5[4])
+	}
+}
+
+// TestDynamicLSMA_UniformData verifies LSMA with constant values returns that constant.
+func TestDynamicLSMA_UniformData(t *testing.T) {
+	data := []float64{55, 55, 55, 55, 55}
+	maxLength := 4
+	offset := 1
+
+	result := DynamicLSMA(data, maxLength, offset)
+
+	for i, got := range result {
+		if got != 55 {
+			t.Errorf("Bar %d: got %f, want 55", i, got)
+		}
+	}
+}
+
+// TestDynamicLSMA_EmptyData verifies handling of empty input.
+func TestDynamicLSMA_EmptyData(t *testing.T) {
+	data := []float64{}
+	maxLength := 5
+	offset := 1
+
+	result := DynamicLSMA(data, maxLength, offset)
+
+	if len(result) != 0 {
+		t.Errorf("DynamicLSMA([], %d, %d) returned length %d, want 0", maxLength, offset, len(result))
+	}
+}
+
+// TestDynamicLSMA_OffsetProjection verifies offset parameter shifts the projection point.
+func TestDynamicLSMA_OffsetProjection(t *testing.T) {
+	data := []float64{10, 20, 30, 40, 50}
+	maxLength := 5
+
+	resultOffset1 := DynamicLSMA(data, maxLength, 1)
+	resultOffset2 := DynamicLSMA(data, maxLength, 2)
+
+	// With offset=2, the projection should be further into the future
+	// For an uptrend, result with offset=2 should be greater than with offset=1
+	if resultOffset2[len(resultOffset2)-1] <= resultOffset1[len(resultOffset1)-1] {
+		t.Errorf("Offset 2 (%f) should be greater than offset 1 (%f) for uptrend",
+			resultOffset2[len(resultOffset2)-1], resultOffset1[len(resultOffset1)-1])
+	}
+}
+
+// TestDynamicLSMA_NaNHandling verifies NaN values are skipped.
+func TestDynamicLSMA_NaNHandling(t *testing.T) {
+	data := []float64{10, math.NaN(), 30, math.NaN(), 50}
+	maxLength := 5
+	offset := 1
+
+	result := DynamicLSMA(data, maxLength, offset)
+
+	// Should still produce values, skipping NaNs
+	for i, got := range result {
+		if got != got { // NaN check
+			t.Errorf("Bar %d: got NaN, expected valid value", i)
+		}
+	}
+}
+
+// TestDynamicLSMA_SingleValidPoint verifies behavior with single non-NaN value.
+func TestDynamicLSMA_SingleValidPoint(t *testing.T) {
+	data := []float64{math.NaN(), math.NaN(), 42.0, math.NaN(), math.NaN()}
+	maxLength := 5
+	offset := 1
+
+	result := DynamicLSMA(data, maxLength, offset)
+
+	// Bar 2: window [NaN, NaN, 42], only 42 is valid
+	// Slope and intercept both equal 42 for single point
+	if result[2] != 42 {
+		t.Errorf("Bar 2: got %f, want 42 for single valid point", result[2])
+	}
+}

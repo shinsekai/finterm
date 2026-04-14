@@ -104,28 +104,22 @@ func (v *View) renderTitle() string {
 
 // renderSummary renders the signal summary bar.
 func (v *View) renderSummary() string {
-	bullish, bearish, neutral := v.model.GetSignalCounts()
-	long, short, hold := v.model.GetBlitzCounts()
+	long, cash := v.model.GetTPICounts()
+	blitzLong, blitzShort, blitzHold := v.model.GetBlitzCounts()
 	destinyLong, destinyShort, destinyHold := v.model.GetDestinyCounts()
 
 	var summary strings.Builder
 
-	if bullish > 0 {
-		summary.WriteString(v.theme.Bullish().Render(fmt.Sprintf("%d ▲", bullish)))
+	// TPI summary
+	if long > 0 {
+		summary.WriteString(v.theme.Bullish().Render(fmt.Sprintf("%d LONG", long)))
 	}
 
-	if bearish > 0 {
+	if cash > 0 {
 		if summary.Len() > 0 {
 			summary.WriteString("  ")
 		}
-		summary.WriteString(v.theme.Bearish().Render(fmt.Sprintf("%d ▼", bearish)))
-	}
-
-	if neutral > 0 {
-		if summary.Len() > 0 {
-			summary.WriteString("  ")
-		}
-		summary.WriteString(v.theme.Neutral().Render(fmt.Sprintf("%d ─", neutral)))
+		summary.WriteString(v.theme.Muted().Render(fmt.Sprintf("%d CASH", cash)))
 	}
 
 	// Show pending count if some rows are still loading
@@ -140,23 +134,23 @@ func (v *View) renderSummary() string {
 	}
 
 	// BLITZ summary line (on a new line)
-	if long > 0 || short > 0 || hold > 0 {
+	if blitzLong > 0 || blitzShort > 0 || blitzHold > 0 {
 		var blitz strings.Builder
 		blitz.WriteString("BLITZ: ")
-		if long > 0 {
-			blitz.WriteString(v.theme.Bullish().Render(fmt.Sprintf("%d LONG", long)))
+		if blitzLong > 0 {
+			blitz.WriteString(v.theme.Bullish().Render(fmt.Sprintf("%d LONG", blitzLong)))
 		}
-		if short > 0 {
+		if blitzShort > 0 {
 			if blitz.Len() > 7 { // "BLITZ: " length
 				blitz.WriteString("  ")
 			}
-			blitz.WriteString(v.theme.Bearish().Render(fmt.Sprintf("%d SHORT", short)))
+			blitz.WriteString(v.theme.Bearish().Render(fmt.Sprintf("%d SHORT", blitzShort)))
 		}
-		if hold > 0 {
+		if blitzHold > 0 {
 			if blitz.Len() > 7 { // "BLITZ: " length
 				blitz.WriteString("  ")
 			}
-			blitz.WriteString(v.theme.Muted().Render(fmt.Sprintf("%d HOLD", hold)))
+			blitz.WriteString(v.theme.Muted().Render(fmt.Sprintf("%d HOLD", blitzHold)))
 		}
 
 		if summary.Len() > 0 {
@@ -235,9 +229,16 @@ func (v *View) buildColumns() []components.Column {
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
-			Title:       "SIGNAL",
-			Width:       15,
+			Title:       "TPI",
+			Width:       18,
 			Alignment:   components.AlignLeft,
+			Style:       v.theme.TableRow(),
+			HeaderStyle: v.theme.TableHeader(),
+		},
+		{
+			Title:       "FTEMA",
+			Width:       10,
+			Alignment:   components.AlignCenter,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
 		},
@@ -265,20 +266,6 @@ func (v *View) buildColumns() []components.Column {
 		{
 			Title:       "RSI",
 			Width:       7,
-			Alignment:   components.AlignRight,
-			Style:       v.theme.TableRow(),
-			HeaderStyle: v.theme.TableHeader(),
-		},
-		{
-			Title:       "EMA FAST",
-			Width:       11,
-			Alignment:   components.AlignRight,
-			Style:       v.theme.TableRow(),
-			HeaderStyle: v.theme.TableHeader(),
-		},
-		{
-			Title:       "EMA SLOW",
-			Width:       11,
 			Alignment:   components.AlignRight,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
@@ -329,7 +316,7 @@ func (v *View) buildTableRows(rows []RowData) []components.Row {
 	cryptoStartIndex := v.model.GetCryptoStartIndex()
 	if cryptoStartIndex > 0 && cryptoStartIndex < len(rows) {
 		// Insert separator at the crypto start position
-		separatorCells := make([]components.Cell, 9)
+		separatorCells := make([]components.Cell, 8)
 		separatorCells[0].Text = v.theme.Divider().Render("── Crypto ──")
 		// All other cells remain empty
 
@@ -366,7 +353,6 @@ func (v *View) buildRowCells(row RowData) []components.Cell {
 func (v *View) buildLoadingCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
-		{Text: v.theme.Spinner().Render("⟳ Loading…")},
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
@@ -383,13 +369,12 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 
 	return []components.Cell{
 		{Text: v.theme.Accent().Render(result.Symbol)},
-		{Text: v.renderSignalBadge(result.Signal)},
+		{Text: v.renderTPICell(result.TPI, result.TPISignal)},
+		{Text: v.renderFTEMABadge(result.Signal)},
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
 		{Text: v.renderDestinyBadge(result.DestinyScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
-		{Text: FormatValue(result.EMAFast, 2)},
-		{Text: FormatValue(result.EMASlow, 2)},
 		{Text: v.renderValuationBadge(result.Valuation)},
 	}
 }
@@ -403,13 +388,12 @@ func (v *View) buildCachedCells(row RowData) []components.Cell {
 
 	return []components.Cell{
 		{Text: symbolWithBadge},
-		{Text: v.renderSignalBadge(result.Signal)},
+		{Text: v.renderTPICell(result.TPI, result.TPISignal)},
+		{Text: v.renderFTEMABadge(result.Signal)},
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
 		{Text: v.renderDestinyBadge(result.DestinyScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
-		{Text: FormatValue(result.EMAFast, 2)},
-		{Text: FormatValue(result.EMASlow, 2)},
 		{Text: v.renderValuationBadge(result.Valuation)},
 	}
 }
@@ -431,7 +415,6 @@ func (v *View) buildErrorCells(row RowData) []components.Cell {
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
-		{Text: "—"},
 	}
 }
 
@@ -440,7 +423,6 @@ func (v *View) buildUnknownCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
 		{Text: v.theme.Muted().Render("Unknown")},
-		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
@@ -459,6 +441,95 @@ func (v *View) renderFooter() string {
 		v.theme.Accent().Render("1-4") + " " + v.theme.Muted().Render("tabs") +
 		"  ·  " +
 		v.theme.Accent().Render("?") + " " + v.theme.Muted().Render("help")
+}
+
+// renderTPICell renders the TPI gauge and label.
+// Gauge is 10 chars wide: left half (0-4) is bearish, center (5) is neutral, right half (6-9) is bullish.
+// For TPI > 0: fill from center rightward with "▓" in bullish color, "░" in muted.
+// For TPI <= 0: fill from center leftward with "▓" in bearish color, "░" in muted.
+func (v *View) renderTPICell(tpi float64, tpiSignal string) string {
+	// Clamp TPI to [-1, 1]
+	switch {
+	case tpi > 1:
+		tpi = 1
+	case tpi < -1:
+		tpi = -1
+	}
+
+	// Build gauge: 10 characters
+	// Positions: 0 1 2 3 4 5 6 7 8 9
+	// Center is at position 5
+	gauge := make([]rune, 10)
+
+	// Fill with empty blocks first
+	for i := range gauge {
+		gauge[i] = '░'
+	}
+
+	// Calculate filled positions
+	// TPI = 1 -> fill all positions 0-9 (full bar)
+	// TPI = 0 -> fill position 5 only (center)
+	// TPI = -1 -> fill all positions 0-9 (full bar, but bearish color)
+	var filledCount int
+	switch {
+	case tpi >= 0:
+		// Positive: fill from center (5) rightward
+		// TPI = 0.5 -> 5 filled positions (5, 6, 7, 8, 9)
+		// TPI = 1 -> 10 filled positions (0-9)
+		filledCount = 5 + int(tpi*5) // 5 to 10
+		for i := 5; i < filledCount && i < 10; i++ {
+			gauge[i] = '▓'
+		}
+	default:
+		// Negative: fill from center (5) leftward
+		// TPI = -0.5 -> 5 filled positions (4, 3, 2, 1, 0)
+		// TPI = -1 -> 10 filled positions (0-9)
+		filledCount = 5 + int(-tpi*5) // 5 to 10
+		lowerBound := 5 - filledCount
+		if lowerBound < 0 {
+			lowerBound = 0
+		}
+		for i := 4; i >= lowerBound; i-- {
+			gauge[i] = '▓'
+		}
+	}
+
+	// Apply color styling
+	var gaugeStyle lipgloss.Style
+	switch {
+	case tpi > 0:
+		gaugeStyle = v.theme.Bullish()
+	case tpi < 0:
+		gaugeStyle = v.theme.Bearish()
+	default:
+		gaugeStyle = v.theme.Muted()
+	}
+
+	gaugeStr := string(gauge)
+	if tpi > 0 || tpi < 0 {
+		gaugeStr = gaugeStyle.Render(gaugeStr)
+	}
+
+	// Render label
+	labelStyle := v.theme.Muted()
+	if tpi > 0 {
+		labelStyle = v.theme.Bullish()
+	}
+	label := labelStyle.Render(tpiSignal)
+
+	return gaugeStr + " " + label
+}
+
+// renderFTEMABadge renders the FTEMA (EMA crossover) as a colored badge.
+func (v *View) renderFTEMABadge(signal trenddomain.Signal) string {
+	switch signal {
+	case trenddomain.Bullish:
+		return v.theme.BullishBadge().Render("▲ BULL")
+	case trenddomain.Bearish:
+		return v.theme.BearishBadge().Render("▼ BEAR")
+	default:
+		return v.theme.NeutralBadge().Render("─ HOLD")
+	}
 }
 
 // renderSignalBadge renders a signal as a colored badge.

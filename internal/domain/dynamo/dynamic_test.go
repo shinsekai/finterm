@@ -1,4 +1,4 @@
-package blitz
+package dynamo
 
 import (
 	"math"
@@ -28,7 +28,7 @@ func TestDynamicLength_BarZero(t *testing.T) {
 	}
 }
 
-// TestDynamicLength_GrowingPhase verifies the growing phase of the window.
+// TestDynamicLength_GrowingPhase verifies = growing phase of the window.
 func TestDynamicLength_GrowingPhase(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -52,7 +52,7 @@ func TestDynamicLength_GrowingPhase(t *testing.T) {
 	}
 }
 
-// TestDynamicLength_AtMax verifies the window stays at max once reached.
+// TestDynamicLength_AtMax verifies = window stays at max once reached.
 func TestDynamicLength_AtMax(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -76,7 +76,7 @@ func TestDynamicLength_AtMax(t *testing.T) {
 	}
 }
 
-// TestDynamicLength_BeyondMax verifies behavior when index exceeds max.
+// TestDynamicLength_BeyondMax verifies = behavior when index exceeds max.
 func TestDynamicLength_BeyondMax(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -114,7 +114,7 @@ func TestDynamicSMA_SingleBar(t *testing.T) {
 	}
 }
 
-// TestDynamicSMA_GrowingWindow verifies adaptive windows [1,2,3,3,3] for maxLength=3.
+// TestDynamicSMA_GrowingWindow verifies = adaptive windows [1,2,3,3,3] for maxLength=3.
 func TestDynamicSMA_GrowingWindow(t *testing.T) {
 	data := []float64{10, 20, 30, 40, 50}
 	maxLength := 3
@@ -147,7 +147,7 @@ func TestDynamicSMA_GrowingWindow(t *testing.T) {
 	}
 }
 
-// TestDynamicSMA_FullLength verifies correct average once at max length.
+// TestDynamicSMA_FullLength verifies = correct average once at max length.
 func TestDynamicSMA_FullLength(t *testing.T) {
 	data := []float64{10, 20, 30, 40, 50, 60, 70, 80, 90, 100}
 	maxLength := 5
@@ -168,7 +168,7 @@ func TestDynamicSMA_FullLength(t *testing.T) {
 	}
 }
 
-// TestDynamicSMA_EmptyInput verifies handling of empty input.
+// TestDynamicSMA_EmptyInput verifies = handling of empty input.
 func TestDynamicSMA_EmptyInput(t *testing.T) {
 	data := []float64{}
 	maxLength := 5
@@ -180,7 +180,7 @@ func TestDynamicSMA_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestDynamicSMA_KnownValues verifies hand-calculated expected outputs.
+// TestDynamicSMA_KnownValues verifies = hand-calculated expected outputs.
 func TestDynamicSMA_KnownValues(t *testing.T) {
 	data := []float64{2, 4, 6, 8}
 	maxLength := 2
@@ -200,7 +200,7 @@ func TestDynamicSMA_KnownValues(t *testing.T) {
 	}
 }
 
-// TestDynamicSMA_NaNValues verifies NaN handling (should skip NaN values).
+// TestDynamicSMA_NaNValues verifies = NaN handling (should skip NaN values).
 func TestDynamicSMA_NaNValues(t *testing.T) {
 	data := []float64{10, math.NaN(), 30, 40, 50}
 	maxLength := 3
@@ -233,7 +233,7 @@ func TestDynamicSMA_NaNValues(t *testing.T) {
 	}
 }
 
-// TestDynamicRMA_SingleBar verifies RMA with a single data point.
+// TestDynamicRMA_SingleBar verifies = RMA with a single data point.
 func TestDynamicRMA_SingleBar(t *testing.T) {
 	data := []float64{10.0}
 	maxLength := 14
@@ -248,7 +248,7 @@ func TestDynamicRMA_SingleBar(t *testing.T) {
 	}
 }
 
-// TestDynamicRMA_FallbackToSMA verifies fallback to SMA when len==1.
+// TestDynamicRMA_FallbackToSMA verifies = fallback to SMA when len==1.
 func TestDynamicRMA_FallbackToSMA(t *testing.T) {
 	data := []float64{10, 20, 30}
 	maxLength := 1
@@ -256,7 +256,7 @@ func TestDynamicRMA_FallbackToSMA(t *testing.T) {
 	result := DynamicRMA(data, maxLength)
 
 	// With maxLength=1, every bar should use SMA of length 1
-	// which is just the data value itself
+	// which is just data value itself
 	for i, got := range result {
 		if got != data[i] {
 			t.Errorf("Bar %d: got %f, want %f (SMA fallback)", i, got, data[i])
@@ -264,7 +264,7 @@ func TestDynamicRMA_FallbackToSMA(t *testing.T) {
 	}
 }
 
-// TestDynamicRMA_WilderFormula verifies the (prev*(len-1)+src)/len formula.
+// TestDynamicRMA_WilderFormula verifies = (prev*(len-1)+src)/len formula.
 func TestDynamicRMA_WilderFormula(t *testing.T) {
 	// Use constant data after first bar to verify formula with adaptive length
 	data := []float64{100, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10}
@@ -285,14 +285,14 @@ func TestDynamicRMA_WilderFormula(t *testing.T) {
 
 	// Bars after reaching max length should use Wilder formula with len=14
 	// At bar 13: len=14, (prev * 13 + src) / 14
-	// Let's verify bar 13 after the adaptive warm-up is complete
+	// Let's verify bar 13 after adaptive warm-up is complete
 	// Bar 13: len=14, use Wilder formula with full length
 	if result[13] <= 0 || result[13] > 100 {
 		t.Errorf("Bar 13 (len=14): got %f, expected value between 0 and 100", result[13])
 	}
 }
 
-// TestDynamicRMA_GrowingLength verifies adaptive behavior during warm-up.
+// TestDynamicRMA_GrowingLength verifies = adaptive behavior during warm-up.
 func TestDynamicRMA_GrowingLength(t *testing.T) {
 	data := []float64{10, 20, 30, 40, 50}
 	maxLength := 3
@@ -329,7 +329,7 @@ func TestDynamicRMA_GrowingLength(t *testing.T) {
 	}
 }
 
-// TestDynamicRMA_EmptyInput verifies handling of empty input.
+// TestDynamicRMA_EmptyInput verifies = handling of empty input.
 func TestDynamicRMA_EmptyInput(t *testing.T) {
 	data := []float64{}
 	maxLength := 14
@@ -341,7 +341,7 @@ func TestDynamicRMA_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestDynamicRMA_KnownValues verifies hand-calculated expected outputs.
+// TestDynamicRMA_KnownValues verifies = hand-calculated expected outputs.
 func TestDynamicRMA_KnownValues(t *testing.T) {
 	data := []float64{10, 20, 30, 40}
 	maxLength := 2
@@ -361,7 +361,7 @@ func TestDynamicRMA_KnownValues(t *testing.T) {
 	}
 }
 
-// TestDynamicRMA_NaNValues verifies NaN handling.
+// TestDynamicRMA_NaNValues verifies = NaN handling.
 func TestDynamicRMA_NaNValues(t *testing.T) {
 	data := []float64{100, math.NaN(), 30, 40}
 	maxLength := 14
@@ -391,7 +391,7 @@ func TestDynamicRMA_NaNValues(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_SingleBar verifies EMA with a single data point.
+// TestDynamicEMA_SingleBar verifies = EMA with a single data point.
 func TestDynamicEMA_SingleBar(t *testing.T) {
 	data := []float64{10.0}
 	maxLength := 10
@@ -406,7 +406,7 @@ func TestDynamicEMA_SingleBar(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_AlphaCalculation verifies alpha = 2/(len+1) not 2+(len+1).
+// TestDynamicEMA_AlphaCalculation verifies = alpha = 2/(len+1) not 2+(len+1).
 func TestDynamicEMA_AlphaCalculation(t *testing.T) {
 	data := []float64{100, 100, 100}
 	maxLength := 9 // So len at bar 0 = 1, alpha = 2/10 = 0.2
@@ -431,9 +431,9 @@ func TestDynamicEMA_AlphaCalculation(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_AlphaCalculationDetailed verifies alpha calculation with different values.
+// TestDynamicEMA_AlphaCalculationDetailed verifies = alpha calculation with different values.
 func TestDynamicEMA_AlphaCalculationDetailed(t *testing.T) {
-	// Use data where we can verify the EMA formula after seed point
+	// Use data where we can verify EMA formula after seed point
 	// With maxLength=9, seed point is at bar 8 (len=9, i=8)
 	data := make([]float64, 10)
 	for i := range data {
@@ -458,7 +458,7 @@ func TestDynamicEMA_AlphaCalculationDetailed(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_SeedPoint verifies first valid EMA value is seeded properly.
+// TestDynamicEMA_SeedPoint verifies = first valid EMA value is seeded properly.
 func TestDynamicEMA_SeedPoint(t *testing.T) {
 	data := []float64{100, 110, 120, 130, 140, 150}
 	maxLength := 5
@@ -487,7 +487,7 @@ func TestDynamicEMA_SeedPoint(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_GrowingLength verifies adaptive EMA during warm-up.
+// TestDynamicEMA_GrowingLength verifies = adaptive EMA during warm-up.
 func TestDynamicEMA_GrowingLength(t *testing.T) {
 	data := []float64{100, 110, 120, 130, 140}
 	maxLength := 4
@@ -510,7 +510,7 @@ func TestDynamicEMA_GrowingLength(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_EmptyInput verifies handling of empty input.
+// TestDynamicEMA_EmptyInput verifies = handling of empty input.
 func TestDynamicEMA_EmptyInput(t *testing.T) {
 	data := []float64{}
 	maxLength := 10
@@ -522,7 +522,7 @@ func TestDynamicEMA_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_KnownValues verifies hand-calculated expected outputs.
+// TestDynamicEMA_KnownValues verifies = hand-calculated expected outputs.
 func TestDynamicEMA_KnownValues(t *testing.T) {
 	data := []float64{100, 110, 120, 130}
 	maxLength := 3
@@ -544,7 +544,7 @@ func TestDynamicEMA_KnownValues(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_NaNValues verifies NaN handling.
+// TestDynamicEMA_NaNValues verifies = NaN handling.
 func TestDynamicEMA_NaNValues(t *testing.T) {
 	data := []float64{100, math.NaN(), 120, 130}
 	maxLength := 3
@@ -575,7 +575,7 @@ func TestDynamicEMA_NaNValues(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_MatchesStandardEMA verifies convergence to standard EMA.
+// TestDynamicEMA_MatchesStandardEMA verifies = convergence to standard EMA.
 func TestDynamicEMA_MatchesStandardEMA(t *testing.T) {
 	data := make([]float64, 30)
 	for i := range data {
@@ -612,7 +612,7 @@ func TestDynamicEMA_MatchesStandardEMA(t *testing.T) {
 	}
 }
 
-// TestDynamicEMA_AllNaN verifies handling when all data is NaN.
+// TestDynamicEMA_AllNaN verifies = handling when all data is NaN.
 func TestDynamicEMA_AllNaN(t *testing.T) {
 	data := []float64{math.NaN(), math.NaN(), math.NaN()}
 	maxLength := 3
@@ -627,7 +627,7 @@ func TestDynamicEMA_AllNaN(t *testing.T) {
 	}
 }
 
-// TestDynamicSMA_AllNaN verifies SMA with all NaN values.
+// TestDynamicSMA_AllNaN verifies = SMA with all NaN values.
 func TestDynamicSMA_AllNaN(t *testing.T) {
 	data := []float64{math.NaN(), math.NaN(), math.NaN()}
 	maxLength := 3
@@ -642,7 +642,7 @@ func TestDynamicSMA_AllNaN(t *testing.T) {
 	}
 }
 
-// TestDynamicRMA_AllNaN verifies RMA with all NaN values.
+// TestDynamicRMA_AllNaN verifies = RMA with all NaN values.
 func TestDynamicRMA_AllNaN(t *testing.T) {
 	data := []float64{math.NaN(), math.NaN(), math.NaN()}
 	maxLength := 14
@@ -658,7 +658,7 @@ func TestDynamicRMA_AllNaN(t *testing.T) {
 	}
 }
 
-// TestDynamicWMA_UniformData verifies WMA with constant values returns that constant.
+// TestDynamicWMA_UniformData verifies = WMA with constant values returns that constant.
 func TestDynamicWMA_UniformData(t *testing.T) {
 	data := []float64{10, 10, 10, 10, 10}
 	maxLength := 3
@@ -672,7 +672,7 @@ func TestDynamicWMA_UniformData(t *testing.T) {
 	}
 }
 
-// TestDynamicWMA_AscendingData verifies WMA is biased toward newest values.
+// TestDynamicWMA_AscendingData verifies = WMA is biased toward newest values.
 func TestDynamicWMA_AscendingData(t *testing.T) {
 	data := []float64{1, 2, 3, 4, 5}
 	maxLength := 3
@@ -709,7 +709,7 @@ func TestDynamicWMA_AscendingData(t *testing.T) {
 	}
 }
 
-// TestDynamicWMA_DescendingData verifies WMA is biased toward newest values even when descending.
+// TestDynamicWMA_DescendingData verifies = WMA is biased toward newest values even when descending.
 func TestDynamicWMA_DescendingData(t *testing.T) {
 	data := []float64{5, 4, 3, 2, 1}
 	maxLength := 3
@@ -732,7 +732,7 @@ func TestDynamicWMA_DescendingData(t *testing.T) {
 	}
 }
 
-// TestDynamicWMA_SingleValue verifies WMA with a single data point.
+// TestDynamicWMA_SingleValue verifies = WMA with a single data point.
 func TestDynamicWMA_SingleValue(t *testing.T) {
 	data := []float64{42.0}
 	maxLength := 5
@@ -747,7 +747,7 @@ func TestDynamicWMA_SingleValue(t *testing.T) {
 	}
 }
 
-// TestDynamicWMA_EmptyData verifies handling of empty input.
+// TestDynamicWMA_EmptyData verifies = handling of empty input.
 func TestDynamicWMA_EmptyData(t *testing.T) {
 	data := []float64{}
 	maxLength := 5
@@ -759,7 +759,7 @@ func TestDynamicWMA_EmptyData(t *testing.T) {
 	}
 }
 
-// TestDynamicWMA_NaNHandling verifies NaN values are skipped.
+// TestDynamicWMA_NaNHandling verifies = NaN values are skipped.
 func TestDynamicWMA_NaNHandling(t *testing.T) {
 	data := []float64{10, math.NaN(), 30, 40, 50}
 	maxLength := 3
@@ -800,7 +800,7 @@ func TestDynamicWMA_NaNHandling(t *testing.T) {
 	}
 }
 
-// TestDynamicWMA_AdaptiveLength verifies early bars use shorter windows.
+// TestDynamicWMA_AdaptiveLength verifies = early bars use shorter windows.
 func TestDynamicWMA_AdaptiveLength(t *testing.T) {
 	data := []float64{1, 2, 3, 4, 5}
 	maxLength := 3
@@ -828,7 +828,7 @@ func TestDynamicWMA_AdaptiveLength(t *testing.T) {
 	}
 }
 
-// TestDynamicDEMA_LessLagThanEMA verifies DEMA is closer to price than EMA on trending data.
+// TestDynamicDEMA_LessLagThanEMA verifies = DEMA is closer to price than EMA on trending data.
 func TestDynamicDEMA_LessLagThanEMA(t *testing.T) {
 	// Linear trend data
 	data := []float64{100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200}
@@ -837,7 +837,7 @@ func TestDynamicDEMA_LessLagThanEMA(t *testing.T) {
 	ema := DynamicEMA(data, maxLength)
 	dema := DynamicDEMA(data, maxLength)
 
-	// On trending data, DEMA should be closer to the latest price than EMA
+	// On trending data, DEMA should be closer to latest price than EMA
 	// Latest price is 200 at index 10
 	latestPrice := data[len(data)-1]
 	demaDist := math.Abs(dema[len(dema)-1] - latestPrice)
@@ -849,7 +849,7 @@ func TestDynamicDEMA_LessLagThanEMA(t *testing.T) {
 	}
 }
 
-// TestDynamicDEMA_UniformData verifies DEMA with constant values returns that constant.
+// TestDynamicDEMA_UniformData verifies = DEMA with constant values returns that constant.
 func TestDynamicDEMA_UniformData(t *testing.T) {
 	data := []float64{50, 50, 50, 50, 50}
 	maxLength := 3
@@ -863,7 +863,7 @@ func TestDynamicDEMA_UniformData(t *testing.T) {
 	}
 }
 
-// TestDynamicDEMA_EmptyData verifies handling of empty input.
+// TestDynamicDEMA_EmptyData verifies = handling of empty input.
 func TestDynamicDEMA_EmptyData(t *testing.T) {
 	data := []float64{}
 	maxLength := 5
@@ -875,7 +875,7 @@ func TestDynamicDEMA_EmptyData(t *testing.T) {
 	}
 }
 
-// TestDynamicDEMA_MatchesFormula verifies dema = 2*ema1 - ema2.
+// TestDynamicDEMA_MatchesFormula verifies = dema = 2*ema1 - ema2.
 func TestDynamicDEMA_MatchesFormula(t *testing.T) {
 	data := []float64{100, 110, 120, 130, 140}
 	maxLength := 3
@@ -892,7 +892,7 @@ func TestDynamicDEMA_MatchesFormula(t *testing.T) {
 	}
 }
 
-// TestDynamicTEMA_LessLagThanDEMA verifies TEMA is closer than DEMA.
+// TestDynamicTEMA_LessLagThanDEMA verifies = TEMA is closer than DEMA.
 func TestDynamicTEMA_LessLagThanDEMA(t *testing.T) {
 	// Linear trend data
 	data := []float64{100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200}
@@ -901,7 +901,7 @@ func TestDynamicTEMA_LessLagThanDEMA(t *testing.T) {
 	dema := DynamicDEMA(data, maxLength)
 	tema := DynamicTEMA(data, maxLength)
 
-	// On trending data, TEMA should be closer to the latest price than DEMA
+	// On trending data, TEMA should be closer to latest price than DEMA
 	// Latest price is 200 at index 10
 	latestPrice := data[len(data)-1]
 	temaDist := math.Abs(tema[len(tema)-1] - latestPrice)
@@ -913,7 +913,7 @@ func TestDynamicTEMA_LessLagThanDEMA(t *testing.T) {
 	}
 }
 
-// TestDynamicTEMA_UniformData verifies TEMA with constant values returns that constant.
+// TestDynamicTEMA_UniformData verifies = TEMA with constant values returns that constant.
 func TestDynamicTEMA_UniformData(t *testing.T) {
 	data := []float64{75, 75, 75, 75, 75}
 	maxLength := 3
@@ -927,7 +927,7 @@ func TestDynamicTEMA_UniformData(t *testing.T) {
 	}
 }
 
-// TestDynamicTEMA_EmptyData verifies handling of empty input.
+// TestDynamicTEMA_EmptyData verifies = handling of empty input.
 func TestDynamicTEMA_EmptyData(t *testing.T) {
 	data := []float64{}
 	maxLength := 5
@@ -939,7 +939,7 @@ func TestDynamicTEMA_EmptyData(t *testing.T) {
 	}
 }
 
-// TestDynamicTEMA_MatchesFormula verifies tema = 3*(ema1-ema2) + ema3.
+// TestDynamicTEMA_MatchesFormula verifies = tema = 3*(ema1-ema2) + ema3.
 func TestDynamicTEMA_MatchesFormula(t *testing.T) {
 	data := []float64{100, 110, 120, 130, 140}
 	maxLength := 3
@@ -957,7 +957,7 @@ func TestDynamicTEMA_MatchesFormula(t *testing.T) {
 	}
 }
 
-// TestDynamicHMA_MoreResponsiveThanSMA verifies HMA reacts faster than SMA.
+// TestDynamicHMA_MoreResponsiveThanSMA verifies = HMA reacts faster than SMA.
 func TestDynamicHMA_MoreResponsiveThanSMA(t *testing.T) {
 	// Data with a sharp trend change: uptrend then sharp downtrend
 	data := []float64{100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150,
@@ -968,7 +968,7 @@ func TestDynamicHMA_MoreResponsiveThanSMA(t *testing.T) {
 
 	turnPoint := 10 // where trend changes from up to down (value 150)
 
-	// Verify both indicators show the trend reversal (values decrease after the turn)
+	// Verify both indicators show trend reversal (values decrease after turn)
 	// HMA should decrease from peak to trough
 	if hma[turnPoint] < hma[len(data)-1] {
 		t.Errorf("HMA should decrease after trend reversal: peak=%f, trough=%f",
@@ -979,7 +979,7 @@ func TestDynamicHMA_MoreResponsiveThanSMA(t *testing.T) {
 	priceChange := data[len(data)-1] - data[turnPoint] // 100 - 150 = -50
 	hmaChange := hma[len(data)-1] - hma[turnPoint]
 
-	// HMA should move in the same direction as price and show significant change
+	// HMA should move in same direction as price and show significant change
 	if hmaChange*priceChange < 0 {
 		t.Errorf("HMA change direction (%f) should match price change direction (%f)",
 			hmaChange, priceChange)
@@ -998,7 +998,7 @@ func TestDynamicHMA_MoreResponsiveThanSMA(t *testing.T) {
 	}
 }
 
-// TestDynamicHMA_UniformData verifies HMA with constant values returns that constant.
+// TestDynamicHMA_UniformData verifies = HMA with constant values returns that constant.
 func TestDynamicHMA_UniformData(t *testing.T) {
 	data := []float64{60, 60, 60, 60, 60}
 	maxLength := 4
@@ -1012,7 +1012,7 @@ func TestDynamicHMA_UniformData(t *testing.T) {
 	}
 }
 
-// TestDynamicHMA_EmptyData verifies handling of empty input.
+// TestDynamicHMA_EmptyData verifies = handling of empty input.
 func TestDynamicHMA_EmptyData(t *testing.T) {
 	data := []float64{}
 	maxLength := 5
@@ -1024,7 +1024,7 @@ func TestDynamicHMA_EmptyData(t *testing.T) {
 	}
 }
 
-// TestDynamicHMA_UsesCorrectSubLengths verifies half and sqrt length calculations.
+// TestDynamicHMA_UsesCorrectSubLengths verifies = half and sqrt length calculations.
 func TestDynamicHMA_UsesCorrectSubLengths(t *testing.T) {
 	data := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	maxLength := 9
@@ -1037,7 +1037,7 @@ func TestDynamicHMA_UsesCorrectSubLengths(t *testing.T) {
 	}
 
 	// The HMA should use halfLen = 4 and sqrtLen = 3 for maxLength=9
-	// Verify the computation is reasonable (non-zero for valid data)
+	// Verify computation is reasonable (non-zero for valid data)
 	for i, got := range result {
 		if got == 0 && i >= 3 {
 			t.Errorf("Bar %d: got 0, expected non-zero value for valid data", i)
@@ -1045,7 +1045,7 @@ func TestDynamicHMA_UsesCorrectSubLengths(t *testing.T) {
 	}
 }
 
-// TestDynamicLSMA_PerfectLinearSeries verifies LSMA matches exact projection.
+// TestDynamicLSMA_PerfectLinearSeries verifies = LSMA matches exact projection.
 func TestDynamicLSMA_PerfectLinearSeries(t *testing.T) {
 	data := []float64{2, 4, 6, 8, 10} // Perfect linear: y = 2x + 2
 	maxLength := 5
@@ -1053,7 +1053,7 @@ func TestDynamicLSMA_PerfectLinearSeries(t *testing.T) {
 
 	result := DynamicLSMA(data, maxLength, offset)
 
-	// For a perfect linear series, LSMA should match the linear regression line
+	// For a perfect linear series, LSMA should match linear regression line
 	// Window at bar 4: x values [0,1,2,3,4], y values [2,4,6,8,10]
 	// Linear regression: slope = 2, intercept = 2
 	// With offset=1, we project to x = 1-1 = 0
@@ -1077,7 +1077,7 @@ func TestDynamicLSMA_PerfectLinearSeries(t *testing.T) {
 	}
 }
 
-// TestDynamicLSMA_UniformData verifies LSMA with constant values returns that constant.
+// TestDynamicLSMA_UniformData verifies = LSMA with constant values returns that constant.
 func TestDynamicLSMA_UniformData(t *testing.T) {
 	data := []float64{55, 55, 55, 55, 55}
 	maxLength := 4
@@ -1092,7 +1092,7 @@ func TestDynamicLSMA_UniformData(t *testing.T) {
 	}
 }
 
-// TestDynamicLSMA_EmptyData verifies handling of empty input.
+// TestDynamicLSMA_EmptyData verifies = handling of empty input.
 func TestDynamicLSMA_EmptyData(t *testing.T) {
 	data := []float64{}
 	maxLength := 5
@@ -1105,7 +1105,7 @@ func TestDynamicLSMA_EmptyData(t *testing.T) {
 	}
 }
 
-// TestDynamicLSMA_OffsetProjection verifies offset parameter shifts the projection point.
+// TestDynamicLSMA_OffsetProjection verifies = offset parameter shifts projection point.
 func TestDynamicLSMA_OffsetProjection(t *testing.T) {
 	data := []float64{10, 20, 30, 40, 50}
 	maxLength := 5
@@ -1113,7 +1113,7 @@ func TestDynamicLSMA_OffsetProjection(t *testing.T) {
 	resultOffset1 := DynamicLSMA(data, maxLength, 1)
 	resultOffset2 := DynamicLSMA(data, maxLength, 2)
 
-	// With offset=2, the projection should be further into the future
+	// With offset=2, projection should be further into the future
 	// For an uptrend, result with offset=2 should be greater than with offset=1
 	if resultOffset2[len(resultOffset2)-1] <= resultOffset1[len(resultOffset1)-1] {
 		t.Errorf("Offset 2 (%f) should be greater than offset 1 (%f) for uptrend",
@@ -1121,7 +1121,7 @@ func TestDynamicLSMA_OffsetProjection(t *testing.T) {
 	}
 }
 
-// TestDynamicLSMA_NaNHandling verifies NaN values are skipped.
+// TestDynamicLSMA_NaNHandling verifies = NaN values are skipped.
 func TestDynamicLSMA_NaNHandling(t *testing.T) {
 	data := []float64{10, math.NaN(), 30, math.NaN(), 50}
 	maxLength := 5
@@ -1137,7 +1137,7 @@ func TestDynamicLSMA_NaNHandling(t *testing.T) {
 	}
 }
 
-// TestDynamicLSMA_SingleValidPoint verifies behavior with single non-NaN value.
+// TestDynamicLSMA_SingleValidPoint verifies = behavior with single non-NaN value.
 func TestDynamicLSMA_SingleValidPoint(t *testing.T) {
 	data := []float64{math.NaN(), math.NaN(), 42.0, math.NaN(), math.NaN()}
 	maxLength := 5

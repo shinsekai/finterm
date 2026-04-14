@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/shinsekai/finterm/internal/domain/blitz"
+	"github.com/shinsekai/finterm/internal/domain/dynamo"
 )
 
 // OHLCV represents Open, High, Low, Close, Volume data for a single bar.
@@ -90,14 +90,14 @@ func ComputeTPI(closes []float64, maLength, lsmaOffset int) (tpiSeries []float64
 		return nil, [7]int{}, fmt.Errorf("insufficient data: need at least 2 bars, got %d", len(closes))
 	}
 
-	// Compute all 7 MAs using blitz package functions
-	sma := blitz.DynamicSMA(closes, maLength)
-	ema := blitz.DynamicEMA(closes, maLength)
-	dema := blitz.DynamicDEMA(closes, maLength*2)
-	tema := blitz.DynamicTEMA(closes, maLength*3)
-	wma := blitz.DynamicWMA(closes, maLength)
-	hma := blitz.DynamicHMA(closes, maLength)
-	lsma := blitz.DynamicLSMA(closes, maLength, lsmaOffset)
+	// Compute all 7 MAs using dynamo package functions
+	sma := dynamo.DynamicSMA(closes, maLength)
+	ema := dynamo.DynamicEMA(closes, maLength)
+	dema := dynamo.DynamicDEMA(closes, maLength*2)
+	tema := dynamo.DynamicTEMA(closes, maLength*3)
+	wma := dynamo.DynamicWMA(closes, maLength)
+	hma := dynamo.DynamicHMA(closes, maLength)
+	lsma := dynamo.DynamicLSMA(closes, maLength, lsmaOffset)
 
 	maSeries := [][]float64{sma, ema, dema, tema, wma, hma, lsma}
 
@@ -160,10 +160,10 @@ func Compute(data []OHLCV, cfg Config) (*Result, error) {
 	}
 
 	// Compute RSI
-	rsi := blitz.DynamicRSI(closes, cfg.RSILength)
+	rsi := dynamo.DynamicRSI(closes, cfg.RSILength)
 
 	// Compute smoothed RSI using EMA
-	rsiSmooth := blitz.DynamicEMA(rsi, cfg.RSILength)
+	rsiSmooth := dynamo.DynamicEMA(rsi, cfg.RSILength)
 
 	// Walk through bars to compute the latching score
 	score := 0

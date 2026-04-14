@@ -3,6 +3,8 @@ package blitz
 
 import (
 	"fmt"
+
+	"github.com/shinsekai/finterm/internal/domain/dynamo"
 )
 
 // Config holds BLITZ system parameters.
@@ -76,13 +78,13 @@ func Compute(closes []float64, cfg Config) (*Result, error) {
 	}
 
 	// Step 1: Compute TSI (Trend Strength Indicator)
-	tsi := TSI(closes, cfg.TSIPeriod)
+	tsi := dynamo.TSI(closes, cfg.TSIPeriod)
 
 	// Step 2: Compute Dynamic RSI
-	rsi := DynamicRSI(closes, cfg.RSILength)
+	rsi := dynamo.DynamicRSI(closes, cfg.RSILength)
 
 	// Step 3: Smooth the RSI using DynamicEMA
-	rsiSmooth := DynamicEMA(rsi, cfg.RSILength)
+	rsiSmooth := dynamo.DynamicEMA(rsi, cfg.RSILength)
 
 	// Step 4: Generate scores for each bar
 	scores := make([]Score, len(closes))

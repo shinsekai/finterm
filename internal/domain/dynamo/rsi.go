@@ -1,5 +1,5 @@
-// Package blitz provides dynamic-length indicators for BLITZ analysis.
-package blitz
+// Package dynamo provides dynamic-length indicators for indicator analysis.
+package dynamo
 
 // DynamicRSI computes the Relative Strength Index with adaptive length using DynamicRMA.
 // For each bar i (starting from 1):

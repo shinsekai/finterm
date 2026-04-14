@@ -505,45 +505,43 @@ func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingD
 	content.WriteString("\n")
 
 	// FTEMA badge
-	fmt.Fprintf(&content, "%-14s%s\n",
-		v.theme.Muted().Render("FTEMA"),
+	fmt.Fprintf(&content, "%s%s\n",
+		v.theme.Muted().Render(fmt.Sprintf("%-14s", "FTEMA")),
 		v.renderFTEMABadge(indicators.Signal))
 
 	// BLITZ badge
-	fmt.Fprintf(&content, "%-14s%s\n",
-		v.theme.Muted().Render("BLITZ"),
+	fmt.Fprintf(&content, "%s%s\n",
+		v.theme.Muted().Render(fmt.Sprintf("%-14s", "BLITZ")),
 		v.renderBlitzBadge(indicators.BlitzScore))
 
 	// DESTINY badge
-	fmt.Fprintf(&content, "%-14s%s\n",
-		v.theme.Muted().Render("DESTINY"),
+	fmt.Fprintf(&content, "%s%s\n",
+		v.theme.Muted().Render(fmt.Sprintf("%-14s", "DESTINY")),
 		v.renderDestinyBadge(indicators.DestinyScore))
 
 	// Composite section
 	fmt.Fprintf(&content, "\n%s\n", v.theme.Muted().Render("─ Composite ────"))
 	content.WriteString("\n")
 
-	// TPI value
+	// TPI value with color
 	tpiStyle := v.theme.Muted()
 	if indicators.TPI > 0 {
 		tpiStyle = v.theme.Bullish()
 	} else if indicators.TPI < 0 {
 		tpiStyle = v.theme.Bearish()
 	}
-	fmt.Fprintf(&content, "%-14s%s\n",
-		v.theme.Muted().Render("TPI"),
+	fmt.Fprintf(&content, "%s%s\n",
+		v.theme.Muted().Render(fmt.Sprintf("%-14s", "TPI")),
 		tpiStyle.Render(fmt.Sprintf("%+.2f", indicators.TPI)))
 
-	// TPI gauge
-	fmt.Fprintf(&content, "              %s\n", v.renderTPIGauge(indicators.TPI))
-
-	// TPI signal
+	// TPI gauge + signal label on same line
 	tpiSignalStyle := v.theme.Muted()
 	if indicators.TPI > 0 {
 		tpiSignalStyle = v.theme.Bullish()
 	}
-	fmt.Fprintf(&content, "%-14s%s\n",
-		v.theme.Muted().Render("Signal"),
+	fmt.Fprintf(&content, "%s%s %s\n",
+		v.theme.Muted().Render(fmt.Sprintf("%-14s", "")),
+		v.renderTPIGauge(indicators.TPI),
 		tpiSignalStyle.Render(indicators.TPISignal))
 
 	// Last updated
@@ -559,11 +557,11 @@ func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingD
 func (v *View) renderFTEMABadge(signal trenddomain.Signal) string {
 	switch signal {
 	case trenddomain.Bullish:
-		return v.theme.BullishBadge().Render("▲ BULL")
+		return v.theme.Bullish().Render("▲ LONG")
 	case trenddomain.Bearish:
-		return v.theme.BearishBadge().Render("▼ BEAR")
+		return v.theme.Bearish().Render("▼ SHORT")
 	default:
-		return v.theme.NeutralBadge().Render("─ HOLD")
+		return ""
 	}
 }
 
@@ -571,11 +569,11 @@ func (v *View) renderFTEMABadge(signal trenddomain.Signal) string {
 func (v *View) renderBlitzBadge(blitzScore int) string {
 	switch blitzScore {
 	case 1:
-		return v.theme.BullishBadge().Render("▲ LONG")
+		return v.theme.Bullish().Render("▲ LONG")
 	case -1:
-		return v.theme.BearishBadge().Render("▼ SHORT")
+		return v.theme.Bearish().Render("▼ SHORT")
 	default:
-		return v.theme.NeutralBadge().Render("─ HOLD")
+		return ""
 	}
 }
 
@@ -583,11 +581,11 @@ func (v *View) renderBlitzBadge(blitzScore int) string {
 func (v *View) renderDestinyBadge(destinyScore int) string {
 	switch destinyScore {
 	case 1:
-		return v.theme.BullishBadge().Render("▲ LONG")
+		return v.theme.Bullish().Render("▲ LONG")
 	case -1:
-		return v.theme.BearishBadge().Render("▼ SHORT")
+		return v.theme.Bearish().Render("▼ SHORT")
 	default:
-		return v.theme.NeutralBadge().Render("○ HOLD")
+		return ""
 	}
 }
 
@@ -642,20 +640,39 @@ func (v *View) renderTPIGauge(tpi float64) string {
 		}
 	}
 
-	// Apply color styling
-	var gaugeStyle lipgloss.Style
-	switch {
-	case tpi > 0:
-		gaugeStyle = v.theme.Bullish()
-	case tpi < 0:
-		gaugeStyle = v.theme.Bearish()
-	default:
-		gaugeStyle = v.theme.Muted()
-	}
-
-	gaugeStr := string(gauge)
-	if tpi > 0 || tpi < 0 {
-		gaugeStr = gaugeStyle.Render(gaugeStr)
+	// Render each character with positional color.
+	// Position 0 = far left (red), position 5 = center (yellow), position 9 = far right (green).
+	var gaugeStr string
+	for i, ch := range gauge {
+		// Interpolate color based on position:
+		// Position 0-2: red tones
+		// Position 3-4: red-to-yellow transition
+		// Position 5:   yellow (neutral center)
+		// Position 6-7: yellow-to-green transition
+		// Position 8-9: green tones
+		var charStyle lipgloss.Style
+		if ch == '░' {
+			charStyle = v.theme.Muted()
+		} else {
+			// Filled character — color by position
+			switch {
+			case i <= 1:
+				charStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5555")) // deep red
+			case i <= 3:
+				charStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8844")) // orange-red
+			case i == 4:
+				charStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFAA33")) // orange
+			case i == 5:
+				charStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F1FA8C")) // yellow
+			case i == 6:
+				charStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#AADD44")) // yellow-green
+			case i <= 8:
+				charStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#66DD55")) // green
+			default:
+				charStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#50FA7B")) // bright green
+			}
+		}
+		gaugeStr += charStyle.Render(string(ch))
 	}
 
 	return gaugeStr

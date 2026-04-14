@@ -767,7 +767,7 @@ func TestQuoteView_IndicatorsCard_FTEMABadge_Bull(t *testing.T) {
 	view := NewView(model).SetTheme(&defaultTheme{})
 	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
 
-	assert.Contains(t, card, "▲ BULL", "Bullish FTEMA should show ▲ BULL badge")
+	assert.Contains(t, card, "▲ LONG", "Bullish FTEMA should show ▲ LONG badge")
 }
 
 // TestQuoteView_IndicatorsCard_FTEMABadge_Bear verifies bearish FTEMA badge.
@@ -791,7 +791,7 @@ func TestQuoteView_IndicatorsCard_FTEMABadge_Bear(t *testing.T) {
 	view := NewView(model).SetTheme(&defaultTheme{})
 	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
 
-	assert.Contains(t, card, "▼ BEAR", "Bearish FTEMA should show ▼ BEAR badge")
+	assert.Contains(t, card, "▼ SHORT", "Bearish FTEMA should show ▼ SHORT badge")
 }
 
 // TestQuoteView_IndicatorsCard_BlitzBadge verifies BLITZ badge rendering.
@@ -824,10 +824,11 @@ func TestQuoteView_IndicatorsCard_BlitzBadge(t *testing.T) {
 	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
 	assert.Contains(t, card, "▼ SHORT", "BLITZ SHORT should show ▼ SHORT badge")
 
-	// Test BLITZ HOLD
+	// Test BLITZ HOLD - should show nothing
 	model.quoteData.Indicators.BlitzScore = 0
 	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
-	assert.Contains(t, card, "─ HOLD", "BLITZ HOLD should show ─ HOLD badge")
+	// The line should only have the label, not the badge
+	assert.NotContains(t, card, "─ HOLD", "BLITZ HOLD should not show badge")
 }
 
 // TestQuoteView_IndicatorsCard_DestinyBadge verifies DESTINY badge rendering.
@@ -860,10 +861,11 @@ func TestQuoteView_IndicatorsCard_DestinyBadge(t *testing.T) {
 	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
 	assert.Contains(t, card, "▼ SHORT", "DESTINY SHORT should show ▼ SHORT badge")
 
-	// Test DESTINY HOLD
+	// Test DESTINY HOLD - should show nothing
 	model.quoteData.Indicators.DestinyScore = 0
 	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
-	assert.Contains(t, card, "○ HOLD", "DESTINY HOLD should show ○ HOLD badge")
+	// The line should only have the label, not the badge
+	assert.NotContains(t, card, "○ HOLD", "DESTINY HOLD should not show badge")
 }
 
 // TestQuoteView_IndicatorsCard_TPIValue verifies TPI numeric value display.
@@ -943,6 +945,16 @@ func TestQuoteView_IndicatorsCard_TPISignal_Long(t *testing.T) {
 	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
 
 	assert.Contains(t, card, "LONG", "Positive TPI should show LONG signal")
+	// Verify gauge and signal are on same line (gauge + signal should be together)
+	lines := strings.Split(card, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "▓") && strings.Contains(line, "LONG") {
+			// Found a line with both gauge and signal
+			return
+		}
+	}
+	// If we get here, the gauge and signal aren't on the same line
+	t.Error("TPI gauge and signal should be on the same line")
 }
 
 // TestQuoteView_IndicatorsCard_TPISignal_Cash verifies CASH signal for negative/zero TPI.

@@ -254,12 +254,14 @@ func TestQuoteModel_Update_QuoteResultMsg(t *testing.T) {
 	}
 
 	indicators := &trenddomain.Result{
-		Symbol:    "AAPL",
-		RSI:       52.3,
-		EMAFast:   188.20,
-		EMASlow:   186.45,
-		Signal:    trenddomain.Bullish,
-		Valuation: "Fair value",
+		Symbol:       "AAPL",
+		RSI:          52.3,
+		Signal:       trenddomain.Bullish,
+		Valuation:    "Fair value",
+		BlitzScore:   1,
+		DestinyScore: 1,
+		TPI:          0.67,
+		TPISignal:    "LONG",
 	}
 
 	msg := QuoteResultMsg{
@@ -744,32 +746,309 @@ func TestQuoteView_IndicatorsCard_RSIBar(t *testing.T) {
 	assert.Contains(t, rsiBar, "100", "Should contain zone marker 100")
 }
 
-// TestQuoteView_IndicatorsCard_TrendSignalIcon verifies trend signal icons.
-func TestQuoteView_IndicatorsCard_TrendSignalIcon(t *testing.T) {
+// TestQuoteView_IndicatorsCard_FTEMABadge_Bull verifies bullish FTEMA badge.
+func TestQuoteView_IndicatorsCard_FTEMABadge_Bull(t *testing.T) {
 	model := NewModel()
 	model.width = 80
 	model.state = StateLoaded
 	model.quoteData = &QuoteData{
 		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
 		Indicators: &trenddomain.Result{
-			Symbol:  "AAPL",
-			RSI:     50,
-			EMAFast: 150,
-			EMASlow: 145,
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   0,
+			DestinyScore: 0,
+			TPI:          0.67,
+			TPISignal:    "LONG",
 		},
 	}
 
 	view := NewView(model).SetTheme(&defaultTheme{})
-
-	// Test bullish
-	model.quoteData.Indicators.Signal = trenddomain.Bullish
 	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
-	assert.Contains(t, card, "▲", "Bullish should contain up arrow")
 
-	// Test bearish
-	model.quoteData.Indicators.Signal = trenddomain.Bearish
+	assert.Contains(t, card, "▲ BULL", "Bullish FTEMA should show ▲ BULL badge")
+}
+
+// TestQuoteView_IndicatorsCard_FTEMABadge_Bear verifies bearish FTEMA badge.
+func TestQuoteView_IndicatorsCard_FTEMABadge_Bear(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bearish,
+			BlitzScore:   0,
+			DestinyScore: 0,
+			TPI:          -0.33,
+			TPISignal:    "CASH",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "▼ BEAR", "Bearish FTEMA should show ▼ BEAR badge")
+}
+
+// TestQuoteView_IndicatorsCard_BlitzBadge verifies BLITZ badge rendering.
+func TestQuoteView_IndicatorsCard_BlitzBadge(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 0,
+			TPI:          0.67,
+			TPISignal:    "LONG",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "▲ LONG", "BLITZ LONG should show ▲ LONG badge")
+
+	// Test BLITZ SHORT
+	model.quoteData.Indicators.BlitzScore = -1
+	model.quoteData.Indicators.TPI = -0.67
+	model.quoteData.Indicators.TPISignal = "CASH"
 	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
-	assert.Contains(t, card, "▼", "Bearish should contain down arrow")
+	assert.Contains(t, card, "▼ SHORT", "BLITZ SHORT should show ▼ SHORT badge")
+
+	// Test BLITZ HOLD
+	model.quoteData.Indicators.BlitzScore = 0
+	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+	assert.Contains(t, card, "─ HOLD", "BLITZ HOLD should show ─ HOLD badge")
+}
+
+// TestQuoteView_IndicatorsCard_DestinyBadge verifies DESTINY badge rendering.
+func TestQuoteView_IndicatorsCard_DestinyBadge(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   0,
+			DestinyScore: 1,
+			TPI:          0.67,
+			TPISignal:    "LONG",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "▲ LONG", "DESTINY LONG should show ▲ LONG badge")
+
+	// Test DESTINY SHORT
+	model.quoteData.Indicators.DestinyScore = -1
+	model.quoteData.Indicators.TPI = -0.67
+	model.quoteData.Indicators.TPISignal = "CASH"
+	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+	assert.Contains(t, card, "▼ SHORT", "DESTINY SHORT should show ▼ SHORT badge")
+
+	// Test DESTINY HOLD
+	model.quoteData.Indicators.DestinyScore = 0
+	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+	assert.Contains(t, card, "○ HOLD", "DESTINY HOLD should show ○ HOLD badge")
+}
+
+// TestQuoteView_IndicatorsCard_TPIValue verifies TPI numeric value display.
+func TestQuoteView_IndicatorsCard_TPIValue(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1,
+			TPI:          0.67,
+			TPISignal:    "LONG",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "+0.67", "Positive TPI should show with + sign")
+
+	// Test negative TPI
+	model.quoteData.Indicators.TPI = -0.33
+	model.quoteData.Indicators.TPISignal = "CASH"
+	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+	assert.Contains(t, card, "-0.33", "Negative TPI should show with - sign")
+}
+
+// TestQuoteView_IndicatorsCard_TPIGauge verifies TPI gauge rendering.
+func TestQuoteView_IndicatorsCard_TPIGauge(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1,
+			TPI:          0.67,
+			TPISignal:    "LONG",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "▓", "TPI gauge should contain filled block character")
+	assert.Contains(t, card, "░", "TPI gauge should contain empty block character")
+}
+
+// TestQuoteView_IndicatorsCard_TPISignal_Long verifies LONG signal for positive TPI.
+func TestQuoteView_IndicatorsCard_TPISignal_Long(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1,
+			TPI:          0.67,
+			TPISignal:    "LONG",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "LONG", "Positive TPI should show LONG signal")
+}
+
+// TestQuoteView_IndicatorsCard_TPISignal_Cash verifies CASH signal for negative/zero TPI.
+func TestQuoteView_IndicatorsCard_TPISignal_Cash(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bearish,
+			BlitzScore:   -1,
+			DestinyScore: -1,
+			TPI:          -0.33,
+			TPISignal:    "CASH",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "CASH", "Negative TPI should show CASH signal")
+
+	// Test zero TPI (also shows CASH)
+	model.quoteData.Indicators.TPI = 0
+	model.quoteData.Indicators.TPISignal = "CASH"
+	card = view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+	assert.Contains(t, card, "CASH", "Zero TPI should show CASH signal")
+}
+
+// TestQuoteView_IndicatorsCard_NoEMA verifies EMA values are not displayed.
+func TestQuoteView_IndicatorsCard_NoEMA(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1,
+			TPI:          0.67,
+			TPISignal:    "LONG",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.NotContains(t, card, "EMA(10)", "Should not display EMA(10)")
+	assert.NotContains(t, card, "EMA(20)", "Should not display EMA(20)")
+}
+
+// TestQuoteView_IndicatorsCard_NoTrendLabel verifies old Trend label is not displayed.
+func TestQuoteView_IndicatorsCard_NoTrendLabel(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1,
+			TPI:          0.67,
+			TPISignal:    "LONG",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.NotContains(t, card, "Trend:", "Should not display old Trend: label")
+}
+
+// TestQuoteView_IndicatorsCard_RSIPreserved verifies RSI bar still renders.
+func TestQuoteView_IndicatorsCard_RSIPreserved(t *testing.T) {
+	model := NewModel()
+	model.width = 80
+	model.state = StateLoaded
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
+		Indicators: &trenddomain.Result{
+			Symbol:       "AAPL",
+			RSI:          50,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1,
+			TPI:          0.67,
+			TPISignal:    "LONG",
+		},
+	}
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
+
+	assert.Contains(t, card, "RSI(14):", "Should display RSI label")
+	assert.Contains(t, card, "50.0", "Should display RSI value")
+	assert.Contains(t, card, "Fair value", "Should display RSI valuation")
+	assert.Contains(t, card, "█", "Should display RSI progress bar")
 }
 
 // TestQuoteView_ChangeDisplay_BullishIcon verifies ▲ icon for positive change.
@@ -913,11 +1192,13 @@ func TestQuoteView_PriceRendered(t *testing.T) {
 			LastTradingDay: "2026-04-01",
 		},
 		Indicators: &trenddomain.Result{
-			Symbol:  "AAPL",
-			RSI:     52.3,
-			EMAFast: 154.00,
-			EMASlow: 153.50,
-			Signal:  trenddomain.Bullish,
+			Symbol:       "AAPL",
+			RSI:          52.3,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1,
+			TPI:          0.67,
+			TPISignal:    "LONG",
 		},
 	}
 
@@ -987,118 +1268,6 @@ func TestQuoteView_DayRangeBar_PriceAtHigh(t *testing.T) {
 	// When price is at high, bar should be fully filled (no empty blocks)
 	assert.Contains(t, bar, "▓", "Should contain filled block character")
 	assert.NotContains(t, bar, "░", "Should not contain empty block character when at high")
-}
-
-// TestQuoteView_EMACrossover_Bullish verifies bullish crossover display.
-func TestQuoteView_EMACrossover_Bullish(t *testing.T) {
-	model := NewModel()
-	model.width = 80
-	model.state = StateLoaded
-	model.quoteData = &QuoteData{
-		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
-		Indicators: &trenddomain.Result{
-			Symbol:  "AAPL",
-			RSI:     52.3,
-			EMAFast: 150,
-			EMASlow: 145,
-			Signal:  trenddomain.Bullish,
-		},
-	}
-
-	view := NewView(model).SetTheme(&defaultTheme{})
-	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
-
-	assert.Contains(t, card, "above", "Should show 'above' for bullish crossover")
-	assert.Contains(t, card, "$5.00", "Should show correct delta amount")
-}
-
-// TestQuoteView_EMACrossover_Bearish verifies bearish crossover display.
-func TestQuoteView_EMACrossover_Bearish(t *testing.T) {
-	model := NewModel()
-	model.width = 80
-	model.state = StateLoaded
-	model.quoteData = &QuoteData{
-		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
-		Indicators: &trenddomain.Result{
-			Symbol:  "AAPL",
-			RSI:     52.3,
-			EMAFast: 140,
-			EMASlow: 145,
-			Signal:  trenddomain.Bearish,
-		},
-	}
-
-	view := NewView(model).SetTheme(&defaultTheme{})
-	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
-
-	assert.Contains(t, card, "below", "Should show 'below' for bearish crossover")
-	assert.Contains(t, card, "$5.00", "Should show correct delta amount")
-}
-
-// TestQuoteView_EMACrossover_Converged verifies converged EMAs display.
-func TestQuoteView_EMACrossover_Converged(t *testing.T) {
-	model := NewModel()
-	model.width = 80
-	model.state = StateLoaded
-	model.quoteData = &QuoteData{
-		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
-		Indicators: &trenddomain.Result{
-			Symbol:  "AAPL",
-			RSI:     52.3,
-			EMAFast: 145,
-			EMASlow: 145,
-			Signal:  trenddomain.Bearish, // Equality is treated as Bearish
-		},
-	}
-
-	view := NewView(model).SetTheme(&defaultTheme{})
-	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
-
-	assert.Contains(t, card, "converged", "Should show 'converged' when EMAs are equal")
-}
-
-// TestQuoteView_TrendBadge_Bullish verifies bullish badge.
-func TestQuoteView_TrendBadge_Bullish(t *testing.T) {
-	model := NewModel()
-	model.width = 80
-	model.state = StateLoaded
-	model.quoteData = &QuoteData{
-		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
-		Indicators: &trenddomain.Result{
-			Symbol:  "AAPL",
-			RSI:     52.3,
-			EMAFast: 150,
-			EMASlow: 145,
-			Signal:  trenddomain.Bullish,
-		},
-	}
-
-	view := NewView(model).SetTheme(&defaultTheme{})
-	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
-
-	assert.Contains(t, card, "▲ BULL", "Should show bullish badge")
-}
-
-// TestQuoteView_TrendBadge_Bearish verifies bearish badge.
-func TestQuoteView_TrendBadge_Bearish(t *testing.T) {
-	model := NewModel()
-	model.width = 80
-	model.state = StateLoaded
-	model.quoteData = &QuoteData{
-		Quote: &alphavantage.GlobalQuote{Symbol: "AAPL"},
-		Indicators: &trenddomain.Result{
-			Symbol:  "AAPL",
-			RSI:     52.3,
-			EMAFast: 140,
-			EMASlow: 145,
-			Signal:  trenddomain.Bearish,
-		},
-	}
-
-	view := NewView(model).SetTheme(&defaultTheme{})
-	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
-
-	assert.Contains(t, card, "▼ BEAR", "Should show bearish badge")
 }
 
 // TestQuoteView_IdleRecentLookups verifies recent lookups shown in idle state.

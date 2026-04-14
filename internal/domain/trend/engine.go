@@ -12,6 +12,7 @@ import (
 	"github.com/shinsekai/finterm/internal/cache"
 	"github.com/shinsekai/finterm/internal/config"
 	"github.com/shinsekai/finterm/internal/domain/blitz"
+	"github.com/shinsekai/finterm/internal/domain/destiny"
 	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 )
 
@@ -37,6 +38,10 @@ type Result struct {
 	BlitzTSI float64
 	// BlitzRSISmooth is the latest smoothed RSI value from BLITZ.
 	BlitzRSISmooth float64
+	// DESTINY trend following system results.
+	DestinyScore     int     // +1 (long), -1 (short), 0 (hold)
+	DestinyTPI       float64 // Trend Probability Indicator value
+	DestinyRSISmooth float64 // Smoothed RSI from DESTINY
 }
 
 // CryptoDataFetcher fetches OHLCV data for cryptocurrency symbols.
@@ -127,6 +132,8 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	var err error
 	var blitzScore int
 	var blitzTSI, blitzRSISmooth float64
+	var destinyScore int
+	var destinyTPI, destinyRSISmooth float64
 
 	// Route to appropriate indicator path based on asset class
 	switch assetClass {
@@ -185,14 +192,17 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 				}
 			}
 
-			// Extract close prices and compute BLITZ
+			// Extract close prices and compute BLITZ and DESTINY
 			if tsData != nil {
 				closes, err := extractClosePricesFromTimeSeries(tsData)
 				if err != nil {
-					fmt.Printf("warning: failed to extract close prices for BLITZ computation for %s: %v\n", symbol, err)
+					fmt.Printf("warning: failed to extract close prices for BLITZ/DESTINY computation for %s: %v\n", symbol, err)
 					blitzScore, blitzTSI, blitzRSISmooth = 0, 0, 0
+					destinyScore, destinyTPI, destinyRSISmooth = 0, 0, 0
 				} else {
 					blitzScore, blitzTSI, blitzRSISmooth = computeBlitz(closes)
+					// Compute DESTINY after BLITZ
+					destinyScore, destinyTPI, destinyRSISmooth = computeDestiny(closes)
 				}
 			}
 		}
@@ -233,12 +243,14 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 			return nil, fmt.Errorf("computing local EMA slow for %s: %w", symbol, err)
 		}
 
-		// Compute BLITZ score for crypto using existing OHLCV data
+		// Compute BLITZ and DESTINY score for crypto using existing OHLCV data
 		closes := make([]float64, len(ohlcvData))
 		for i, ohlcv := range ohlcvData {
 			closes[i] = ohlcv.Close
 		}
 		blitzScore, blitzTSI, blitzRSISmooth = computeBlitz(closes)
+		// Compute DESTINY score for crypto using existing OHLCV data
+		destinyScore, destinyTPI, destinyRSISmooth = computeDestiny(closes)
 
 	default:
 		return nil, fmt.Errorf("unsupported asset class: %v", assetClass)
@@ -268,16 +280,19 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	valuation := computeValuation(rsi, e.cfg.Valuation)
 
 	return &Result{
-		Symbol:         strings.ToUpper(symbol),
-		Price:          price,
-		RSI:            rsi,
-		EMAFast:        emaFast,
-		EMASlow:        emaSlow,
-		Signal:         signal,
-		Valuation:      valuation,
-		BlitzScore:     blitzScore,
-		BlitzTSI:       blitzTSI,
-		BlitzRSISmooth: blitzRSISmooth,
+		Symbol:           strings.ToUpper(symbol),
+		Price:            price,
+		RSI:              rsi,
+		EMAFast:          emaFast,
+		EMASlow:          emaSlow,
+		Signal:           signal,
+		Valuation:        valuation,
+		BlitzScore:       blitzScore,
+		BlitzTSI:         blitzTSI,
+		BlitzRSISmooth:   blitzRSISmooth,
+		DestinyScore:     destinyScore,
+		DestinyTPI:       destinyTPI,
+		DestinyRSISmooth: destinyRSISmooth,
 	}, nil
 }
 
@@ -352,6 +367,30 @@ func computeBlitz(closes []float64) (score int, tsi, rsiSmooth float64) {
 		return 0, 0, 0
 	}
 	return int(blitzResult.Current), blitzResult.TSI, blitzResult.RSISmooth
+}
+
+// computeDestiny computes DESTINY signal from close prices.
+// Returns score=0 if computation fails (e.g., insufficient data).
+func computeDestiny(closes []float64) (score int, tpi, rsiSmooth float64) {
+	// Convert closes to destiny.OHLCV format
+	ohlcvData := make([]destiny.OHLCV, len(closes))
+	for i, close := range closes {
+		ohlcvData[i] = destiny.OHLCV{
+			Date:   float64(i),
+			Open:   close,
+			High:   close,
+			Low:    close,
+			Close:  close,
+			Volume: 0,
+		}
+	}
+
+	destinyResult, err := destiny.Compute(ohlcvData, destiny.DefaultConfig())
+	if err != nil {
+		// DESTINY computation failed - return default values
+		return 0, 0, 0
+	}
+	return destinyResult.Score, destinyResult.TPI, destinyResult.RSISmooth
 }
 
 // AnalyzeWithSymbolDetection performs trend analysis with automatic asset class detection.

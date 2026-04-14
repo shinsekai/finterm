@@ -106,6 +106,7 @@ func (v *View) renderTitle() string {
 func (v *View) renderSummary() string {
 	bullish, bearish, neutral := v.model.GetSignalCounts()
 	long, short, hold := v.model.GetBlitzCounts()
+	destinyLong, destinyShort, destinyHold := v.model.GetDestinyCounts()
 
 	var summary strings.Builder
 
@@ -164,6 +165,32 @@ func (v *View) renderSummary() string {
 		summary.WriteString(v.theme.Muted().Render(blitz.String()))
 	}
 
+	// DESTINY summary line (on a new line after BLITZ)
+	if destinyLong > 0 || destinyShort > 0 || destinyHold > 0 {
+		var destiny strings.Builder
+		destiny.WriteString("DESTINY: ")
+		if destinyLong > 0 {
+			destiny.WriteString(v.theme.Bullish().Render(fmt.Sprintf("%d LONG", destinyLong)))
+		}
+		if destinyShort > 0 {
+			if destiny.Len() > 9 { // "DESTINY: " length
+				destiny.WriteString("  ")
+			}
+			destiny.WriteString(v.theme.Bearish().Render(fmt.Sprintf("%d SHORT", destinyShort)))
+		}
+		if destinyHold > 0 {
+			if destiny.Len() > 9 { // "DESTINY: " length
+				destiny.WriteString("  ")
+			}
+			destiny.WriteString(v.theme.Muted().Render(fmt.Sprintf("%d HOLD", destinyHold)))
+		}
+
+		if summary.Len() > 0 {
+			summary.WriteString("\n")
+		}
+		summary.WriteString(v.theme.Muted().Render(destiny.String()))
+	}
+
 	return summary.String()
 }
 
@@ -216,6 +243,13 @@ func (v *View) buildColumns() []components.Column {
 		},
 		{
 			Title:       "BLITZ",
+			Width:       10,
+			Alignment:   components.AlignCenter,
+			Style:       v.theme.TableRow(),
+			HeaderStyle: v.theme.TableHeader(),
+		},
+		{
+			Title:       "DESTINY",
 			Width:       10,
 			Alignment:   components.AlignCenter,
 			Style:       v.theme.TableRow(),
@@ -295,7 +329,7 @@ func (v *View) buildTableRows(rows []RowData) []components.Row {
 	cryptoStartIndex := v.model.GetCryptoStartIndex()
 	if cryptoStartIndex > 0 && cryptoStartIndex < len(rows) {
 		// Insert separator at the crypto start position
-		separatorCells := make([]components.Cell, 8)
+		separatorCells := make([]components.Cell, 9)
 		separatorCells[0].Text = v.theme.Divider().Render("── Crypto ──")
 		// All other cells remain empty
 
@@ -339,6 +373,7 @@ func (v *View) buildLoadingCells(row RowData) []components.Cell {
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -350,6 +385,7 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 		{Text: v.theme.Accent().Render(result.Symbol)},
 		{Text: v.renderSignalBadge(result.Signal)},
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
+		{Text: v.renderDestinyBadge(result.DestinyScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
 		{Text: FormatValue(result.EMAFast, 2)},
@@ -369,6 +405,7 @@ func (v *View) buildCachedCells(row RowData) []components.Cell {
 		{Text: symbolWithBadge},
 		{Text: v.renderSignalBadge(result.Signal)},
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
+		{Text: v.renderDestinyBadge(result.DestinyScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
 		{Text: FormatValue(result.EMAFast, 2)},
@@ -394,6 +431,7 @@ func (v *View) buildErrorCells(row RowData) []components.Cell {
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -402,6 +440,7 @@ func (v *View) buildUnknownCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
 		{Text: v.theme.Muted().Render("Unknown")},
+		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
@@ -443,6 +482,18 @@ func (v *View) renderBlitzBadge(blitzScore int) string {
 		return v.theme.BearishBadge().Render("▼ SHORT")
 	default:
 		return v.theme.NeutralBadge().Render("─ HOLD")
+	}
+}
+
+// renderDestinyBadge renders a DESTINY score as a colored badge.
+func (v *View) renderDestinyBadge(destinyScore int) string {
+	switch destinyScore {
+	case 1:
+		return v.theme.BullishBadge().Render("▲ LONG")
+	case -1:
+		return v.theme.BearishBadge().Render("▼ SHORT")
+	default:
+		return v.theme.Muted().Render("○ HOLD")
 	}
 }
 

@@ -613,3 +613,92 @@ func TestTrendModel_GetBlitzCounts_CachedRows(t *testing.T) {
 	assert.Equal(t, 0, short, "Should have 0 SHORT signals")
 	assert.Equal(t, 0, hold, "Should have 0 HOLD signals")
 }
+
+// TestTrendModel_GetDestinyCounts_MixedSignals verifies GetDestinyCounts correctly
+// counts LONG, SHORT, and HOLD DESTINY signals.
+func TestTrendModel_GetDestinyCounts_MixedSignals(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
+
+	destinyScores := []int{1, 1, -1, 0, -1}
+
+	for i, score := range destinyScores {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:       model.rows[i].Symbol,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: score,
+			Price:        100.0,
+		}
+	}
+
+	long, short, hold := model.GetDestinyCounts()
+
+	assert.Equal(t, 2, long, "Should count 2 LONG signals")
+	assert.Equal(t, 2, short, "Should count 2 SHORT signals")
+	assert.Equal(t, 1, hold, "Should count 1 HOLD signal")
+}
+
+// TestTrendModel_GetDestinyCounts_IgnoresLoadingRows verifies GetDestinyCounts
+// ignores rows that are still loading or in error state.
+func TestTrendModel_GetDestinyCounts_IgnoresLoadingRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL")
+
+	// Set only one row to loaded
+	model.rows[0].State = StateLoaded
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:       "AAPL",
+		Signal:       trenddomain.Bullish,
+		BlitzScore:   1,
+		DestinyScore: 1,
+		Price:        100.0,
+	}
+
+	// Set second row to error
+	model.rows[1].State = StateError
+	model.rows[1].Error = errors.New("network error")
+
+	// Third row remains in loading state
+	// rows[2] stays in StateLoading
+
+	long, short, hold := model.GetDestinyCounts()
+
+	assert.Equal(t, 1, long, "Should count 1 LONG signal (only loaded row)")
+	assert.Equal(t, 0, short, "Should have 0 SHORT signals")
+	assert.Equal(t, 0, hold, "Should have 0 HOLD signals")
+}
+
+// TestTrendModel_GetDestinyCounts_EmptyRows verifies GetDestinyCounts returns
+// all zeros when there are no loaded rows.
+func TestTrendModel_GetDestinyCounts_EmptyRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{})
+
+	// No rows at all
+	long, short, hold := model.GetDestinyCounts()
+
+	assert.Equal(t, 0, long, "Should have 0 LONG signals when empty")
+	assert.Equal(t, 0, short, "Should have 0 SHORT signals when empty")
+	assert.Equal(t, 0, hold, "Should have 0 HOLD signals when empty")
+}
+
+// TestTrendModel_GetDestinyCounts_CachedRows verifies GetDestinyCounts
+// includes cached rows in count.
+func TestTrendModel_GetDestinyCounts_CachedRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL")
+
+	// Set row to cached state
+	model.rows[0].State = StateCached
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:       "AAPL",
+		Signal:       trenddomain.Bullish,
+		BlitzScore:   1,
+		DestinyScore: 1,
+		Price:        100.0,
+	}
+
+	long, short, hold := model.GetDestinyCounts()
+
+	assert.Equal(t, 1, long, "Should count cached row as LONG")
+	assert.Equal(t, 0, short, "Should have 0 SHORT signals")
+	assert.Equal(t, 0, hold, "Should have 0 HOLD signals")
+}

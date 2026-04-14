@@ -92,6 +92,13 @@ blitz:
   # RSI smooth threshold for long/short signal generation.
   threshold: 48
 
+# DESTINY trend following system configuration.
+destiny:
+  ma_length: 45                    # Base period for 7 MAs (DEMA uses 2×, TEMA uses 3×)
+  rsi_length: 18                   # Dynamic RSI lookback period
+  rsi_threshold: 56                # RSI smooth threshold for signal confirmation
+  lsma_offset: 6                   # LSMA projection offset
+
 # Cache TTL settings for different data types.
 cache:
   # Time to live for intraday quotes.

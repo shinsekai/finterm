@@ -133,13 +133,13 @@ func TestTrendModel_View_LoadingState(t *testing.T) {
 	rendered := view.Render()
 
 	assert.Contains(t, rendered, "Trend Analysis", "View should contain title")
-	assert.Contains(t, rendered, "Loading…", "View should contain loading indicator for tickers")
+	assert.Contains(t, rendered, "pending", "View should contain pending indicator")
 	assert.Contains(t, rendered, "AAPL", "View should contain AAPL symbol")
 	assert.Contains(t, rendered, "MSFT", "View should contain MSFT symbol")
 	assert.Contains(t, rendered, "navigate", "View should contain navigation help")
 	assert.Contains(t, rendered, "refresh", "View should contain refresh help")
-	// BLITZ column should show "—" for loading rows
-	assert.Contains(t, rendered, "—", "View should contain em dash for missing values in BLITZ column")
+	// TPI, FTEMA, BLITZ columns should show "—" for loading rows
+	assert.Contains(t, rendered, "—", "View should contain em dash for missing values")
 }
 
 // TestTrendModel_View_LoadedState verifies rendering in loaded state with data.
@@ -155,6 +155,8 @@ func TestTrendModel_View_LoadedState(t *testing.T) {
 		EMASlow:    145.75,
 		Signal:     trenddomain.Bullish,
 		BlitzScore: 1,
+		TPI:        0.67,
+		TPISignal:  "LONG",
 	}
 	model.rows[0].State = StateLoaded
 	model.rows[0].Result = result
@@ -164,11 +166,9 @@ func TestTrendModel_View_LoadedState(t *testing.T) {
 
 	assert.Contains(t, rendered, "Trend Analysis", "View should contain title")
 	assert.Contains(t, rendered, "AAPL", "View should contain AAPL symbol")
-	assert.Contains(t, rendered, "BULL", "View should contain bullish signal badge")
-	assert.Contains(t, rendered, "LONG", "View should contain BLITZ LONG badge")
-	assert.Contains(t, rendered, "50.50", "View should contain RSI value")
-	assert.Contains(t, rendered, "150.25", "View should contain EMA fast value")
-	assert.Contains(t, rendered, "145.75", "View should contain EMA slow value")
+	assert.Contains(t, rendered, "BULL", "View should contain FTEMA BULL badge")
+	assert.Contains(t, rendered, "LONG", "View should contain TPI LONG label")
+	assert.Contains(t, rendered, "▓", "View should contain TPI gauge bars")
 	assert.Contains(t, rendered, "$155.50", "View should contain dollar-prefixed price")
 }
 
@@ -201,7 +201,7 @@ func TestTrendModel_View_MixedState(t *testing.T) {
 	assert.Contains(t, rendered, "BULL", "View should contain bullish signal for AAPL")
 	assert.Contains(t, rendered, "LONG", "View should contain BLITZ LONG for AAPL")
 	assert.Contains(t, rendered, "API error", "View should contain error for MSFT")
-	assert.Contains(t, rendered, "Loading…", "View should contain loading for GOOGL")
+	assert.Contains(t, rendered, "pending", "View should contain pending indicator for GOOGL")
 }
 
 // TestTrendModel_View_EmptyWatchlist verifies rendering with empty watchlist.
@@ -348,6 +348,8 @@ func TestTrendModel_View_RenderTableColumns(t *testing.T) {
 		EMASlow:    145.0,
 		Signal:     trenddomain.Bullish,
 		BlitzScore: 1,
+		TPI:        0.67,
+		TPISignal:  "LONG",
 	}
 
 	view := NewView(model).SetTheme(&mockTheme{})
@@ -355,12 +357,16 @@ func TestTrendModel_View_RenderTableColumns(t *testing.T) {
 
 	// Check column headers
 	assert.Contains(t, rendered, "SYMBOL", "View should have SYMBOL column")
-	assert.Contains(t, rendered, "SIGNAL", "View should have SIGNAL column")
+	assert.Contains(t, rendered, "TPI", "View should have TPI column")
+	assert.Contains(t, rendered, "FTEMA", "View should have FTEMA column")
 	assert.Contains(t, rendered, "BLITZ", "View should have BLITZ column")
 	assert.Contains(t, rendered, "RSI", "View should have RSI column")
-	assert.Contains(t, rendered, "EMA FAST", "View should have EMA FAST column")
-	assert.Contains(t, rendered, "EMA SLOW", "View should have EMA SLOW column")
 	assert.Contains(t, rendered, "VALUATION", "View should have VALUATION column")
+
+	// Verify old columns are NOT present
+	assert.NotContains(t, rendered, "SIGNAL", "View should NOT have SIGNAL column")
+	assert.NotContains(t, rendered, "EMA FAST", "View should NOT have EMA FAST column")
+	assert.NotContains(t, rendered, "EMA SLOW", "View should NOT have EMA SLOW column")
 }
 
 // TestTrendModel_View_DefaultTheme verifies view works with default theme.
@@ -566,82 +572,6 @@ func TestTrendView_TitleWithIcon(t *testing.T) {
 	title := view.renderTitle()
 	assert.Contains(t, title, "◆", "Title should contain diamond icon")
 	assert.Contains(t, title, "Trend Analysis", "Title should contain text")
-}
-
-// TestTrendView_SummaryBar_Counts verifies signal summary bar shows correct counts.
-func TestTrendView_SummaryBar_Counts(t *testing.T) {
-	model := newTestModelForView("AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
-
-	// Set up 3 bullish, 2 bearish (no neutral signal exists in domain)
-	signals := []trenddomain.Signal{
-		trenddomain.Bullish,
-		trenddomain.Bullish,
-		trenddomain.Bullish,
-		trenddomain.Bearish,
-		trenddomain.Bearish,
-	}
-	blitzScores := []int{1, 1, 0, -1, -1}
-
-	for i, signal := range signals {
-		model.rows[i].State = StateLoaded
-		model.rows[i].Result = &trenddomain.Result{
-			Symbol:     model.rows[i].Symbol,
-			Signal:     signal,
-			BlitzScore: blitzScores[i],
-			Price:      100.0,
-			RSI:        50.0,
-			EMAFast:    100.0,
-			EMASlow:    90.0,
-		}
-	}
-
-	view := NewView(model).SetTheme(&mockTheme{})
-	summary := view.renderSummary()
-
-	assert.Contains(t, summary, "3 ▲", "Summary should show 3 bullish signals")
-	assert.Contains(t, summary, "2 ▼", "Summary should show 2 bearish signals")
-	assert.Contains(t, summary, "BLITZ:", "Summary should show BLITZ label")
-	assert.Contains(t, summary, "2 LONG", "Summary should show 2 BLITZ LONG")
-	assert.Contains(t, summary, "2 SHORT", "Summary should show 2 BLITZ SHORT")
-	assert.Contains(t, summary, "1 HOLD", "Summary should show 1 BLITZ HOLD")
-}
-
-// TestTrendView_SummaryBar_WithPending verifies pending count is shown during loading.
-func TestTrendView_SummaryBar_WithPending(t *testing.T) {
-	model := newTestModelForView("AAPL", "MSFT", "BTC")
-
-	// Set 2 loaded, 1 loading
-	model.rows[0].State = StateLoaded
-	model.rows[0].Result = &trenddomain.Result{
-		Symbol:     "AAPL",
-		Signal:     trenddomain.Bullish,
-		BlitzScore: 1,
-		Price:      100.0,
-		RSI:        50.0,
-		EMAFast:    100.0,
-		EMASlow:    90.0,
-	}
-	model.rows[1].State = StateLoaded
-	model.rows[1].Result = &trenddomain.Result{
-		Symbol:     "MSFT",
-		Signal:     trenddomain.Bearish,
-		BlitzScore: -1,
-		Price:      100.0,
-		RSI:        50.0,
-		EMAFast:    100.0,
-		EMASlow:    90.0,
-	}
-	// rows[2] stays in loading state
-
-	view := NewView(model).SetTheme(&mockTheme{})
-	summary := view.renderSummary()
-
-	assert.Contains(t, summary, "1 ▲", "Summary should show 1 bullish signal")
-	assert.Contains(t, summary, "1 ▼", "Summary should show 1 bearish signal")
-	assert.Contains(t, summary, "1 pending", "Summary should show 1 pending")
-	assert.Contains(t, summary, "BLITZ:", "Summary should show BLITZ label")
-	assert.Contains(t, summary, "1 LONG", "Summary should show 1 BLITZ LONG")
-	assert.Contains(t, summary, "1 SHORT", "Summary should show 1 BLITZ SHORT")
 }
 
 // TestTrendView_SummaryBar_HiddenWhenEmpty verifies summary bar is hidden when watchlist is empty.
@@ -1013,8 +943,8 @@ func TestTrendView_BlitzColumn_Loading(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 	cells := view.buildLoadingCells(model.rows[0])
 
-	// BLITZ is the 3rd column (index 2)
-	assert.Equal(t, "—", cells[2].Text, "BLITZ column should show '—' for loading rows")
+	// BLITZ is the 4th column (index 3) in the new 8-column layout
+	assert.Equal(t, "—", cells[3].Text, "BLITZ column should show '—' for loading rows")
 }
 
 // TestTrendView_BlitzColumn_Error verifies "—" for error rows in BLITZ column.
@@ -1026,8 +956,8 @@ func TestTrendView_BlitzColumn_Error(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 	cells := view.buildErrorCells(model.rows[0])
 
-	// BLITZ is the 3rd column (index 2)
-	assert.Equal(t, "—", cells[2].Text, "BLITZ column should show '—' for error rows")
+	// BLITZ is the 4th column (index 3) in the new 8-column layout
+	assert.Equal(t, "—", cells[3].Text, "BLITZ column should show '—' for error rows")
 }
 
 // TestTrendView_BlitzColumn_Unknown verifies "—" for unknown state rows in BLITZ column.
@@ -1038,8 +968,8 @@ func TestTrendView_BlitzColumn_Unknown(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 	cells := view.buildUnknownCells(model.rows[0])
 
-	// BLITZ is the 3rd column (index 2)
-	assert.Equal(t, "—", cells[2].Text, "BLITZ column should show '—' for unknown state rows")
+	// BLITZ is the 4th column (index 3) in the new 8-column layout
+	assert.Equal(t, "—", cells[3].Text, "BLITZ column should show '—' for unknown state rows")
 }
 
 // TestTrendView_BlitzColumn_Loaded verifies correct BLITZ badge for loaded rows.
@@ -1071,8 +1001,8 @@ func TestTrendView_BlitzColumn_Loaded(t *testing.T) {
 			view := NewView(model).SetTheme(&mockTheme{})
 			cells := view.buildLoadedCells(model.rows[0])
 
-			// BLITZ is the 3rd column (index 2)
-			assert.Contains(t, cells[2].Text, tt.shouldHave, "BLITZ column should show correct badge")
+			// BLITZ is the 4th column (index 3) in the new 8-column layout
+			assert.Contains(t, cells[3].Text, tt.shouldHave, "BLITZ column should show correct badge")
 		})
 	}
 }
@@ -1094,8 +1024,8 @@ func TestTrendView_BlitzColumn_Cached(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 	cells := view.buildCachedCells(model.rows[0])
 
-	// BLITZ is the 3rd column (index 2)
-	assert.Contains(t, cells[2].Text, "▲ LONG", "BLITZ column should show LONG badge for cached rows")
+	// BLITZ is the 4th column (index 3) in the new 8-column layout
+	assert.Contains(t, cells[3].Text, "▲ LONG", "BLITZ column should show LONG badge for cached rows")
 }
 
 // TestTrendView_ValuationColors verifies valuation color coding.
@@ -1246,7 +1176,7 @@ func TestTrendView_DestinyColumn_Loaded(t *testing.T) {
 			cells := view.buildLoadedCells(model.rows[0])
 
 			// DESTINY is 4th column (index 3)
-			assert.Contains(t, cells[3].Text, tt.shouldHave, "DESTINY column should show correct badge for loaded rows")
+			assert.Contains(t, cells[4].Text, tt.shouldHave, "DESTINY column should show correct badge for loaded rows")
 		})
 	}
 }
@@ -1259,7 +1189,7 @@ func TestTrendView_DestinyColumn_Loading(t *testing.T) {
 	cells := view.buildLoadingCells(model.rows[0])
 
 	// DESTINY is 4th column (index 3)
-	assert.Equal(t, "—", cells[3].Text, "DESTINY column should show '—' for loading rows")
+	assert.Equal(t, "—", cells[4].Text, "DESTINY column should show '—' for loading rows")
 }
 
 // TestTrendView_DestinyColumn_Error verifies "—" for error rows in DESTINY column.
@@ -1272,7 +1202,7 @@ func TestTrendView_DestinyColumn_Error(t *testing.T) {
 	cells := view.buildErrorCells(model.rows[0])
 
 	// DESTINY is 4th column (index 3)
-	assert.Equal(t, "—", cells[3].Text, "DESTINY column should show '—' for error rows")
+	assert.Equal(t, "—", cells[4].Text, "DESTINY column should show '—' for error rows")
 }
 
 // TestTrendView_DestinyColumn_Unknown verifies "—" for unknown state rows in DESTINY column.
@@ -1284,7 +1214,7 @@ func TestTrendView_DestinyColumn_Unknown(t *testing.T) {
 	cells := view.buildUnknownCells(model.rows[0])
 
 	// DESTINY is 4th column (index 3)
-	assert.Equal(t, "—", cells[3].Text, "DESTINY column should show '—' for unknown state rows")
+	assert.Equal(t, "—", cells[4].Text, "DESTINY column should show '—' for unknown state rows")
 }
 
 // TestTrendView_DestinySummary verifies DESTINY summary line with correct counts.
@@ -1364,4 +1294,205 @@ func TestTrendView_DestinySummary_Empty(t *testing.T) {
 	// Summary bar should not be rendered when watchlist is empty
 	assert.Contains(t, rendered, "Trend Analysis", "View should contain title")
 	assert.NotContains(t, rendered, "DESTINY:", "View should not show DESTINY summary when empty")
+}
+
+// TestTrendView_TPICell_Positive verifies TPI cell with positive value.
+func TestTrendView_TPICell_Positive(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	tpiCell := view.renderTPICell(0.67, "LONG")
+	assert.Contains(t, tpiCell, "LONG", "Positive TPI should show LONG label")
+	assert.Contains(t, tpiCell, "▓", "Positive TPI should show filled gauge bars")
+}
+
+// TestTrendView_TPICell_Zero verifies TPI cell with zero value.
+func TestTrendView_TPICell_Zero(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	tpiCell := view.renderTPICell(0.0, "CASH")
+	assert.Contains(t, tpiCell, "CASH", "Zero TPI should show CASH label")
+	assert.Contains(t, tpiCell, "░", "Zero TPI should show empty gauge bars")
+}
+
+// TestTrendView_TPICell_Negative verifies TPI cell with negative value.
+func TestTrendView_TPICell_Negative(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	tpiCell := view.renderTPICell(-0.67, "CASH")
+	assert.Contains(t, tpiCell, "CASH", "Negative TPI should show CASH label")
+	assert.Contains(t, tpiCell, "▓", "Negative TPI should show filled gauge bars")
+}
+
+// TestTrendView_TPICell_MaxPositive verifies TPI cell with max positive value.
+func TestTrendView_TPICell_MaxPositive(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	tpiCell := view.renderTPICell(1.0, "LONG")
+	assert.Contains(t, tpiCell, "LONG", "Max positive TPI should show LONG label")
+	assert.Contains(t, tpiCell, "▓▓▓▓▓", "Max positive TPI should show 5 filled gauge bars on right")
+}
+
+// TestTrendView_TPICell_MaxNegative verifies TPI cell with max negative value.
+func TestTrendView_TPICell_MaxNegative(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	tpiCell := view.renderTPICell(-1.0, "CASH")
+	assert.Contains(t, tpiCell, "CASH", "Max negative TPI should show CASH label")
+	assert.Contains(t, tpiCell, "▓▓▓▓▓", "Max negative TPI should show 5 filled gauge bars on left")
+}
+
+// TestTrendView_FTEMABadge_Bull verifies bullish FTEMA badge rendering.
+func TestTrendView_FTEMABadge_Bull(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	badge := view.renderFTEMABadge(trenddomain.Bullish)
+	assert.Contains(t, badge, "▲ BULL", "Bullish badge should show arrow and BULL")
+}
+
+// TestTrendView_FTEMABadge_Bear verifies bearish FTEMA badge rendering.
+func TestTrendView_FTEMABadge_Bear(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	badge := view.renderFTEMABadge(trenddomain.Bearish)
+	assert.Contains(t, badge, "▼ BEAR", "Bearish badge should show arrow and BEAR")
+}
+
+// TestTrendView_NoEMAColumns verifies EMA columns are not in output.
+func TestTrendView_NoEMAColumns(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	model.rows[0].State = StateLoaded
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:     "AAPL",
+		RSI:        50.0,
+		EMAFast:    150.0,
+		EMASlow:    145.0,
+		Signal:     trenddomain.Bullish,
+		BlitzScore: 1,
+		TPI:        0.67,
+		TPISignal:  "LONG",
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	// Verify EMA columns are NOT present
+	assert.NotContains(t, rendered, "EMA FAST", "View should NOT have EMA FAST column header")
+	assert.NotContains(t, rendered, "EMA SLOW", "View should NOT have EMA SLOW column header")
+}
+
+// TestTrendView_TPISummary verifies TPI summary line with correct counts.
+func TestTrendView_TPISummary(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
+
+	// Set up 3 LONG, 2 CASH
+	for i, symbol := range []string{"AAPL", "MSFT", "GOOGL", "NVDA", "AMZN"} {
+		model.rows[i].State = StateLoaded
+		tpiSignal := "CASH"
+		if i < 3 {
+			tpiSignal = "LONG"
+		}
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:     symbol,
+			Signal:     trenddomain.Bullish,
+			BlitzScore: 1,
+			Price:      100.0,
+			RSI:        50.0,
+			EMAFast:    100.0,
+			EMASlow:    90.0,
+			TPI:        0.67,
+			TPISignal:  tpiSignal,
+		}
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	summary := view.renderSummary()
+
+	assert.Contains(t, summary, "3 LONG", "Summary should show 3 LONG")
+	assert.Contains(t, summary, "2 CASH", "Summary should show 2 CASH")
+}
+
+// TestTrendView_SummaryBar_Counts verifies signal summary bar shows correct counts.
+func TestTrendView_SummaryBar_Counts(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
+
+	// Set up 3 LONG, 2 CASH
+	blitzScores := []int{1, 1, 0, -1, -1}
+
+	for i, symbol := range []string{"AAPL", "MSFT", "GOOGL", "NVDA", "AMZN"} {
+		model.rows[i].State = StateLoaded
+		tpiSignal := "CASH"
+		if i < 3 {
+			tpiSignal = "LONG"
+		}
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:     symbol,
+			Signal:     trenddomain.Bullish,
+			BlitzScore: blitzScores[i],
+			Price:      100.0,
+			RSI:        50.0,
+			EMAFast:    100.0,
+			EMASlow:    90.0,
+			TPI:        0.67,
+			TPISignal:  tpiSignal,
+		}
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	summary := view.renderSummary()
+
+	assert.Contains(t, summary, "3 LONG", "Summary should show 3 LONG")
+	assert.Contains(t, summary, "2 CASH", "Summary should show 2 CASH")
+	assert.Contains(t, summary, "BLITZ:", "Summary should show BLITZ label")
+	assert.Contains(t, summary, "2 LONG", "Summary should show 2 BLITZ LONG")
+	assert.Contains(t, summary, "2 SHORT", "Summary should show 2 BLITZ SHORT")
+	assert.Contains(t, summary, "1 HOLD", "Summary should show 1 BLITZ HOLD")
+}
+
+// TestTrendView_SummaryBar_WithPending verifies pending count is shown during loading.
+func TestTrendView_SummaryBar_WithPending(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "BTC")
+
+	// Set 2 loaded, 1 loading
+	model.rows[0].State = StateLoaded
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:     "AAPL",
+		Signal:     trenddomain.Bullish,
+		BlitzScore: 1,
+		Price:      100.0,
+		RSI:        50.0,
+		EMAFast:    100.0,
+		EMASlow:    90.0,
+		TPI:        0.67,
+		TPISignal:  "LONG",
+	}
+	model.rows[1].State = StateLoaded
+	model.rows[1].Result = &trenddomain.Result{
+		Symbol:     "MSFT",
+		Signal:     trenddomain.Bearish,
+		BlitzScore: -1,
+		Price:      100.0,
+		RSI:        50.0,
+		EMAFast:    100.0,
+		EMASlow:    90.0,
+		TPI:        0.0,
+		TPISignal:  "CASH",
+	}
+	// rows[2] stays in loading state
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	summary := view.renderSummary()
+
+	assert.Contains(t, summary, "1 LONG", "Summary should show 1 LONG TPI signal")
+	assert.Contains(t, summary, "1 CASH", "Summary should show 1 CASH TPI signal")
+	assert.Contains(t, summary, "1 pending", "Summary should show 1 pending")
+	assert.Contains(t, summary, "BLITZ:", "Summary should show BLITZ label")
+	assert.Contains(t, summary, "1 LONG", "Summary should show 1 BLITZ LONG")
+	assert.Contains(t, summary, "1 SHORT", "Summary should show 1 BLITZ SHORT")
 }

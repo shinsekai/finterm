@@ -81,7 +81,7 @@ func DefaultConfig() *Config {
 			MaxRetries: 3,
 		},
 		Watchlist: WatchlistConfig{
-			Equities: []string{"AAPL", "MSFT", "GOOGL", "AMZN", "NVDA"},
+			Equities: []string{"QQQ", "SPY"},
 			Crypto:   []string{"BTC", "ETH", "SOL"},
 		},
 		Trend: TrendConfig{

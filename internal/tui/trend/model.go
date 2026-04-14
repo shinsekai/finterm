@@ -413,6 +413,27 @@ func (m Model) GetDestinyCounts() (long, short, hold int) {
 	return l, s, h
 }
 
+// GetTPICounts returns the count of LONG and CASH TPI signals
+// across all loaded rows. Loading and error rows are ignored.
+func (m Model) GetTPICounts() (long, cash int) {
+	var l, c int
+	for _, row := range m.rows {
+		if row.State != StateLoaded && row.State != StateCached {
+			continue
+		}
+		if row.Result == nil {
+			continue
+		}
+		switch row.Result.TPISignal {
+		case "LONG":
+			l++
+		case "CASH":
+			c++
+		}
+	}
+	return l, c
+}
+
 // KeyBindings returns the keyboard bindings for the trend view.
 func (m Model) KeyBindings() []components.KeyBinding {
 	return []components.KeyBinding{

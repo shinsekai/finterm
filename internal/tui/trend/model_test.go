@@ -702,3 +702,102 @@ func TestTrendModel_GetDestinyCounts_CachedRows(t *testing.T) {
 	assert.Equal(t, 0, short, "Should have 0 SHORT signals")
 	assert.Equal(t, 0, hold, "Should have 0 HOLD signals")
 }
+
+// TestTrendModel_GetTPICounts verifies GetTPICounts correctly
+// counts LONG and CASH TPI signals.
+func TestTrendModel_GetTPICounts(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
+
+	// Set up 3 LONG, 2 CASH
+	for i, symbol := range []string{"AAPL", "MSFT", "GOOGL", "NVDA", "AMZN"} {
+		tpiSignal := "CASH"
+		if i < 3 {
+			tpiSignal = "LONG"
+		}
+		updatedM, _ := model.Update(TrendDataMsg{
+			Symbol: symbol,
+			Result: &trenddomain.Result{
+				Symbol:     symbol,
+				Signal:     trenddomain.Bullish,
+				BlitzScore: 1,
+				TPI:        0.67,
+				TPISignal:  tpiSignal,
+			},
+		})
+		model = asModel(t, updatedM)
+	}
+
+	long, cash := model.GetTPICounts()
+
+	assert.Equal(t, 3, long, "Should count 3 LONG TPI signals")
+	assert.Equal(t, 2, cash, "Should count 2 CASH TPI signals")
+}
+
+// TestTrendModel_GetTPICounts_IgnoresLoadingRows verifies GetTPICounts
+// ignores rows that are still loading or in error state.
+func TestTrendModel_GetTPICounts_IgnoresLoadingRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL")
+
+	// Set only one row to loaded
+	updatedM, _ := model.Update(TrendDataMsg{
+		Symbol: "AAPL",
+		Result: &trenddomain.Result{
+			Symbol:     "AAPL",
+			Signal:     trenddomain.Bullish,
+			BlitzScore: 1,
+			TPI:        0.67,
+			TPISignal:  "LONG",
+		},
+	})
+	model = asModel(t, updatedM)
+
+	// Set one row to error
+	updatedM, _ = model.Update(TrendErrorMsg{Symbol: "MSFT", Err: errors.New("network error")})
+	model = asModel(t, updatedM)
+
+	// GOOGL remains in loading state
+
+	long, cash := model.GetTPICounts()
+
+	assert.Equal(t, 1, long, "Should count 1 LONG signal")
+	assert.Equal(t, 0, cash, "Should have 0 CASH signals")
+}
+
+// TestTrendModel_GetTPICounts_EmptyRows verifies GetTPICounts returns
+// zeros when there are no loaded rows.
+func TestTrendModel_GetTPICounts_EmptyRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{})
+
+	// No rows at all
+	long, cash := model.GetTPICounts()
+
+	assert.Equal(t, 0, long, "Should have 0 LONG signals")
+	assert.Equal(t, 0, cash, "Should have 0 CASH signals")
+}
+
+// TestTrendModel_GetTPICounts_CachedRows verifies GetTPICounts
+// includes cached rows in count.
+func TestTrendModel_GetTPICounts_CachedRows(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL")
+
+	// Set row to loaded
+	updatedM, _ := model.Update(TrendDataMsg{
+		Symbol: "AAPL",
+		Result: &trenddomain.Result{
+			Symbol:     "AAPL",
+			Signal:     trenddomain.Bullish,
+			BlitzScore: 1,
+			TPI:        0.67,
+			TPISignal:  "LONG",
+		},
+	})
+	model = asModel(t, updatedM)
+
+	// Manually set to cached state
+	model.rows[0].State = StateCached
+
+	long, cash := model.GetTPICounts()
+
+	assert.Equal(t, 1, long, "Should count cached row as LONG")
+	assert.Equal(t, 0, cash, "Should have 0 CASH signals")
+}

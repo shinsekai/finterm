@@ -146,13 +146,14 @@ func DynamicEMA(data []float64, maxLength int) []float64 {
 // The most recent value has the highest weight (len), the oldest has weight 1.
 //
 // For each bar i:
-//   len = DynamicLength(maxLength, i)
-//   Iterate j from 0 to len-1, looking back: value = data[i-j]
-//   Skip NaN values.
-//   weight = len - j (corrected from original Pine code which had weight = len - 1)
-//   weightedSum += value × weight
-//   normalizationFactor += weight
-//   result[i] = weightedSum / normalizationFactor (if > 0, else 0)
+//
+//	len = DynamicLength(maxLength, i)
+//	Iterate j from 0 to len-1, looking back: value = data[i-j]
+//	Skip NaN values.
+//	weight = len - j (corrected from original Pine code which had weight = len - 1)
+//	weightedSum += value × weight
+//	normalizationFactor += weight
+//	result[i] = weightedSum / normalizationFactor (if > 0, else 0)
 //
 // Note: The weight calculation uses "len - j" instead of "len - 1" from the original
 // Pine Script code, which was a typo that would give all elements the same weight.
@@ -223,9 +224,10 @@ func DynamicDEMA(data []float64, maxLength int) []float64 {
 // DynamicTEMA computes a Triple Exponential Moving Average.
 // Formula: tema[i] = 3 × (ema1[i] - ema2[i]) + ema3[i]
 // Where:
-//   ema1 = DynamicEMA(data, maxLength)
-//   ema2 = DynamicEMA(ema1, maxLength)
-//   ema3 = DynamicEMA(ema2, maxLength)
+//
+//	ema1 = DynamicEMA(data, maxLength)
+//	ema2 = DynamicEMA(ema1, maxLength)
+//	ema3 = DynamicEMA(ema2, maxLength)
 //
 // TEMA is designed to have even less lag than DEMA by using triple smoothing.
 //
@@ -250,12 +252,13 @@ func DynamicTEMA(data []float64, maxLength int) []float64 {
 // DynamicHMA computes a Hull Moving Average, designed to be very responsive with minimal lag.
 //
 // Steps:
-//   halfLen = round(maxLength / 2)
-//   sqrtLen = round(sqrt(maxLength))
-//   wma1 = DynamicWMA(data, halfLen) — WMA with half period
-//   wma2 = DynamicWMA(data, maxLength) — WMA with full period
-//   diff[i] = 2 × wma1[i] - wma2[i]
-//   hma = DynamicWMA(diff, sqrtLen) — WMA of the difference with sqrt period
+//
+//	halfLen = round(maxLength / 2)
+//	sqrtLen = round(sqrt(maxLength))
+//	wma1 = DynamicWMA(data, halfLen) — WMA with half period
+//	wma2 = DynamicWMA(data, maxLength) — WMA with full period
+//	diff[i] = 2 × wma1[i] - wma2[i]
+//	hma = DynamicWMA(diff, sqrtLen) — WMA of the difference with sqrt period
 //
 // The Hull Moving Average responds faster to price changes than standard SMA/EMA
 // while maintaining smoothness.
@@ -293,18 +296,19 @@ func DynamicHMA(data []float64, maxLength int) []float64 {
 // DynamicLSMA computes a Least Squares Moving Average (linear regression projected value).
 //
 // For each bar i:
-//   len = DynamicLength(maxLength, i)
-//   Window: data[max(0, i-len+1)..i]
-//   Perform linear regression on the window:
-//     x values: 0, 1, 2, ..., len-1 (bar position within window)
-//     y values: data[startIdx], data[startIdx+1], ..., data[i]
-//     Skip NaN values.
-//     Compute slope and intercept using least squares:
-//       Σx, Σy, Σxy, Σx² are summed over valid (non-NaN) points
-//       count = number of valid points
-//       slope = (count × Σxy - Σx × Σy) / (count × Σx² - (Σx)²)
-//       intercept = (Σy - slope × Σx) / count
-//     lsma[i] = slope × (offset - 1) + intercept
+//
+//	len = DynamicLength(maxLength, i)
+//	Window: data[max(0, i-len+1)..i]
+//	Perform linear regression on the window:
+//	  x values: 0, 1, 2, ..., len-1 (bar position within window)
+//	  y values: data[startIdx], data[startIdx+1], ..., data[i]
+//	  Skip NaN values.
+//	  Compute slope and intercept using least squares:
+//	    Σx, Σy, Σxy, Σx² are summed over valid (non-NaN) points
+//	    count = number of valid points
+//	    slope = (count × Σxy - Σx × Σy) / (count × Σx² - (Σx)²)
+//	    intercept = (Σy - slope × Σx) / count
+//	  lsma[i] = slope × (offset - 1) + intercept
 //
 // If the denominator is zero (all x values the same), use the mean of y.
 // If count is 0 (all NaN), result is 0.

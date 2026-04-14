@@ -958,13 +958,14 @@ func TestTrendView_BlitzSummary_OnlyLong(t *testing.T) {
 	for i := range model.rows {
 		model.rows[i].State = StateLoaded
 		model.rows[i].Result = &trenddomain.Result{
-			Symbol:     model.rows[i].Symbol,
-			Signal:     trenddomain.Bullish,
-			BlitzScore: 1,
-			Price:      100.0,
-			RSI:        50.0,
-			EMAFast:    100.0,
-			EMASlow:    90.0,
+			Symbol:       model.rows[i].Symbol,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1, // Set LONG so DESTINY doesn't show HOLD
+			Price:        100.0,
+			RSI:          50.0,
+			EMAFast:      100.0,
+			EMASlow:      90.0,
 		}
 	}
 
@@ -974,7 +975,8 @@ func TestTrendView_BlitzSummary_OnlyLong(t *testing.T) {
 	assert.Contains(t, summary, "BLITZ:", "Summary should show BLITZ label")
 	assert.Contains(t, summary, "2 LONG", "Summary should show 2 LONG")
 	assert.NotContains(t, summary, "SHORT", "Summary should not show SHORT")
-	assert.NotContains(t, summary, "HOLD", "Summary should not show HOLD")
+	// Check BLITZ section specifically doesn't show HOLD (DESTINY may show HOLD)
+	assert.NotRegexp(t, `(?i)BLITZ:.*\d\s+HOLD`, summary, "BLITZ section should not show HOLD")
 }
 
 // TestTrendView_BlitzSummary_OnlyHold verifies BLITZ summary with only HOLD signals.
@@ -1152,4 +1154,214 @@ func TestTrendView_ValuationColors(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestTrendView_DestinyBadge_Long verifies LONG DESTINY badge rendering.
+func TestTrendView_DestinyBadge_Long(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	badge := view.renderDestinyBadge(1)
+	assert.Contains(t, badge, "▲ LONG", "LONG badge should show arrow and LONG")
+}
+
+// TestTrendView_DestinyBadge_Short verifies SHORT DESTINY badge rendering.
+func TestTrendView_DestinyBadge_Short(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	badge := view.renderDestinyBadge(-1)
+	assert.Contains(t, badge, "▼ SHORT", "SHORT badge should show arrow and SHORT")
+}
+
+// TestTrendView_DestinyBadge_Hold verifies HOLD DESTINY badge rendering.
+func TestTrendView_DestinyBadge_Hold(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	badge := view.renderDestinyBadge(0)
+	assert.Contains(t, badge, "○ HOLD", "HOLD badge should show circle and HOLD")
+}
+
+// TestTrendView_DestinyBadge_OtherScores verifies other DESTINY scores render as HOLD.
+func TestTrendView_DestinyBadge_OtherScores(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	view := NewView(model).SetTheme(&mockTheme{})
+
+	tests := []int{2, -2, 100, -100}
+	for _, score := range tests {
+		badge := view.renderDestinyBadge(score)
+		assert.Contains(t, badge, "○ HOLD", "DESTINY score %d should render as HOLD", score)
+	}
+}
+
+// TestTrendView_DestinyColumn_InHeader verifies DESTINY column in table header.
+func TestTrendView_DestinyColumn_InHeader(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	model.rows[0].State = StateLoaded
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:     "AAPL",
+		RSI:        50.0,
+		EMAFast:    100.0,
+		EMASlow:    90.0,
+		Signal:     trenddomain.Bullish,
+		BlitzScore: 1,
+		Price:      100.0,
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	assert.Contains(t, rendered, "DESTINY", "View should have DESTINY column in header")
+}
+
+// TestTrendView_DestinyColumn_Loaded verifies correct DESTINY badge for loaded rows.
+func TestTrendView_DestinyColumn_Loaded(t *testing.T) {
+	tests := []struct {
+		name         string
+		destinyScore int
+		shouldHave   string
+	}{
+		{"LONG", 1, "▲ LONG"},
+		{"SHORT", -1, "▼ SHORT"},
+		{"HOLD", 0, "○ HOLD"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := newTestModelForView("TEST")
+			model.rows[0].State = StateLoaded
+			model.rows[0].Result = &trenddomain.Result{
+				Symbol:       "TEST",
+				RSI:          50.0,
+				EMAFast:      100.0,
+				EMASlow:      90.0,
+				Signal:       trenddomain.Bullish,
+				BlitzScore:   1,
+				DestinyScore: tt.destinyScore,
+				Price:        100.0,
+			}
+
+			view := NewView(model).SetTheme(&mockTheme{})
+			cells := view.buildLoadedCells(model.rows[0])
+
+			// DESTINY is 4th column (index 3)
+			assert.Contains(t, cells[3].Text, tt.shouldHave, "DESTINY column should show correct badge for loaded rows")
+		})
+	}
+}
+
+// TestTrendView_DestinyColumn_Loading verifies "—" for loading rows in DESTINY column.
+func TestTrendView_DestinyColumn_Loading(t *testing.T) {
+	model := newTestModelForView("AAPL")
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	cells := view.buildLoadingCells(model.rows[0])
+
+	// DESTINY is 4th column (index 3)
+	assert.Equal(t, "—", cells[3].Text, "DESTINY column should show '—' for loading rows")
+}
+
+// TestTrendView_DestinyColumn_Error verifies "—" for error rows in DESTINY column.
+func TestTrendView_DestinyColumn_Error(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	model.rows[0].State = StateError
+	model.rows[0].Error = errors.New("API error")
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	cells := view.buildErrorCells(model.rows[0])
+
+	// DESTINY is 4th column (index 3)
+	assert.Equal(t, "—", cells[3].Text, "DESTINY column should show '—' for error rows")
+}
+
+// TestTrendView_DestinyColumn_Unknown verifies "—" for unknown state rows in DESTINY column.
+func TestTrendView_DestinyColumn_Unknown(t *testing.T) {
+	model := newTestModelForView("AAPL")
+	model.rows[0].State = State(99) // Invalid state
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	cells := view.buildUnknownCells(model.rows[0])
+
+	// DESTINY is 4th column (index 3)
+	assert.Equal(t, "—", cells[3].Text, "DESTINY column should show '—' for unknown state rows")
+}
+
+// TestTrendView_DestinySummary verifies DESTINY summary line with correct counts.
+func TestTrendView_DestinySummary(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
+
+	destinyScores := []int{1, 1, -1, 0}
+
+	for i, score := range destinyScores {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:       model.rows[i].Symbol,
+			RSI:          50.0,
+			EMAFast:      100.0,
+			EMASlow:      90.0,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: score,
+			Price:        100.0,
+		}
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	summary := view.renderSummary()
+
+	// Should show DESTINY summary with counts
+	assert.Contains(t, summary, "DESTINY:", "Summary should show DESTINY label")
+	assert.Contains(t, summary, "2 LONG", "Summary should show 2 LONG")
+	assert.Contains(t, summary, "1 SHORT", "Summary should show 1 SHORT")
+	assert.Contains(t, summary, "1 HOLD", "Summary should show 1 HOLD")
+}
+
+// TestTrendView_DestinySummary_OnlyHold verifies DESTINY summary when all are HOLD.
+func TestTrendView_DestinySummary_OnlyHold(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT")
+
+	for i := range model.rows {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:       model.rows[i].Symbol,
+			RSI:          50.0,
+			EMAFast:      100.0,
+			EMASlow:      90.0,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 0, // All HOLD
+			Price:        100.0,
+		}
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	summary := view.renderSummary()
+
+	// Should show DESTINY summary with only HOLD count
+	assert.Contains(t, summary, "DESTINY:", "Summary should show DESTINY label")
+	assert.Contains(t, summary, "2 HOLD", "Summary should show 2 HOLD")
+	// Verify that "DESTINY" section shows HOLD (not in BLITZ section)
+	assert.Contains(t, summary, "DESTINY: 2 HOLD", "Summary should show DESTINY HOLD count")
+	// Verify no DESTINY LONG or SHORT when all are HOLD
+	assert.NotRegexp(t, `(?i)DESTINY:.*\d\s+LONG`, summary, "Should not show DESTINY LONG when all are HOLD")
+	assert.NotRegexp(t, `(?i)DESTINY:.*\d\s+SHORT`, summary, "Should not show DESTINY SHORT when all are HOLD")
+}
+
+// TestTrendView_DestinySummary_Empty verifies DESTINY summary is hidden when no data.
+func TestTrendView_DestinySummary_Empty(t *testing.T) {
+	model := NewModel()
+	model.Configure(
+		context.Background(),
+		&viewMockEngine{},
+		&config.WatchlistConfig{Equities: []string{}, Crypto: []string{}},
+		indicators.NewAssetClassDetector([]string{}),
+	)
+
+	view := NewView(*model).SetTheme(&mockTheme{})
+	rendered := view.Render()
+
+	// Summary bar should not be rendered when watchlist is empty
+	assert.Contains(t, rendered, "Trend Analysis", "View should contain title")
+	assert.NotContains(t, rendered, "DESTINY:", "View should not show DESTINY summary when empty")
 }

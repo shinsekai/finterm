@@ -873,3 +873,153 @@ func TestEngine_BlitzScore_NoTimeSeriesClient(t *testing.T) {
 		t.Errorf("BlitzScore = %d, want 0 when no time series client is provided", result.BlitzScore)
 	}
 }
+
+// TestEngine_DestinyScore_Crypto verifies DESTINY computation for crypto symbols.
+func TestEngine_DestinyScore_Crypto(t *testing.T) {
+	remoteRSI := &mockIndicator{}
+	remoteEMA := &mockIndicator{}
+
+	// Generate test OHLCV data with enough data for DESTINY (needs 45+ bars)
+	testData := GenerateTestOHLCV(50, 100.0, 0.02, time.Now().AddDate(0, 0, -50))
+
+	localRSI := indicators.NewLocalRSI(testData)
+	localEMA := indicators.NewLocalEMA(testData)
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector([]string{"BTC"})
+
+	cryptoFetcher := &mockCryptoFetcher{data: testData}
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher, nil, nil)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "BTC", indicators.Crypto)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	// Verify DESTINY fields are populated
+	if result.DestinyScore < -1 || result.DestinyScore > 1 {
+		t.Errorf("DestinyScore = %d, want -1, 0, or 1", result.DestinyScore)
+	}
+	// TPI and RSISmooth should be populated when there's enough data
+	if len(testData) >= 45 {
+		if result.DestinyTPI == 0 && result.DestinyRSISmooth == 0 {
+			t.Errorf("DestinyTPI and DestinyRSISmooth should be populated with sufficient data")
+		}
+	}
+}
+
+// TestEngine_DestinyScore_Equity verifies DESTINY computation for equity symbols.
+func TestEngine_DestinyScore_Equity(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 55.0},
+		},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 150.0},
+		},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// Create mock time series data for DESTINY
+	timeSeries := &alphavantage.TimeSeriesDaily{
+		TimeSeries: make(map[string]alphavantage.TimeSeriesEntry),
+	}
+	// Add 50 days of data
+	startDate := time.Now().AddDate(0, 0, -50)
+	for i := 0; i < 50; i++ {
+		date := startDate.AddDate(0, 0, i).Format("2006-01-02")
+		price := 100.0 + float64(i)*0.5
+		timeSeries.TimeSeries[date] = alphavantage.TimeSeriesEntry{
+			Open:   fmt.Sprintf("%.2f", price),
+			High:   fmt.Sprintf("%.2f", price+1),
+			Low:    fmt.Sprintf("%.2f", price-1),
+			Close:  fmt.Sprintf("%.2f", price),
+			Volume: "1000000",
+		}
+	}
+
+	timeSeriesClient := &mockTimeSeriesClient{data: timeSeries}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	// Verify DESTINY fields are populated
+	if result.DestinyScore < -1 || result.DestinyScore > 1 {
+		t.Errorf("DestinyScore = %d, want -1, 0, or 1", result.DestinyScore)
+	}
+	// TPI and RSISmooth should be populated when there's enough data
+	if result.DestinyTPI == 0 && result.DestinyRSISmooth == 0 {
+		t.Errorf("DestinyTPI and DestinyRSISmooth should be populated with sufficient time series data")
+	}
+}
+
+// TestEngine_DestinyFailure_DoesNotBlockOthers verifies RSI/EMA still work if DESTINY fails.
+func TestEngine_DestinyFailure_DoesNotBlockOthers(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 55.0},
+		},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 150.0},
+		},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// Create empty time series data (will cause DESTINY to fail)
+	timeSeries := &alphavantage.TimeSeriesDaily{
+		TimeSeries: make(map[string]alphavantage.TimeSeriesEntry),
+	}
+
+	timeSeriesClient := &mockTimeSeriesClient{data: timeSeries}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	// Analysis should succeed despite DESTINY failure
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v, want success despite DESTINY failure", err)
+	}
+
+	// Verify existing fields are still computed correctly
+	if result.RSI != 55.0 {
+		t.Errorf("RSI = %f, want 55.0", result.RSI)
+	}
+	if result.EMAFast != 150.0 {
+		t.Errorf("EMAFast = %f, want 150.0", result.EMAFast)
+	}
+	if result.Valuation == "" {
+		t.Error("Valuation should be computed")
+	}
+
+	// DESTINY should default to Hold (0) when it fails
+	if result.DestinyScore != 0 {
+		t.Errorf("DestinyScore = %d, want 0 when DESTINY fails", result.DestinyScore)
+	}
+}

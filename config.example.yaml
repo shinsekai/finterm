@@ -81,6 +81,17 @@ valuation:
   # RSI above this value is considered overbought.
   overbought: 70
 
+# BLITZ trend following system configuration.
+blitz:
+  # Lookback period for dynamic RSI calculation.
+  rsi_length: 12
+
+  # Pearson correlation lookback period for trend strength index.
+  tsi_period: 14
+
+  # RSI smooth threshold for long/short signal generation.
+  threshold: 48
+
 # Cache TTL settings for different data types.
 cache:
   # Time to live for intraday quotes.

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-04-14
+
+### Added
+- BLITZ trend following system — a custom multi-signal scoring engine ported from Pine Script
+  - Trend Strength Index (TSI): rolling Pearson correlation of price vs time for trend direction
+  - Dynamic RSI: adaptive-length RSI that produces values from bar 1 (no NaN warmup period)
+  - Dynamic EMA smoothing of RSI for noise reduction
+  - Three-condition signal: TSI confirms direction, smoothed RSI confirms momentum, threshold confirms strength
+  - Latching score: holds LONG (+1) or SHORT (-1) until the opposite signal fires
+- BLITZ column in the trend tab showing ▲ LONG / ▼ SHORT / ○ HOLD badges alongside the existing EMA crossover signal
+- BLITZ summary counts in the trend summary bar (e.g., "BLITZ: 5 LONG  2 SHORT  1 HOLD")
+- Dynamic moving average primitives in `internal/domain/blitz/`:
+  - `DynamicRMA` — Wilder's smoothing with per-bar adaptive length
+  - `DynamicEMA` — exponential MA with per-bar adaptive length
+  - `DynamicSMA` — simple MA with adaptive window and NaN handling
+  - `PearsonCorrelation` — rolling window Pearson r computation
+- Daily time series fetching for equities to support BLITZ computation
+- GitHub Actions release workflow with goreleaser for cross-platform binaries
+- CI workflow with build, test (race detector), vet, and golangci-lint
+
+### Fixed
+- golangci-lint v2.x compatibility for Go 1.24
+
 ## [0.1.0] — 2026-04-05
 
 ### Added

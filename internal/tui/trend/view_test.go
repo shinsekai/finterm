@@ -445,7 +445,7 @@ func TestTrendView_SignalBadge_Bullish(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 
 	badge := view.renderFTEMABadge(trenddomain.Bullish)
-	assert.Contains(t, badge, "▲ LONG", "Bullish badge should show arrow and LONG")
+	assert.Contains(t, badge, "▲  LONG", "Bullish badge should show arrow and LONG")
 }
 
 // TestTrendView_SignalBadge_Bearish verifies bearish signal badge rendering.
@@ -819,7 +819,7 @@ func TestTrendView_BlitzBadge_Long(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 
 	badge := view.renderBlitzBadge(1)
-	assert.Contains(t, badge, "▲ LONG", "LONG badge should show arrow and LONG")
+	assert.Contains(t, badge, "▲  LONG", "LONG badge should show arrow and LONG")
 }
 
 // TestTrendView_BlitzBadge_Short verifies SHORT BLITZ badge rendering.
@@ -978,7 +978,7 @@ func TestTrendView_BlitzColumn_Loaded(t *testing.T) {
 		blitzScore int
 		shouldHave string
 	}{
-		{"LONG", 1, "▲ LONG"},
+		{"LONG", 1, "▲  LONG"},
 		{"SHORT", -1, "▼ SHORT"},
 		{"HOLD", 0, ""},
 	}
@@ -1028,7 +1028,7 @@ func TestTrendView_BlitzColumn_Cached(t *testing.T) {
 	cells := view.buildCachedCells(model.rows[0])
 
 	// BLITZ is the 4th column (index 3) in the new 8-column layout
-	assert.Contains(t, cells[3].Text, "▲ LONG", "BLITZ column should show LONG badge for cached rows")
+	assert.Contains(t, cells[3].Text, "▲  LONG", "BLITZ column should show LONG badge for cached rows")
 }
 
 // TestTrendView_ValuationColors verifies valuation color coding.
@@ -1095,7 +1095,7 @@ func TestTrendView_DestinyBadge_Long(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 
 	badge := view.renderDestinyBadge(1)
-	assert.Contains(t, badge, "▲ LONG", "LONG badge should show arrow and LONG")
+	assert.Contains(t, badge, "▲  LONG", "LONG badge should show arrow and LONG")
 }
 
 // TestTrendView_DestinyBadge_Short verifies SHORT DESTINY badge rendering.
@@ -1155,7 +1155,7 @@ func TestTrendView_DestinyColumn_Loaded(t *testing.T) {
 		destinyScore int
 		shouldHave   string
 	}{
-		{"LONG", 1, "▲ LONG"},
+		{"LONG", 1, "▲  LONG"},
 		{"SHORT", -1, "▼ SHORT"},
 		{"HOLD", 0, ""},
 	}
@@ -1359,7 +1359,7 @@ func TestTrendView_FTEMABadge_Bull(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 
 	badge := view.renderFTEMABadge(trenddomain.Bullish)
-	assert.Contains(t, badge, "▲ LONG", "Bullish badge should show arrow and LONG")
+	assert.Contains(t, badge, "▲  LONG", "Bullish badge should show arrow and LONG")
 }
 
 // TestTrendView_FTEMABadge_Bear verifies bearish FTEMA badge rendering.

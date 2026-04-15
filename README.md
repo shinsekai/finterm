@@ -32,22 +32,23 @@ It's designed for traders and analysts who live in the terminal and want a fast,
 
 ## Features
 
-**Trend Following** — Watchlist table with three independent signal systems per ticker:
+**Trend Following** — Watchlist table with a TPI composite score and three independent signal systems per ticker:
 
-- **EMA Crossover** — Classic EMA(10)/EMA(20) trend direction. Bullish when fast crosses above slow.
-- **BLITZ System** — Correlation-based scoring combining TSI (Pearson correlation), adaptive RSI, and threshold confirmation. Fast, reactive signals.
-- **DESTINY System** — Consensus-based scoring using the Trend Probability Indicator (TPI): average direction of 7 moving averages (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA) confirmed by adaptive RSI. More conservative, high-conviction signals.
+- **TPI** — Trend Probability Indicator: averages FTEMA, BLITZ, and DESTINY into a single score (-1 to +1) with a color-gradient gauge. TPI > 0 = LONG, TPI ≤ 0 = CASH.
+- **FTEMA** — Fast/slow EMA crossover (EMA 10 vs EMA 20). The classic trend direction signal.
+- **BLITZ** — Correlation-based scoring combining TSI (Pearson correlation), adaptive RSI, and threshold confirmation. Fast and reactive.
+- **DESTINY** — Consensus-based scoring using 7 moving averages (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA) confirmed by adaptive RSI. Conservative, high-conviction.
 
-Three perspectives at a glance. When all agree, conviction is highest.
+```
+ SYMBOL  TPI                FTEMA     BLITZ     DESTINY      PRICE    RSI  VALUATION
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ QQQ     ░░░░░▓▓▓░░ LONG   ▲ LONG              ▼ SHORT    $604.52  67.97  ◇ Overval
+ SPY     ░░░░░▓▓▓░░ LONG   ▲ LONG              ▼ SHORT    $673.59  67.56  ◇ Overval
+ BTC     ░░░░░▓░░░░ LONG   ▲ LONG              ▼ SHORT  $74,446    52.84  ○ Fair val
+ SOL     ░░▓▓▓░░░░░ CASH   ▼ SHORT  ▼ SHORT    ▼ SHORT     $86.56  44.64  ◇ Underval
+```
 
-SYMBOL   SIGNAL     BLITZ    DESTINY    PRICE       RSI   EMA FAST   EMA SLOW  VALUATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-AAPL     ▲ BULL    ▲ LONG   ▲ LONG    $189.84    52.3    $188.20    $186.45  ○ Fair val
-MSFT     ▼ BEAR    ▼ SHORT  ▼ SHORT   $378.91    38.1    $375.10    $380.22  ◇ Underval
-BTC      ▲ BULL    ▲ LONG   ○ HOLD   $67,432    48.7  $66,800    $65,200    ○ Fair val
-ETH      ▼ BEAR    ○ HOLD   ▼ SHORT   $3,521    29.5   $3,480     $3,620    ◆ Oversold
-
-**Quote Lookup** — Type any ticker to get real-time price, volume, change, and inline indicator analysis.
+**Quote Lookup** — Type any ticker to get real-time price, volume, change, RSI gauge, and signal system analysis (FTEMA, BLITZ, DESTINY, TPI composite with gauge).
 
 **Macro Dashboard** — Paneled view of GDP, CPI, inflation, federal funds rate, treasury yields, unemployment, and nonfarm payroll.
 
@@ -81,7 +82,8 @@ The domain layer communicates with the data layer through interfaces — never c
 
 | Signal | Rule |
 |---|---|
-| **EMA Trend** | `EMA(10) > EMA(20)` → Bullish, `EMA(10) < EMA(20)` → Bearish |
+| **FTEMA** | `EMA(10) > EMA(20)` → LONG, `EMA(10) < EMA(20)` → SHORT |
+| **TPI** | Average of FTEMA (+1/-1), BLITZ (+1/-1/0), DESTINY (+1/-1/0). TPI > 0 → LONG, TPI ≤ 0 → CASH |
 | **Valuation** | RSI < 30 → Oversold, 30–45 → Undervalued, 45–55 → Fair, 55–70 → Overvalued, > 70 → Overbought |
 
 ### BLITZ System
@@ -285,8 +287,9 @@ finterm/
 │   │   ├── trend/                   # Trend engine + scoring
 │   │   │   └── indicators/          # RSI, EMA (local + remote)
 │   │   ├── valuation/               # RSI-based valuation
-│   │   ├── blitz/                   # BLITZ trend following + shared dynamic MA primitives
-│   │   └── destiny/                 # DESTINY trend following system
+│   │   ├── dynamo/                  # Shared dynamic-length MA primitives (SMA, EMA, RMA, WMA, DEMA, TEMA, HMA, LSMA, RSI, TSI)
+│   │   ├── blitz/                   # BLITZ signal engine
+│   │   └── destiny/                 # DESTINY signal engine
 │   ├── alphavantage/                # API client + typed models
 │   ├── cache/                       # In-memory TTL cache
 │   └── config/                      # YAML + env var loading
@@ -307,7 +310,7 @@ finterm/
 
 ### Design Decisions
 
-**Why EMA crossover only for trend?** Simplicity and clarity. EMA(10) > EMA(20) gives a clean binary signal — the trend is up or it's down. RSI is reserved for valuation because it answers a different question: is the asset cheap or expensive relative to recent momentum.
+**Why a composite TPI instead of one signal?** Each signal system captures a different dimension of trend. FTEMA is a simple lagging direction indicator. BLITZ is fast and reactive, using Pearson correlation. DESTINY is conservative, polling 7 MA types for consensus. The TPI averages all three into a single score: LONG when the average is positive, CASH when it isn't. This prevents over-reliance on any single method — a ticker is only LONG when the weight of evidence supports it.
 
 **Why compute crypto indicators locally?** Alpha Vantage's technical endpoints (RSI, EMA) map crypto symbols to exchange-listed instruments that follow equity market hours — no weekend data, which creates gaps in 24/7 crypto markets. Fetching raw OHLCV from the crypto endpoints and computing locally ensures continuous, accurate signals.
 

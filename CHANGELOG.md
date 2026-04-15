@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-04-15
+
+### Added
+- TPI (Trend Probability Indicator) composite signal — averages FTEMA, BLITZ, and DESTINY
+  into a single score from -1 to +1. TPI > 0 signals LONG, TPI ≤ 0 signals CASH
+- TPI gauge column in the trend table with per-character gradient color (red → orange → yellow → green)
+- FTEMA column replacing the old SIGNAL column — same EMA crossover logic, new label
+- Signal systems section in Quote view showing FTEMA, BLITZ, DESTINY badges with TPI composite gauge
+- Shared `internal/domain/dynamo/` package for dynamic-length indicator primitives
+  (extracted from blitz/ so both BLITZ and DESTINY import from a common foundation)
+
+### Changed
+- Trend table columns simplified: removed EMA FAST and EMA SLOW columns
+- New column order: SYMBOL, TPI (with gauge), FTEMA, BLITZ, DESTINY, PRICE, RSI, VALUATION
+- All signal badges unified: FTEMA, BLITZ, and DESTINY all show ▲ LONG (green) or ▼ SHORT (red)
+  with empty cell when no signal — no more BULL/BEAR/HOLD labels
+- Quote Technical Indicators card now shows signal systems + TPI composite instead of EMA values
+- Upgraded Go from 1.24.2 to 1.26.2
+
+### Fixed
+- LONG badges invisible in trend table — BullishBadge background was stripped by table row
+  styling, leaving dark text on dark background. Fixed by using foreground-only text colors
+- TPI gauge now renders per-character gradient colors instead of flat single color
+- Quote indicators card label alignment — fixed ANSI-aware padding for signal system labels
+- Summary bar now shows "TPI:" prefix label before LONG/CASH counts
+
 ## [0.3.0] — 2026-04-14
 
 ### Added

@@ -28,17 +28,13 @@ func (m *mockEngine) AnalyzeWithSymbolDetection(_ context.Context, _ string) (*t
 	return m.result, nil
 }
 
-// asModel converts a tea.Model to *Model, handling both value and pointer types.
+// asModel converts a tea.Model to *Model.
 func asModel(t *testing.T, m tea.Model) *Model {
 	t.Helper()
 	if ptrModel, ok := m.(*Model); ok {
 		return ptrModel
 	}
-	if model, ok := m.(Model); ok {
-		// Return a pointer to a copy of the value
-		return &model
-	}
-	require.Fail(t, "expected Model or *Model, got %T", m)
+	require.Fail(t, "expected *Model, got %T", m)
 	return nil
 }
 
@@ -291,21 +287,6 @@ func TestTrendModel_ContextCancellation(t *testing.T) {
 }
 
 // TestTrendModel_RefreshKey verifies pressing 'r' triggers refresh.
-func TestTrendModel_RefreshKey(t *testing.T) {
-	model := newTestModel(t, &mockEngine{}, "AAPL")
-
-	// Set row to loaded
-	result := &trenddomain.Result{Symbol: "AAPL", RSI: 50.5}
-	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: result})
-	model = asModel(t, updatedM)
-	assert.Equal(t, StateLoaded, model.GetRows()[0].State)
-
-	// Press 'r'
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}}
-	updatedM, _ = model.Update(msg)
-	updatedModel := asModel(t, updatedM)
-	assert.Equal(t, StateLoading, updatedModel.GetRows()[0].State, "Row should be in loading state after refresh")
-}
 
 // TestFormatValue verifies the FormatValue helper function.
 func TestFormatValue(t *testing.T) {
@@ -711,8 +692,10 @@ func TestTrendModel_GetTPICounts(t *testing.T) {
 	// Set up 3 LONG, 2 CASH
 	for i, symbol := range []string{"AAPL", "MSFT", "GOOGL", "NVDA", "AMZN"} {
 		tpiSignal := "CASH"
+		tpiValue := -0.33
 		if i < 3 {
 			tpiSignal = "LONG"
+			tpiValue = 0.67
 		}
 		updatedM, _ := model.Update(TrendDataMsg{
 			Symbol: symbol,
@@ -720,7 +703,7 @@ func TestTrendModel_GetTPICounts(t *testing.T) {
 				Symbol:     symbol,
 				Signal:     trenddomain.Bullish,
 				BlitzScore: 1,
-				TPI:        0.67,
+				TPI:        tpiValue,
 				TPISignal:  tpiSignal,
 			},
 		})

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-04-15
+
+### Added
+- FLOW trend following system — double-smoothed Heikin-Ashi momentum scoring
+  - Sebastine indicator: EMA-smoothed OHLC → Heikin-Ashi synthesis → second EMA smoothing
+    → body ratio as percentage. First system to use full OHLC data, not just closes
+  - Dynamic RSI with threshold confirmation (length 14, threshold 55)
+  - Asymmetric signal logic matching DESTINY pattern (AND for longs, OR for shorts)
+- FLOW column in trend and quote views showing ▲ LONG / ▼ SHORT
+- FLOW summary counts in trend summary bar
+- TPI composite now averages 4 signals: FTEMA, BLITZ, DESTINY, FLOW
+
+### Changed
+- TPI formula updated from 3-signal to 4-signal average
+
 ## [0.4.0] — 2026-04-15
 
 ### Added

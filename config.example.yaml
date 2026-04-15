@@ -108,6 +108,21 @@ destiny:
   # LSMA linear regression projection offset.
   lsma_offset: 6
 
+# FLOW trend following system configuration.
+# Uses double-smoothed Heikin-Ashi candles (Sebastine indicator) with Dynamic RSI.
+flow:
+  # Dynamic RSI lookback period.
+  rsi_length: 14
+
+  # Smoothed RSI threshold for signal confirmation.
+  rsi_threshold: 55
+
+  # First EMA smoothing period applied to raw OHLC data.
+  fast_length: 45
+
+  # Second EMA smoothing period applied to Heikin-Ashi candles.
+  slow_length: 50
+
 # Cache TTL settings for different data types.
 cache:
   # Time to live for intraday quotes.

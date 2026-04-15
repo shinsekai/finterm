@@ -13,6 +13,7 @@ import (
 	"github.com/shinsekai/finterm/internal/config"
 	"github.com/shinsekai/finterm/internal/domain/blitz"
 	"github.com/shinsekai/finterm/internal/domain/destiny"
+	"github.com/shinsekai/finterm/internal/domain/flow"
 	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 )
 
@@ -45,8 +46,12 @@ type Result struct {
 	DestinyScore     int     // +1 (long), -1 (short), 0 (hold)
 	DestinyTPI       float64 // Trend Probability Indicator value
 	DestinyRSISmooth float64 // Smoothed RSI from DESTINY
+	// FLOW trend following system results.
+	FlowScore     int     // +1 (long), -1 (short), 0 (hold)
+	FlowSebastine float64 // Latest Sebastine value
+	FlowRSISmooth float64 // Smoothed RSI from FLOW
 	// TPI composite signal.
-	// TPI is the average of EMA signal, BLITZ, DESTINY (-1 to +1).
+	// TPI is the average of EMA signal, BLITZ, DESTINY, FLOW (-1 to +1).
 	TPI float64
 	// TPISignal is the TPI signal label: "LONG" or "CASH".
 	TPISignal string
@@ -142,6 +147,8 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	var blitzTSI, blitzRSISmooth float64
 	var destinyScore int
 	var destinyTPI, destinyRSISmooth float64
+	var flowScore int
+	var flowSebastine, flowRSISmooth float64
 
 	// Route to appropriate indicator path based on asset class
 	switch assetClass {
@@ -200,17 +207,20 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 				}
 			}
 
-			// Extract close prices and compute BLITZ and DESTINY
+			// Extract OHLC data and compute BLITZ, DESTINY, and FLOW
 			if tsData != nil {
-				closes, err := extractClosePricesFromTimeSeries(tsData)
+				opens, highs, lows, closePrices, err := extractOHLCFromTimeSeries(tsData)
 				if err != nil {
-					fmt.Printf("warning: failed to extract close prices for BLITZ/DESTINY computation for %s: %v\n", symbol, err)
+					fmt.Printf("warning: failed to extract OHLC data for BLITZ/DESTINY/FLOW computation for %s: %v\n", symbol, err)
 					blitzScore, blitzTSI, blitzRSISmooth = 0, 0, 0
 					destinyScore, destinyTPI, destinyRSISmooth = 0, 0, 0
+					flowScore, flowSebastine, flowRSISmooth = 0, 0, 0
 				} else {
-					blitzScore, blitzTSI, blitzRSISmooth = computeBlitz(closes)
+					blitzScore, blitzTSI, blitzRSISmooth = computeBlitz(closePrices)
 					// Compute DESTINY after BLITZ
-					destinyScore, destinyTPI, destinyRSISmooth = computeDestiny(closes)
+					destinyScore, destinyTPI, destinyRSISmooth = computeDestiny(closePrices)
+					// Compute FLOW using full OHLC data
+					flowScore, flowSebastine, flowRSISmooth = computeFlow(opens, highs, lows, closePrices)
 				}
 			}
 		}
@@ -251,14 +261,22 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 			return nil, fmt.Errorf("computing local EMA slow for %s: %w", symbol, err)
 		}
 
-		// Compute BLITZ and DESTINY score for crypto using existing OHLCV data
+		// Compute BLITZ, DESTINY, and FLOW score for crypto using existing OHLCV data
 		closes := make([]float64, len(ohlcvData))
+		opens := make([]float64, len(ohlcvData))
+		highs := make([]float64, len(ohlcvData))
+		lows := make([]float64, len(ohlcvData))
 		for i, ohlcv := range ohlcvData {
 			closes[i] = ohlcv.Close
+			opens[i] = ohlcv.Open
+			highs[i] = ohlcv.High
+			lows[i] = ohlcv.Low
 		}
 		blitzScore, blitzTSI, blitzRSISmooth = computeBlitz(closes)
 		// Compute DESTINY score for crypto using existing OHLCV data
 		destinyScore, destinyTPI, destinyRSISmooth = computeDestiny(closes)
+		// Compute FLOW score for crypto using full OHLCV data
+		flowScore, flowSebastine, flowRSISmooth = computeFlow(opens, highs, lows, closes)
 
 	default:
 		return nil, fmt.Errorf("unsupported asset class: %v", assetClass)
@@ -288,7 +306,7 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	valuation := computeValuation(rsi, e.cfg.Valuation)
 
 	// Compute TPI composite signal
-	tpi := TPI(signal, blitzScore, destinyScore)
+	tpi := TPI(signal, blitzScore, destinyScore, flowScore)
 	tpiSignal := TPISignal(tpi)
 
 	return &Result{
@@ -305,6 +323,9 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 		DestinyScore:     destinyScore,
 		DestinyTPI:       destinyTPI,
 		DestinyRSISmooth: destinyRSISmooth,
+		FlowScore:        flowScore,
+		FlowSebastine:    flowSebastine,
+		FlowRSISmooth:    flowRSISmooth,
 		TPI:              tpi,
 		TPISignal:        tpiSignal,
 	}, nil
@@ -333,6 +354,7 @@ func computeValuation(rsi float64, val config.ValuationConfig) string {
 // extractClosePricesFromTimeSeries extracts close prices from a TimeSeriesDaily response.
 // The response contains dates as string keys with values sorted newest-first.
 // This function returns closes sorted oldest-first for BLITZ computation.
+// nolint:unused // Kept for reference, used in future BLITZ implementation
 func extractClosePricesFromTimeSeries(ts *alphavantage.TimeSeriesDaily) ([]float64, error) {
 	if ts == nil || len(ts.TimeSeries) == 0 {
 		return nil, fmt.Errorf("empty time series data")
@@ -370,6 +392,93 @@ func extractClosePricesFromTimeSeries(ts *alphavantage.TimeSeriesDaily) ([]float
 	}
 
 	return closes, nil
+}
+
+// extractOHLCFromTimeSeries extracts OHLC data from a TimeSeriesDaily response.
+// The response contains dates as string keys with values sorted newest-first.
+// This function returns OHLC arrays sorted oldest-first for FLOW computation.
+func extractOHLCFromTimeSeries(ts *alphavantage.TimeSeriesDaily) (opens, highs, lows, closes []float64, err error) {
+	if ts == nil || len(ts.TimeSeries) == 0 {
+		return nil, nil, nil, nil, fmt.Errorf("empty time series data")
+	}
+
+	// The time series map has date string keys, sorted newest-first
+	// We need to sort them oldest-first and extract OHLC data
+	dates := make([]string, 0, len(ts.TimeSeries))
+	for date := range ts.TimeSeries {
+		dates = append(dates, date)
+	}
+
+	// Sort dates (they're in YYYY-MM-DD format, so string comparison works)
+	for i := 0; i < len(dates); i++ {
+		for j := i + 1; j < len(dates); j++ {
+			if dates[i] > dates[j] {
+				dates[i], dates[j] = dates[j], dates[i]
+			}
+		}
+	}
+
+	// Extract OHLC data in sorted order
+	opens = make([]float64, 0, len(dates))
+	highs = make([]float64, 0, len(dates))
+	lows = make([]float64, 0, len(dates))
+	closes = make([]float64, 0, len(dates))
+
+	for _, date := range dates {
+		entry := ts.TimeSeries[date]
+		open, err := strconv.ParseFloat(entry.Open, 64)
+		if err == nil {
+			opens = append(opens, open)
+		}
+		high, err := strconv.ParseFloat(entry.High, 64)
+		if err == nil {
+			highs = append(highs, high)
+		}
+		low, err := strconv.ParseFloat(entry.Low, 64)
+		if err == nil {
+			lows = append(lows, low)
+		}
+		closePrice, err := strconv.ParseFloat(entry.Close, 64)
+		if err == nil {
+			closes = append(closes, closePrice)
+		}
+	}
+
+	if len(opens) == 0 {
+		return nil, nil, nil, nil, fmt.Errorf("no valid OHLC data found in time series")
+	}
+
+	return opens, highs, lows, closes, nil
+}
+
+// computeFlow computes FLOW signal from OHLC data.
+// Returns score=0 if computation fails (e.g., insufficient data).
+func computeFlow(opens, highs, lows, closes []float64) (score int, sebastine, rsiSmooth float64) {
+	// Convert closes to flow.OHLCV format
+	n := len(closes)
+	if n == 0 {
+		return 0, 0, 0
+	}
+
+	flowOHLCV := make([]flow.OHLCV, n)
+	for i := 0; i < n; i++ {
+		flowOHLCV[i] = flow.OHLCV{
+			Date:   time.Time{}, // Not used by FLOW
+			Open:   opens[i],
+			High:   highs[i],
+			Low:    lows[i],
+			Close:  closes[i],
+			Volume: 0,
+		}
+	}
+
+	result, err := flow.Compute(flowOHLCV, flow.DefaultConfig())
+	if err != nil {
+		// FLOW computation failed - return default values
+		return 0, 0, 0
+	}
+
+	return result.Score, result.Sebastine, result.RSISmooth
 }
 
 // computeBlitz computes BLITZ signal from close prices.

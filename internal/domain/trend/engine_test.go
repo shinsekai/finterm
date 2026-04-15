@@ -1091,14 +1091,14 @@ func TestEngine_TPIPopulated(t *testing.T) {
 		t.Errorf("TPI = %f (<= 0) but TPISignal = %q, want CASH", result.TPI, result.TPISignal)
 	}
 
-	// Verify TPI calculation: (emaSignal + blitzScore + destinyScore) / 3
+	// Verify TPI calculation: (emaSignal + blitzScore + destinyScore + flowScore) / 4
 	expectedEma := 1.0
 	if result.Signal == Bearish {
 		expectedEma = -1.0
 	}
-	expectedTPI := (expectedEma + float64(result.BlitzScore) + float64(result.DestinyScore)) / 3.0
+	expectedTPI := (expectedEma + float64(result.BlitzScore) + float64(result.DestinyScore) + float64(result.FlowScore)) / 4.0
 	if result.TPI != expectedTPI {
-		t.Errorf("TPI = %f, want %f (computed from signal=%v, blitz=%d, destiny=%d)",
-			result.TPI, expectedTPI, result.Signal, result.BlitzScore, result.DestinyScore)
+		t.Errorf("TPI = %f, want %f (computed from signal=%v, blitz=%d, destiny=%d, flow=%d)",
+			result.TPI, expectedTPI, result.Signal, result.BlitzScore, result.DestinyScore, result.FlowScore)
 	}
 }

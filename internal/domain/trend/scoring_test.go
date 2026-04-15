@@ -198,8 +198,8 @@ func TestSignal_String(t *testing.T) {
 }
 
 func TestTPI_AllBullish(t *testing.T) {
-	// TPI(Bullish, 1, 1) returns 1.0 (all agree long)
-	got := TPI(Bullish, 1, 1)
+	// TPI(Bullish, 1, 1, 1) returns 1.0 (all agree long)
+	got := TPI(Bullish, 1, 1, 1)
 	want := 1.0
 	if got != want {
 		t.Errorf("TPI(Bullish, 1, 1) = %f, want %f", got, want)
@@ -207,8 +207,8 @@ func TestTPI_AllBullish(t *testing.T) {
 }
 
 func TestTPI_AllBearish(t *testing.T) {
-	// TPI(Bearish, -1, -1) returns -1.0 (all agree short)
-	got := TPI(Bearish, -1, -1)
+	// TPI(Bearish, -1, -1, -1) returns -1.0 (all agree short)
+	got := TPI(Bearish, -1, -1, -1)
 	want := -1.0
 	if got != want {
 		t.Errorf("TPI(Bearish, -1, -1) = %f, want %f", got, want)
@@ -216,38 +216,38 @@ func TestTPI_AllBearish(t *testing.T) {
 }
 
 func TestTPI_Mixed_BullishMajority(t *testing.T) {
-	// TPI(Bullish, 1, 0) returns ~0.67 (2 of 3 long → LONG)
-	got := TPI(Bullish, 1, 0)
-	want := 2.0 / 3.0
+	// TPI(Bullish, 1, 0, 0) returns 0.5 (2 of 4 long → LONG)
+	got := TPI(Bullish, 1, 0, 0)
+	want := 0.5
 	if got != want {
-		t.Errorf("TPI(Bullish, 1, 0) = %f, want %f", got, want)
+		t.Errorf("TPI(Bullish, 1, 0, 0) = %f, want %f", got, want)
 	}
 }
 
 func TestTPI_Mixed_BearishMajority(t *testing.T) {
-	// TPI(Bearish, -1, 0) returns -0.67 (2 of 3 short → CASH)
-	got := TPI(Bearish, -1, 0)
-	want := -2.0 / 3.0
+	// TPI(Bearish, -1, 0, 0) returns -0.5 (2 of 4 short → CASH)
+	got := TPI(Bearish, -1, 0, 0)
+	want := -0.5
 	if got != want {
-		t.Errorf("TPI(Bearish, -1, 0) = %f, want %f", got, want)
+		t.Errorf("TPI(Bearish, -1, 0, 0) = %f, want %f", got, want)
 	}
 }
 
 func TestTPI_Neutral(t *testing.T) {
-	// TPI(Bullish, 0, -1) returns 0.0 (mixed → CASH)
-	got := TPI(Bullish, 0, -1)
+	// TPI(Bullish, 0, -1, 0) returns 0.0 (mixed → CASH)
+	got := TPI(Bullish, 0, -1, 0)
 	want := 0.0
 	if got != want {
-		t.Errorf("TPI(Bullish, 0, -1) = %f, want %f", got, want)
+		t.Errorf("TPI(Bullish, 0, -1, 0) = %f, want %f", got, want)
 	}
 }
 
 func TestTPI_AllHold(t *testing.T) {
-	// TPI(Bearish, 0, 0) returns -0.33
-	got := TPI(Bearish, 0, 0)
-	want := -1.0 / 3.0
+	// TPI(Bearish, 0, 0, 0) returns -0.25
+	got := TPI(Bearish, 0, 0, 0)
+	want := -1.0 / 4.0
 	if got != want {
-		t.Errorf("TPI(Bearish, 0, 0) = %f, want %f", got, want)
+		t.Errorf("TPI(Bearish, 0, 0, 0) = %f, want %f", got, want)
 	}
 }
 

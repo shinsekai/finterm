@@ -41,17 +41,17 @@ func Score(emaFast, emaSlow float64) Signal {
 }
 
 // TPI computes the Trend Probability Indicator.
-// It averages the EMA crossover signal, BLITZ score, and DESTINY score.
+// It averages the EMA crossover signal, BLITZ score, DESTINY score, and FLOW score.
 // Returns a value from -1.0 to +1.0.
 // TPI > 0 → LONG, TPI <= 0 → CASH.
-func TPI(emaSignal Signal, blitzScore, destinyScore int) float64 {
+func TPI(emaSignal Signal, blitzScore, destinyScore, flowScore int) float64 {
 	ema := float64(0)
 	if emaSignal == Bullish {
 		ema = 1.0
 	} else {
 		ema = -1.0
 	}
-	return (ema + float64(blitzScore) + float64(destinyScore)) / 3.0
+	return (ema + float64(blitzScore) + float64(destinyScore) + float64(flowScore)) / 4.0
 }
 
 // TPISignal returns the TPI signal label.

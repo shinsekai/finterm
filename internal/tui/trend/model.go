@@ -3,7 +3,6 @@ package trend
 
 import (
 	"context"
-	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -130,12 +129,12 @@ func (m *Model) Configure(
 
 // Init initializes the trend model and returns an initial command.
 // Triggers concurrent fetch for all watchlist tickers.
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return m.fetchAllCmd()
 }
 
 // Update handles messages and updates the model state.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
@@ -175,12 +174,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the trend view.
-func (m Model) View() string {
+func (m *Model) View() string {
 	return NewView(m).Render()
 }
 
 // handleKeyMsg handles keyboard input messages.
-func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyUp:
 		if m.activeRow > 0 {
@@ -206,7 +205,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 // handleTrendData updates the model with trend analysis result for a ticker.
-func (m Model) handleTrendData(msg TrendDataMsg) Model {
+func (m *Model) handleTrendData(msg TrendDataMsg) *Model {
 	for i, row := range m.rows {
 		if row.Symbol == msg.Symbol {
 			m.rows[i].State = StateLoaded
@@ -219,7 +218,7 @@ func (m Model) handleTrendData(msg TrendDataMsg) Model {
 }
 
 // handleTrendError updates the model with an error for a ticker.
-func (m Model) handleTrendError(msg TrendErrorMsg) Model {
+func (m *Model) handleTrendError(msg TrendErrorMsg) *Model {
 	for i, row := range m.rows {
 		if row.Symbol == msg.Symbol {
 			m.rows[i].State = StateError
@@ -276,7 +275,7 @@ func (m Model) fetchTickerCmd(index int) tea.Cmd {
 }
 
 // updateOverallState updates the overall state based on the status of all rows.
-func (m Model) updateOverallState() Model {
+func (m *Model) updateOverallState() *Model {
 	allLoaded := true
 	hasLoading := false
 
@@ -434,6 +433,29 @@ func (m Model) GetTPICounts() (long, cash int) {
 	return l, c
 }
 
+// GetFlowCounts returns the count of LONG, SHORT, and HOLD FLOW signals
+// across all loaded rows. Loading and error rows are ignored.
+func (m Model) GetFlowCounts() (long, short, hold int) {
+	var l, s, h int
+	for _, row := range m.rows {
+		if row.State != StateLoaded && row.State != StateCached {
+			continue
+		}
+		if row.Result == nil {
+			continue
+		}
+		switch row.Result.FlowScore {
+		case 1:
+			l++
+		case -1:
+			s++
+		default:
+			h++
+		}
+	}
+	return l, s, h
+}
+
 // KeyBindings returns the keyboard bindings for the trend view.
 func (m Model) KeyBindings() []components.KeyBinding {
 	return []components.KeyBinding{
@@ -458,10 +480,4 @@ type TrendErrorMsg struct { //nolint:revive // type name stutters with package n
 	Symbol string
 	Err    error
 	Index  int
-}
-
-// FormatValue formats a float value for display with fixed decimal places.
-func FormatValue(value float64, decimals int) string {
-	format := fmt.Sprintf("%%.%df", decimals)
-	return fmt.Sprintf(format, value)
 }

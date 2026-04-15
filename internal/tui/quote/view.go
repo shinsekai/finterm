@@ -518,6 +518,10 @@ func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingD
 	fmt.Fprintf(&content, "%s%s\n",
 		v.theme.Muted().Render(fmt.Sprintf("%-14s", "DESTINY")),
 		v.renderDestinyBadge(indicators.DestinyScore))
+	// FLOW badge
+	fmt.Fprintf(&content, "%s%s\n",
+		v.theme.Muted().Render(fmt.Sprintf("%-14s", "FLOW")),
+		v.renderFlowBadge(indicators.FlowScore))
 
 	// Composite section
 	fmt.Fprintf(&content, "\n%s\n", v.theme.Muted().Render("─ Composite ────"))
@@ -580,6 +584,18 @@ func (v *View) renderBlitzBadge(blitzScore int) string {
 // renderDestinyBadge renders a DESTINY score as a colored badge.
 func (v *View) renderDestinyBadge(destinyScore int) string {
 	switch destinyScore {
+	case 1:
+		return v.theme.Bullish().Render("▲ LONG")
+	case -1:
+		return v.theme.Bearish().Render("▼ SHORT")
+	default:
+		return ""
+	}
+}
+
+// renderFlowBadge renders a FLOW score as a colored badge.
+func (v *View) renderFlowBadge(flowScore int) string {
+	switch flowScore {
 	case 1:
 		return v.theme.Bullish().Render("▲ LONG")
 	case -1:

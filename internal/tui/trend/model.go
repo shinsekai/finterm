@@ -3,7 +3,6 @@ package trend
 
 import (
 	"context"
-	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -176,11 +175,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the trend view.
 func (m Model) View() string {
-	return NewView(m).Render()
+	return NewView(&m).Render()
 }
 
 // handleKeyMsg handles keyboard input messages.
-func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyUp:
 		if m.activeRow > 0 {
@@ -434,6 +433,29 @@ func (m Model) GetTPICounts() (long, cash int) {
 	return l, c
 }
 
+// GetFlowCounts returns the count of LONG, SHORT, and HOLD FLOW signals
+// across all loaded rows. Loading and error rows are ignored.
+func (m Model) GetFlowCounts() (long, short, hold int) {
+	var l, s, h int
+	for _, row := range m.rows {
+		if row.State != StateLoaded && row.State != StateCached {
+			continue
+		}
+		if row.Result == nil {
+			continue
+		}
+		switch row.Result.FlowScore {
+		case 1:
+			l++
+		case -1:
+			s++
+		default:
+			h++
+		}
+	}
+	return l, s, h
+}
+
 // KeyBindings returns the keyboard bindings for the trend view.
 func (m Model) KeyBindings() []components.KeyBinding {
 	return []components.KeyBinding{
@@ -458,10 +480,4 @@ type TrendErrorMsg struct { //nolint:revive // type name stutters with package n
 	Symbol string
 	Err    error
 	Index  int
-}
-
-// FormatValue formats a float value for display with fixed decimal places.
-func FormatValue(value float64, decimals int) string {
-	format := fmt.Sprintf("%%.%df", decimals)
-	return fmt.Sprintf(format, value)
 }

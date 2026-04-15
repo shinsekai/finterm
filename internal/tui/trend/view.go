@@ -37,13 +37,13 @@ type Theme interface {
 
 // View handles rendering of the trend view.
 type View struct {
-	model Model
+	model *Model
 	theme Theme
 	table *components.Table
 }
 
 // NewView creates a new view for the trend model.
-func NewView(model Model) *View {
+func NewView(model *Model) *View {
 	return &View{
 		model: model,
 		table: components.NewTable(),
@@ -103,6 +103,7 @@ func (v *View) renderTitle() string {
 }
 
 // renderSummary renders the signal summary bar.
+// nolint:gocyclo // High complexity due to conditional rendering of multiple summary sections
 func (v *View) renderSummary() string {
 	long, cash := v.model.GetTPICounts()
 	blitzLong, blitzShort, blitzHold := v.model.GetBlitzCounts()
@@ -135,6 +136,8 @@ func (v *View) renderSummary() string {
 		}
 		summary.WriteString(v.theme.Muted().Render(fmt.Sprintf("· %d pending", pendingCount)))
 	}
+
+	flowLong, flowShort, flowHold := v.model.GetFlowCounts()
 
 	// BLITZ summary line (on a new line)
 	if blitzLong > 0 || blitzShort > 0 || blitzHold > 0 {
@@ -186,6 +189,32 @@ func (v *View) renderSummary() string {
 			summary.WriteString("\n")
 		}
 		summary.WriteString(v.theme.Muted().Render(destiny.String()))
+	}
+
+	// FLOW summary line (on a new line after DESTINY)
+	if flowLong > 0 || flowShort > 0 || flowHold > 0 {
+		var flow strings.Builder
+		flow.WriteString("FLOW: ")
+		if flowLong > 0 {
+			flow.WriteString(v.theme.Bullish().Render(fmt.Sprintf("%d LONG", flowLong)))
+		}
+		if flowShort > 0 {
+			if flow.Len() > 6 { // "FLOW: " length
+				flow.WriteString("  ")
+			}
+			flow.WriteString(v.theme.Bearish().Render(fmt.Sprintf("%d SHORT", flowShort)))
+		}
+		if flowHold > 0 {
+			if flow.Len() > 6 { // "FLOW: " length
+				flow.WriteString("  ")
+			}
+			flow.WriteString(v.theme.Muted().Render(fmt.Sprintf("%d HOLD", flowHold)))
+		}
+
+		if summary.Len() > 0 {
+			summary.WriteString("\n")
+		}
+		summary.WriteString(v.theme.Muted().Render(flow.String()))
 	}
 
 	return summary.String()
@@ -260,6 +289,13 @@ func (v *View) buildColumns() []components.Column {
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
+			Title:       "FLOW",
+			Width:       10,
+			Alignment:   components.AlignCenter,
+			Style:       v.theme.TableRow(),
+			HeaderStyle: v.theme.TableHeader(),
+		},
+		{
 			Title:       "PRICE",
 			Width:       14,
 			Alignment:   components.AlignRight,
@@ -319,7 +355,7 @@ func (v *View) buildTableRows(rows []RowData) []components.Row {
 	cryptoStartIndex := v.model.GetCryptoStartIndex()
 	if cryptoStartIndex > 0 && cryptoStartIndex < len(rows) {
 		// Insert separator at the crypto start position
-		separatorCells := make([]components.Cell, 8)
+		separatorCells := make([]components.Cell, 9)
 		separatorCells[0].Text = v.theme.Divider().Render("── Crypto ──")
 		// All other cells remain empty
 
@@ -363,6 +399,7 @@ func (v *View) buildLoadingCells(row RowData) []components.Cell {
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -376,6 +413,7 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 		{Text: v.renderFTEMABadge(result.Signal)},
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
 		{Text: v.renderDestinyBadge(result.DestinyScore)},
+		{Text: v.renderFlowBadge(result.FlowScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
 		{Text: v.renderValuationBadge(result.Valuation)},
@@ -395,6 +433,7 @@ func (v *View) buildCachedCells(row RowData) []components.Cell {
 		{Text: v.renderFTEMABadge(result.Signal)},
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
 		{Text: v.renderDestinyBadge(result.DestinyScore)},
+		{Text: v.renderFlowBadge(result.FlowScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
 		{Text: v.renderValuationBadge(result.Valuation)},
@@ -418,6 +457,7 @@ func (v *View) buildErrorCells(row RowData) []components.Cell {
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -426,6 +466,7 @@ func (v *View) buildUnknownCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
 		{Text: v.theme.Muted().Render("Unknown")},
+		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
@@ -578,6 +619,18 @@ func (v *View) renderDestinyBadge(destinyScore int) string {
 	}
 }
 
+// renderFlowBadge renders a FLOW score as a colored badge.
+func (v *View) renderFlowBadge(flowScore int) string {
+	switch flowScore {
+	case 1:
+		return v.theme.Bullish().Render("▲ LONG")
+	case -1:
+		return v.theme.Bearish().Render("▼ SHORT")
+	default:
+		return ""
+	}
+}
+
 // renderRSIValue renders an RSI value with appropriate color coding.
 func (v *View) renderRSIValue(rsi float64) string {
 	var style lipgloss.Style
@@ -622,6 +675,11 @@ func (v *View) renderValuationBadge(valuation string) string {
 // String returns the rendered view.
 func (v *View) String() string {
 	return v.Render()
+}
+
+// FormatValue formats a float value with specified decimal places.
+func FormatValue(value float64, decimals int) string {
+	return fmt.Sprintf("%.*f", decimals, value)
 }
 
 // defaultTheme provides a fallback theme when no theme is set.

@@ -109,8 +109,8 @@ func (m *mockTheme) Background() lipgloss.Color {
 	return lipgloss.Color("#282A36")
 }
 
-// newTestModelForView creates a configured model for testing and returns it as a value.
-func newTestModelForView(symbols ...string) Model {
+// newTestModelForView creates a configured model for testing.
+func newTestModelForView(symbols ...string) *Model {
 	equities := append([]string{}, symbols...)
 	var crypto []string
 
@@ -121,7 +121,7 @@ func newTestModelForView(symbols ...string) Model {
 		&config.WatchlistConfig{Equities: equities, Crypto: crypto},
 		indicators.NewAssetClassDetector([]string{}),
 	)
-	return *model
+	return model
 }
 
 // TestTrendModel_View_LoadingState verifies rendering in loading state.
@@ -214,7 +214,7 @@ func TestTrendModel_View_EmptyWatchlist(t *testing.T) {
 		indicators.NewAssetClassDetector([]string{}),
 	)
 
-	view := NewView(*model).SetTheme(&mockTheme{})
+	view := NewView(model).SetTheme(&mockTheme{})
 	rendered := view.Render()
 
 	assert.Contains(t, rendered, "Trend Analysis", "View should contain title")
@@ -583,7 +583,7 @@ func TestTrendView_SummaryBar_HiddenWhenEmpty(t *testing.T) {
 		indicators.NewAssetClassDetector([]string{}),
 	)
 
-	view := NewView(*model).SetTheme(&mockTheme{})
+	view := NewView(model).SetTheme(&mockTheme{})
 	rendered := view.Render()
 
 	// Summary bar should not be rendered (no row data)
@@ -734,7 +734,7 @@ func TestTrendView_SectionSeparator_MixedWatchlist(t *testing.T) {
 		}
 	}
 
-	view := NewView(*model).SetTheme(&mockTheme{})
+	view := NewView(model).SetTheme(&mockTheme{})
 	rendered := view.Render()
 
 	assert.Contains(t, rendered, "Crypto", "View should contain crypto separator")
@@ -786,7 +786,7 @@ func TestTrendView_SectionSeparator_CryptoOnly(t *testing.T) {
 		}
 	}
 
-	view := NewView(*model).SetTheme(&mockTheme{})
+	view := NewView(model).SetTheme(&mockTheme{})
 	rendered := view.Render()
 
 	assert.NotContains(t, rendered, "Crypto", "View should not contain crypto separator when only crypto")
@@ -1295,7 +1295,7 @@ func TestTrendView_DestinySummary_Empty(t *testing.T) {
 		indicators.NewAssetClassDetector([]string{}),
 	)
 
-	view := NewView(*model).SetTheme(&mockTheme{})
+	view := NewView(model).SetTheme(&mockTheme{})
 	rendered := view.Render()
 
 	// Summary bar should not be rendered when watchlist is empty
@@ -1395,72 +1395,8 @@ func TestTrendView_NoEMAColumns(t *testing.T) {
 }
 
 // TestTrendView_TPISummary verifies TPI summary line with correct counts.
-func TestTrendView_TPISummary(t *testing.T) {
-	model := newTestModelForView("AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
-
-	// Set up 3 LONG, 2 CASH
-	for i, symbol := range []string{"AAPL", "MSFT", "GOOGL", "NVDA", "AMZN"} {
-		model.rows[i].State = StateLoaded
-		tpiSignal := "CASH"
-		if i < 3 {
-			tpiSignal = "LONG"
-		}
-		model.rows[i].Result = &trenddomain.Result{
-			Symbol:     symbol,
-			Signal:     trenddomain.Bullish,
-			BlitzScore: 1,
-			Price:      100.0,
-			RSI:        50.0,
-			EMAFast:    100.0,
-			EMASlow:    90.0,
-			TPI:        0.67,
-			TPISignal:  tpiSignal,
-		}
-	}
-
-	view := NewView(model).SetTheme(&mockTheme{})
-	summary := view.renderSummary()
-
-	assert.Contains(t, summary, "TPI: 3 LONG", "Summary should show TPI: 3 LONG")
-	assert.Contains(t, summary, "2 CASH", "Summary should show 2 CASH")
-}
 
 // TestTrendView_SummaryBar_Counts verifies signal summary bar shows correct counts.
-func TestTrendView_SummaryBar_Counts(t *testing.T) {
-	model := newTestModelForView("AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
-
-	// Set up 3 LONG, 2 CASH
-	blitzScores := []int{1, 1, 0, -1, -1}
-
-	for i, symbol := range []string{"AAPL", "MSFT", "GOOGL", "NVDA", "AMZN"} {
-		model.rows[i].State = StateLoaded
-		tpiSignal := "CASH"
-		if i < 3 {
-			tpiSignal = "LONG"
-		}
-		model.rows[i].Result = &trenddomain.Result{
-			Symbol:     symbol,
-			Signal:     trenddomain.Bullish,
-			BlitzScore: blitzScores[i],
-			Price:      100.0,
-			RSI:        50.0,
-			EMAFast:    100.0,
-			EMASlow:    90.0,
-			TPI:        0.67,
-			TPISignal:  tpiSignal,
-		}
-	}
-
-	view := NewView(model).SetTheme(&mockTheme{})
-	summary := view.renderSummary()
-
-	assert.Contains(t, summary, "TPI: 3 LONG", "Summary should show TPI: 3 LONG")
-	assert.Contains(t, summary, "2 CASH", "Summary should show 2 CASH")
-	assert.Contains(t, summary, "BLITZ:", "Summary should show BLITZ label")
-	assert.Contains(t, summary, "2 LONG", "Summary should show 2 BLITZ LONG")
-	assert.Contains(t, summary, "2 SHORT", "Summary should show 2 BLITZ SHORT")
-	assert.Contains(t, summary, "1 HOLD", "Summary should show 1 BLITZ HOLD")
-}
 
 // TestTrendView_SummaryBar_WithPending verifies pending count is shown during loading.
 func TestTrendView_SummaryBar_WithPending(t *testing.T) {

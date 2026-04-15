@@ -129,12 +129,12 @@ func (m *Model) Configure(
 
 // Init initializes the trend model and returns an initial command.
 // Triggers concurrent fetch for all watchlist tickers.
-func (m *Model) Init() tea.Cmd {
+func (m Model) Init() tea.Cmd {
 	return m.fetchAllCmd()
 }
 
 // Update handles messages and updates the model state.
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
@@ -174,12 +174,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the trend view.
-func (m *Model) View() string {
-	return NewView(m).Render()
+func (m Model) View() string {
+	return NewView(&m).Render()
 }
 
 // handleKeyMsg handles keyboard input messages.
-func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyUp:
 		if m.activeRow > 0 {
@@ -205,7 +205,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleTrendData updates the model with trend analysis result for a ticker.
-func (m *Model) handleTrendData(msg TrendDataMsg) *Model {
+func (m Model) handleTrendData(msg TrendDataMsg) Model {
 	for i, row := range m.rows {
 		if row.Symbol == msg.Symbol {
 			m.rows[i].State = StateLoaded
@@ -218,7 +218,7 @@ func (m *Model) handleTrendData(msg TrendDataMsg) *Model {
 }
 
 // handleTrendError updates the model with an error for a ticker.
-func (m *Model) handleTrendError(msg TrendErrorMsg) *Model {
+func (m Model) handleTrendError(msg TrendErrorMsg) Model {
 	for i, row := range m.rows {
 		if row.Symbol == msg.Symbol {
 			m.rows[i].State = StateError
@@ -275,7 +275,7 @@ func (m Model) fetchTickerCmd(index int) tea.Cmd {
 }
 
 // updateOverallState updates the overall state based on the status of all rows.
-func (m *Model) updateOverallState() *Model {
+func (m Model) updateOverallState() Model {
 	allLoaded := true
 	hasLoading := false
 

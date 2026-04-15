@@ -29,10 +29,14 @@ func (m *mockEngine) AnalyzeWithSymbolDetection(_ context.Context, _ string) (*t
 }
 
 // asModel converts a tea.Model to *Model.
+// Handles both pointer and value types since Model methods use value receivers.
 func asModel(t *testing.T, m tea.Model) *Model {
 	t.Helper()
 	if ptrModel, ok := m.(*Model); ok {
 		return ptrModel
+	}
+	if valModel, ok := m.(Model); ok {
+		return &valModel
 	}
 	require.Fail(t, "expected *Model, got %T", m)
 	return nil

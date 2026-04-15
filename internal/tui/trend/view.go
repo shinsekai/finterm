@@ -11,6 +11,13 @@ import (
 	"github.com/shinsekai/finterm/internal/tui/components"
 )
 
+// Hardcoded color styles for table cell rendering.
+// These direct foreground colors survive table row styling because they're applied to inner text content.
+var (
+	greenStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#50FA7B")) // Dracula green
+	redStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5555")) // Dracula red
+)
+
 // Theme defines the interface for theme styling.
 // This is defined here to avoid import cycle with the parent tui package.
 type Theme interface {
@@ -262,7 +269,7 @@ func (v *View) buildColumns() []components.Column {
 		},
 		{
 			Title:       "TPI",
-			Width:       18,
+			Width:       24,
 			Alignment:   components.AlignLeft,
 			Style:       v.theme.TableRow(),
 			HeaderStyle: v.theme.TableHeader(),
@@ -487,10 +494,11 @@ func (v *View) renderFooter() string {
 		v.theme.Accent().Render("?") + " " + v.theme.Muted().Render("help")
 }
 
-// renderTPICell renders the TPI gauge and label.
+// renderTPICell renders the TPI gauge, numeric value, and label.
 // Gauge is 10 chars wide: left half (0-4) is bearish, center (5) is neutral, right half (6-9) is bullish.
 // For TPI > 0: fill from center rightward with "▓" in bullish color, "░" in muted.
 // For TPI <= 0: fill from center leftward with "▓" in bearish color, "░" in muted.
+// The numeric value is shown with sign (+/-) and color-coded based on TPI sign.
 func (v *View) renderTPICell(tpi float64, tpiSignal string) string {
 	// Clamp TPI to [-1, 1]
 	switch {
@@ -574,22 +582,34 @@ func (v *View) renderTPICell(tpi float64, tpiSignal string) string {
 	}
 
 	// Render label
-	labelStyle := v.theme.Muted()
+	var label string
 	if tpi > 0 {
-		labelStyle = v.theme.Bullish()
+		label = greenStyle.Render(tpiSignal)
+	} else {
+		label = redStyle.Render(tpiSignal)
 	}
-	label := labelStyle.Render(tpiSignal)
 
-	return gaugeStr + " " + label
+	// Format TPI value with sign and color
+	var tpiValue string
+	switch {
+	case tpi > 0:
+		tpiValue = greenStyle.Render(fmt.Sprintf("%+.2f", tpi))
+	case tpi < 0:
+		tpiValue = redStyle.Render(fmt.Sprintf("%+.2f", tpi))
+	default:
+		tpiValue = fmt.Sprintf("%+.2f", tpi)
+	}
+
+	return gaugeStr + " " + tpiValue + " " + label
 }
 
 // renderFTEMABadge renders the FTEMA (EMA crossover) as a colored badge.
 func (v *View) renderFTEMABadge(signal trenddomain.Signal) string {
 	switch signal {
 	case trenddomain.Bullish:
-		return v.theme.Bullish().Render("▲ LONG")
+		return greenStyle.Render("▲  LONG")
 	case trenddomain.Bearish:
-		return v.theme.Bearish().Render("▼ SHORT")
+		return redStyle.Render("▼ SHORT")
 	default:
 		return ""
 	}
@@ -599,9 +619,9 @@ func (v *View) renderFTEMABadge(signal trenddomain.Signal) string {
 func (v *View) renderBlitzBadge(blitzScore int) string {
 	switch blitzScore {
 	case 1:
-		return v.theme.Bullish().Render("▲ LONG")
+		return greenStyle.Render("▲  LONG")
 	case -1:
-		return v.theme.Bearish().Render("▼ SHORT")
+		return redStyle.Render("▼ SHORT")
 	default:
 		return ""
 	}
@@ -611,9 +631,9 @@ func (v *View) renderBlitzBadge(blitzScore int) string {
 func (v *View) renderDestinyBadge(destinyScore int) string {
 	switch destinyScore {
 	case 1:
-		return v.theme.Bullish().Render("▲ LONG")
+		return greenStyle.Render("▲  LONG")
 	case -1:
-		return v.theme.Bearish().Render("▼ SHORT")
+		return redStyle.Render("▼ SHORT")
 	default:
 		return ""
 	}
@@ -623,9 +643,9 @@ func (v *View) renderDestinyBadge(destinyScore int) string {
 func (v *View) renderFlowBadge(flowScore int) string {
 	switch flowScore {
 	case 1:
-		return v.theme.Bullish().Render("▲ LONG")
+		return greenStyle.Render("▲  LONG")
 	case -1:
-		return v.theme.Bearish().Render("▼ SHORT")
+		return redStyle.Render("▼ SHORT")
 	default:
 		return ""
 	}

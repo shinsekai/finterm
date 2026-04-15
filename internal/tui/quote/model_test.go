@@ -767,7 +767,7 @@ func TestQuoteView_IndicatorsCard_FTEMABadge_Bull(t *testing.T) {
 	view := NewView(model).SetTheme(&defaultTheme{})
 	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
 
-	assert.Contains(t, card, "▲ LONG", "Bullish FTEMA should show ▲ LONG badge")
+	assert.Contains(t, card, "▲  LONG", "Bullish FTEMA should show ▲ LONG badge")
 }
 
 // TestQuoteView_IndicatorsCard_FTEMABadge_Bear verifies bearish FTEMA badge.
@@ -815,7 +815,7 @@ func TestQuoteView_IndicatorsCard_BlitzBadge(t *testing.T) {
 	view := NewView(model).SetTheme(&defaultTheme{})
 	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
 
-	assert.Contains(t, card, "▲ LONG", "BLITZ LONG should show ▲ LONG badge")
+	assert.Contains(t, card, "▲  LONG", "BLITZ LONG should show ▲ LONG badge")
 
 	// Test BLITZ SHORT
 	model.quoteData.Indicators.BlitzScore = -1
@@ -852,7 +852,7 @@ func TestQuoteView_IndicatorsCard_DestinyBadge(t *testing.T) {
 	view := NewView(model).SetTheme(&defaultTheme{})
 	card := view.renderIndicatorsCard(model.quoteData.Indicators, "2026-04-01")
 
-	assert.Contains(t, card, "▲ LONG", "DESTINY LONG should show ▲ LONG badge")
+	assert.Contains(t, card, "▲  LONG", "DESTINY LONG should show ▲ LONG badge")
 
 	// Test DESTINY SHORT
 	model.quoteData.Indicators.DestinyScore = -1

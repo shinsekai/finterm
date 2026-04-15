@@ -539,9 +539,11 @@ func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingD
 		tpiStyle.Render(fmt.Sprintf("%+.2f", indicators.TPI)))
 
 	// TPI gauge + signal label on same line
-	tpiSignalStyle := v.theme.Muted()
+	var tpiSignalStyle lipgloss.Style
 	if indicators.TPI > 0 {
 		tpiSignalStyle = v.theme.Bullish()
+	} else {
+		tpiSignalStyle = v.theme.Bearish()
 	}
 	fmt.Fprintf(&content, "%s%s %s\n",
 		v.theme.Muted().Render(fmt.Sprintf("%-14s", "")),
@@ -561,7 +563,7 @@ func (v *View) renderIndicatorsCard(indicators *trenddomain.Result, lastTradingD
 func (v *View) renderFTEMABadge(signal trenddomain.Signal) string {
 	switch signal {
 	case trenddomain.Bullish:
-		return v.theme.Bullish().Render("▲ LONG")
+		return v.theme.Bullish().Render("▲  LONG")
 	case trenddomain.Bearish:
 		return v.theme.Bearish().Render("▼ SHORT")
 	default:
@@ -573,7 +575,7 @@ func (v *View) renderFTEMABadge(signal trenddomain.Signal) string {
 func (v *View) renderBlitzBadge(blitzScore int) string {
 	switch blitzScore {
 	case 1:
-		return v.theme.Bullish().Render("▲ LONG")
+		return v.theme.Bullish().Render("▲  LONG")
 	case -1:
 		return v.theme.Bearish().Render("▼ SHORT")
 	default:
@@ -585,7 +587,7 @@ func (v *View) renderBlitzBadge(blitzScore int) string {
 func (v *View) renderDestinyBadge(destinyScore int) string {
 	switch destinyScore {
 	case 1:
-		return v.theme.Bullish().Render("▲ LONG")
+		return v.theme.Bullish().Render("▲  LONG")
 	case -1:
 		return v.theme.Bearish().Render("▼ SHORT")
 	default:
@@ -597,7 +599,7 @@ func (v *View) renderDestinyBadge(destinyScore int) string {
 func (v *View) renderFlowBadge(flowScore int) string {
 	switch flowScore {
 	case 1:
-		return v.theme.Bullish().Render("▲ LONG")
+		return v.theme.Bullish().Render("▲  LONG")
 	case -1:
 		return v.theme.Bearish().Render("▼ SHORT")
 	default:

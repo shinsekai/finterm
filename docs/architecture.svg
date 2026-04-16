@@ -1,4 +1,4 @@
-<svg width="100%" viewBox="0 0 880 720" xmlns="http://www.w3.org/2000/svg" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;">
+<svg width="100%" viewBox="0 0 880 900" xmlns="http://www.w3.org/2000/svg" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -10,11 +10,11 @@
   </defs>
 
   <!-- Background -->
-  <rect width="880" height="720" rx="12" fill="url(#bgGrad)" stroke="#e0e0e0" stroke-width="1"/>
+  <rect width="880" height="900" rx="12" fill="url(#bgGrad)" stroke="#e0e0e0" stroke-width="1"/>
 
   <!-- Title -->
   <text x="440" y="36" text-anchor="middle" font-size="18" font-weight="600" fill="#1a1a1a">Finterm — High-Level Architecture</text>
-  <text x="440" y="54" text-anchor="middle" font-size="11" fill="#888">Go + Bubbletea + Alpha Vantage</text>
+  <text x="440" y="54" text-anchor="middle" font-size="11" fill="#888">Go + Bubbletea + Alpha Vantage · 5-signal TPI composite</text>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- PRESENTATION LAYER -->
@@ -30,11 +30,11 @@
   <!-- Views -->
   <rect x="60" y="150" width="170" height="50" rx="8" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="1"/>
   <text x="145" y="172" text-anchor="middle" font-size="12" font-weight="500" fill="#3C3489">Trend View</text>
-  <text x="145" y="188" text-anchor="middle" font-size="10" fill="#7F77DD">EMA crossover + RSI</text>
+  <text x="145" y="188" text-anchor="middle" font-size="10" fill="#7F77DD">5 signals · TPI gauge</text>
 
   <rect x="245" y="150" width="150" height="50" rx="8" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="1"/>
   <text x="320" y="172" text-anchor="middle" font-size="12" font-weight="500" fill="#3C3489">Quote View</text>
-  <text x="320" y="188" text-anchor="middle" font-size="10" fill="#7F77DD">Ticker lookup</text>
+  <text x="320" y="188" text-anchor="middle" font-size="10" fill="#7F77DD">Ticker + signals</text>
 
   <rect x="410" y="150" width="150" height="50" rx="8" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="1"/>
   <text x="485" y="172" text-anchor="middle" font-size="12" font-weight="500" fill="#3C3489">Macro View</text>
@@ -52,8 +52,8 @@
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- Arrows: Presentation → Domain -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
-  <line x1="145" y1="200" x2="145" y2="260" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
-  <line x1="485" y1="200" x2="485" y2="260" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="145" y1="200" x2="145" y2="258" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="485" y1="200" x2="485" y2="258" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
 
   <!-- tea.Msg / tea.Cmd labels -->
   <text x="26" y="240" font-size="9" fill="#888" transform="rotate(-90 26 240)">tea.Msg ↑</text>
@@ -64,108 +64,151 @@
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- DOMAIN LAYER -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
-  <rect x="40" y="260" width="800" height="130" rx="10" fill="none" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="6 3"/>
-  <text x="60" y="280" font-size="12" font-weight="600" fill="#0F6E56">DOMAIN LAYER</text>
-  <text x="210" y="280" font-size="10" fill="#888">Pure business logic — no HTTP, no TUI imports</text>
-
-  <!-- Trend Engine -->
-  <rect x="60" y="294" width="240" height="80" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1"/>
-  <text x="180" y="316" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">Trend Engine</text>
-  <line x1="80" y1="326" x2="280" y2="326" stroke="#9FE1CB" stroke-width="0.8"/>
-  <!-- Sub-items -->
-  <text x="80" y="342" font-size="10" fill="#0F6E56">→ EMA(10/20) crossover scoring</text>
-  <text x="80" y="358" font-size="10" fill="#0F6E56">→ Dual-path: remote / local</text>
-
-  <!-- Indicators -->
-  <rect x="320" y="294" width="240" height="80" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1"/>
-  <text x="440" y="316" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">Indicators</text>
-  <line x1="340" y1="326" x2="540" y2="326" stroke="#9FE1CB" stroke-width="0.8"/>
-  <text x="340" y="342" font-size="10" fill="#0F6E56">→ RSI (RMA/Wilder smoothing)</text>
-  <text x="340" y="358" font-size="10" fill="#0F6E56">→ EMA (TradingView parity)</text>
-
-  <!-- Valuation -->
-  <rect x="580" y="294" width="240" height="80" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1"/>
-  <text x="700" y="316" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">Valuation</text>
-  <line x1="600" y1="326" x2="800" y2="326" stroke="#9FE1CB" stroke-width="0.8"/>
-  <text x="600" y="342" font-size="10" fill="#0F6E56">→ RSI-based scoring</text>
-  <text x="600" y="358" font-size="10" fill="#0F6E56">→ Oversold → Overbought</text>
+  <rect x="40" y="258" width="800" height="320" rx="10" fill="none" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <text x="60" y="278" font-size="12" font-weight="600" fill="#0F6E56">DOMAIN LAYER</text>
+  <text x="154" y="278" font-size="10" fill="#888">Pure business logic — no HTTP, no TUI imports</text>
 
   <!-- Bar close badge -->
-  <rect x="694" y="264" width="136" height="22" rx="11" fill="#FAEEDA" stroke="#EF9F27" stroke-width="1"/>
-  <text x="762" y="279" text-anchor="middle" font-size="9" font-weight="500" fill="#854F0B">Bar close data only</text>
+  <rect x="694" y="262" width="136" height="22" rx="11" fill="#FAEEDA" stroke="#EF9F27" stroke-width="1"/>
+  <text x="762" y="277" text-anchor="middle" font-size="9" font-weight="500" fill="#854F0B">Bar close data only</text>
+
+  <!-- Row A: Trend Engine (orchestrator) + Valuation -->
+  <rect x="60" y="294" width="580" height="58" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1.2"/>
+  <text x="350" y="314" text-anchor="middle" font-size="12" font-weight="600" fill="#085041">Trend Engine — Composite Orchestrator</text>
+  <text x="350" y="332" text-anchor="middle" font-size="10" fill="#0F6E56">FTEMA · BLITZ · DESTINY · FLOW · VORTEX  →  TPI = avg ∈ [−1, +1]</text>
+  <text x="350" y="346" text-anchor="middle" font-size="9" fill="#5DCAA5">Dual path: remote indicators for equities · local computation for crypto</text>
+
+  <rect x="660" y="294" width="160" height="58" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1"/>
+  <text x="740" y="314" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">Valuation</text>
+  <text x="740" y="332" text-anchor="middle" font-size="10" fill="#0F6E56">RSI tier classification</text>
+  <text x="740" y="345" text-anchor="middle" font-size="9" fill="#5DCAA5">Oversold → Overbought</text>
+
+  <!-- Arrows from orchestrator down to engine row -->
+  <line x1="125" y1="352" x2="125" y2="376" stroke="#5DCAA5" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="265" y1="352" x2="265" y2="376" stroke="#5DCAA5" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="405" y1="352" x2="405" y2="376" stroke="#5DCAA5" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="545" y1="352" x2="545" y2="376" stroke="#5DCAA5" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- Row B: 4 Signal Engine packages -->
+  <rect x="60" y="376" width="130" height="72" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1"/>
+  <text x="125" y="394" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">BLITZ</text>
+  <line x1="74" y1="402" x2="176" y2="402" stroke="#9FE1CB" stroke-width="0.8"/>
+  <text x="125" y="418" text-anchor="middle" font-size="10" fill="#0F6E56">TSI (Pearson)</text>
+  <text x="125" y="432" text-anchor="middle" font-size="10" fill="#0F6E56">+ Dynamic RSI</text>
+  <text x="125" y="444" text-anchor="middle" font-size="9" fill="#5DCAA5">momentum score</text>
+
+  <rect x="200" y="376" width="130" height="72" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1"/>
+  <text x="265" y="394" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">DESTINY</text>
+  <line x1="214" y1="402" x2="316" y2="402" stroke="#9FE1CB" stroke-width="0.8"/>
+  <text x="265" y="418" text-anchor="middle" font-size="10" fill="#0F6E56">7-MA TPI</text>
+  <text x="265" y="432" text-anchor="middle" font-size="10" fill="#0F6E56">+ Dynamic RSI</text>
+  <text x="265" y="444" text-anchor="middle" font-size="9" fill="#5DCAA5">consensus score</text>
+
+  <rect x="340" y="376" width="130" height="72" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1"/>
+  <text x="405" y="394" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">FLOW</text>
+  <line x1="354" y1="402" x2="456" y2="402" stroke="#9FE1CB" stroke-width="0.8"/>
+  <text x="405" y="418" text-anchor="middle" font-size="10" fill="#0F6E56">HA Sebastine</text>
+  <text x="405" y="432" text-anchor="middle" font-size="10" fill="#0F6E56">+ Dynamic RSI</text>
+  <text x="405" y="444" text-anchor="middle" font-size="9" fill="#5DCAA5">double-smoothed HA</text>
+
+  <rect x="480" y="376" width="130" height="72" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1"/>
+  <text x="545" y="394" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">VORTEX</text>
+  <line x1="494" y1="402" x2="596" y2="402" stroke="#9FE1CB" stroke-width="0.8"/>
+  <text x="545" y="418" text-anchor="middle" font-size="10" fill="#0F6E56">7-MA TPI + Mid</text>
+  <text x="545" y="432" text-anchor="middle" font-size="10" fill="#0F6E56">(kernel regression)</text>
+  <text x="545" y="444" text-anchor="middle" font-size="9" fill="#5DCAA5">trend-filtered</text>
+
+  <!-- Side badge: independent, latching scores -->
+  <rect x="630" y="376" width="190" height="72" rx="8" fill="#FAFAF5" stroke="#D3D1C7" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="725" y="394" text-anchor="middle" font-size="11" font-weight="500" fill="#5F5E5A">Signal Contract</text>
+  <line x1="644" y1="402" x2="806" y2="402" stroke="#D3D1C7" stroke-width="0.8"/>
+  <text x="725" y="418" text-anchor="middle" font-size="9" fill="#888780">Each engine returns</text>
+  <text x="725" y="430" text-anchor="middle" font-size="9" fill="#888780">score ∈ {−1, 0, +1}</text>
+  <text x="725" y="442" text-anchor="middle" font-size="9" fill="#888780">with latching behavior</text>
+
+  <!-- Arrows from engines down to Dynamo -->
+  <line x1="125" y1="448" x2="125" y2="480" stroke="#5DCAA5" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="265" y1="448" x2="265" y2="480" stroke="#5DCAA5" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="405" y1="448" x2="405" y2="480" stroke="#5DCAA5" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="545" y1="448" x2="545" y2="480" stroke="#5DCAA5" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- Row C: Dynamo (shared primitives) -->
+  <rect x="60" y="480" width="760" height="76" rx="8" fill="#D5EFE4" stroke="#5DCAA5" stroke-width="1.2"/>
+  <text x="440" y="500" text-anchor="middle" font-size="12" font-weight="600" fill="#085041">Dynamo — Shared Dynamic-Length Primitives</text>
+  <line x1="280" y1="508" x2="600" y2="508" stroke="#9FE1CB" stroke-width="0.8"/>
+  <text x="440" y="524" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="ui-monospace, 'SF Mono', Menlo, monospace">SMA · EMA · WMA · DEMA · TEMA · HMA · LSMA · RMA</text>
+  <text x="440" y="540" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="ui-monospace, 'SF Mono', Menlo, monospace">Dynamic RSI · Pearson Correlation · TSI</text>
+  <text x="440" y="552" text-anchor="middle" font-size="9" fill="#5DCAA5">Adaptive lookback: length = min(maxLen, barIndex+1) — warm-up without NaN</text>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- Arrows: Domain → Data -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
-  <line x1="180" y1="374" x2="180" y2="430" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
-  <line x1="440" y1="374" x2="440" y2="430" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
-  <text x="310" y="412" text-anchor="middle" font-size="9" fill="#888">interfaces (no concrete imports)</text>
+  <line x1="200" y1="578" x2="200" y2="618" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="680" y1="578" x2="680" y2="618" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <text x="440" y="602" text-anchor="middle" font-size="9" fill="#888">interfaces only — no concrete data-layer imports</text>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- DATA LAYER -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
-  <rect x="40" y="430" width="800" height="110" rx="10" fill="none" stroke="#D85A30" stroke-width="1.5" stroke-dasharray="6 3"/>
-  <text x="60" y="450" font-size="12" font-weight="600" fill="#993C1D">DATA LAYER</text>
-  <text x="166" y="450" font-size="10" fill="#888">HTTP client + caching</text>
+  <rect x="40" y="618" width="800" height="110" rx="10" fill="none" stroke="#D85A30" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <text x="60" y="638" font-size="12" font-weight="600" fill="#993C1D">DATA LAYER</text>
+  <text x="166" y="638" font-size="10" fill="#888">HTTP client + caching</text>
 
   <!-- AV Client -->
-  <rect x="60" y="464" width="360" height="60" rx="8" fill="#FAECE7" stroke="#F0997B" stroke-width="1"/>
-  <text x="240" y="486" text-anchor="middle" font-size="12" font-weight="500" fill="#712B13">Alpha Vantage Client</text>
-  <text x="240" y="502" text-anchor="middle" font-size="10" fill="#993C1D">Rate-limited (70 req/min) · Retry with backoff · HTTPS only</text>
+  <rect x="60" y="652" width="360" height="60" rx="8" fill="#FAECE7" stroke="#F0997B" stroke-width="1"/>
+  <text x="240" y="674" text-anchor="middle" font-size="12" font-weight="500" fill="#712B13">Alpha Vantage Client</text>
+  <text x="240" y="690" text-anchor="middle" font-size="10" fill="#993C1D">Rate-limited (70 req/min) · Retry with backoff · HTTPS only</text>
 
   <!-- Cache -->
-  <rect x="440" y="464" width="220" height="60" rx="8" fill="#FAECE7" stroke="#F0997B" stroke-width="1"/>
-  <text x="550" y="486" text-anchor="middle" font-size="12" font-weight="500" fill="#712B13">TTL Cache</text>
-  <text x="550" y="502" text-anchor="middle" font-size="10" fill="#993C1D">In-memory · Per-endpoint TTL</text>
+  <rect x="440" y="652" width="220" height="60" rx="8" fill="#FAECE7" stroke="#F0997B" stroke-width="1"/>
+  <text x="550" y="674" text-anchor="middle" font-size="12" font-weight="500" fill="#712B13">TTL Cache</text>
+  <text x="550" y="690" text-anchor="middle" font-size="10" fill="#993C1D">In-memory · Per-endpoint TTL</text>
 
   <!-- Config -->
-  <rect x="680" y="464" width="140" height="60" rx="8" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="1"/>
-  <text x="750" y="486" text-anchor="middle" font-size="12" font-weight="500" fill="#444441">Config</text>
-  <text x="750" y="502" text-anchor="middle" font-size="10" fill="#888780">YAML + env vars</text>
+  <rect x="680" y="652" width="140" height="60" rx="8" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="1"/>
+  <text x="750" y="674" text-anchor="middle" font-size="12" font-weight="500" fill="#444441">Config</text>
+  <text x="750" y="690" text-anchor="middle" font-size="10" fill="#888780">YAML + env vars</text>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- Arrow: Data → Alpha Vantage API -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
-  <line x1="240" y1="524" x2="240" y2="576" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="240" y1="712" x2="240" y2="764" stroke="#888" stroke-width="1.2" marker-end="url(#arrow)"/>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- ALPHA VANTAGE API -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
-  <rect x="40" y="576" width="800" height="124" rx="10" fill="none" stroke="#378ADD" stroke-width="1.5" stroke-dasharray="6 3"/>
-  <text x="60" y="596" font-size="12" font-weight="600" fill="#185FA5">ALPHA VANTAGE API</text>
-  <text x="236" y="596" font-size="10" fill="#888">External service (paid subscription)</text>
+  <rect x="40" y="764" width="800" height="90" rx="10" fill="none" stroke="#378ADD" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <text x="60" y="784" font-size="12" font-weight="600" fill="#185FA5">ALPHA VANTAGE API</text>
+  <text x="236" y="784" font-size="10" fill="#888">External service (paid subscription)</text>
 
-  <rect x="60" y="608" width="150" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
-  <text x="135" y="626" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">Time Series</text>
-  <text x="135" y="640" text-anchor="middle" font-size="9" fill="#378ADD">Daily · Intraday · Crypto</text>
+  <rect x="60" y="796" width="150" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+  <text x="135" y="814" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">Time Series</text>
+  <text x="135" y="828" text-anchor="middle" font-size="9" fill="#378ADD">Daily · Intraday · Crypto</text>
 
-  <rect x="225" y="608" width="150" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
-  <text x="300" y="626" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">Technicals</text>
-  <text x="300" y="640" text-anchor="middle" font-size="9" fill="#378ADD">RSI · EMA (equities)</text>
+  <rect x="225" y="796" width="150" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+  <text x="300" y="814" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">Technicals</text>
+  <text x="300" y="828" text-anchor="middle" font-size="9" fill="#378ADD">RSI · EMA (equities)</text>
 
-  <rect x="390" y="608" width="150" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
-  <text x="465" y="626" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">Macro / Econ</text>
-  <text x="465" y="640" text-anchor="middle" font-size="9" fill="#378ADD">GDP · CPI · Fed · Yields</text>
+  <rect x="390" y="796" width="150" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+  <text x="465" y="814" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">Macro / Econ</text>
+  <text x="465" y="828" text-anchor="middle" font-size="9" fill="#378ADD">GDP · CPI · Fed · Yields</text>
 
-  <rect x="555" y="608" width="130" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
-  <text x="620" y="626" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">News</text>
-  <text x="620" y="640" text-anchor="middle" font-size="9" fill="#378ADD">Sentiment scored</text>
+  <rect x="555" y="796" width="130" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+  <text x="620" y="814" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">News</text>
+  <text x="620" y="828" text-anchor="middle" font-size="9" fill="#378ADD">Sentiment scored</text>
 
-  <rect x="700" y="608" width="120" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
-  <text x="760" y="626" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">Quotes</text>
-  <text x="760" y="640" text-anchor="middle" font-size="9" fill="#378ADD">Bulk · Global</text>
+  <rect x="700" y="796" width="120" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+  <text x="760" y="814" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">Quotes</text>
+  <text x="760" y="828" text-anchor="middle" font-size="9" fill="#378ADD">Bulk · Global</text>
 
-  <!-- Dual path annotation -->
-  <rect x="60" y="660" width="340" height="28" rx="6" fill="#FAEEDA" stroke="#EF9F27" stroke-width="0.8"/>
-  <text x="80" y="679" font-size="10" fill="#854F0B">⚡ Equities: server-side indicators · Crypto: local computation</text>
-
-  <!-- Legend -->
-  <rect x="440" y="660" width="400" height="28" rx="6" fill="#F1EFE8" stroke="#D3D1C7" stroke-width="0.8"/>
-  <text x="460" y="679" font-size="10" fill="#5F5E5A">
+  <!-- Legend footer -->
+  <rect x="40" y="866" width="800" height="24" rx="6" fill="#F1EFE8" stroke="#D3D1C7" stroke-width="0.8"/>
+  <text x="55" y="882" font-size="10" fill="#5F5E5A">
     <tspan fill="#534AB7">■</tspan> Presentation
     <tspan fill="#1D9E75">  ■</tspan> Domain
     <tspan fill="#D85A30">  ■</tspan> Data
     <tspan fill="#378ADD">  ■</tspan> External API
     <tspan fill="#BA7517">  ■</tspan> Constraints
+    <tspan fill="#888"> · ⚡ Equities: remote indicators · Crypto: local computation</tspan>
   </text>
 </svg>

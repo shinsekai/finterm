@@ -15,10 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Asymmetric signal logic matching DESTINY pattern (AND for longs, OR for shorts)
 - FLOW column in trend and quote views showing ▲ LONG / ▼ SHORT
 - FLOW summary counts in trend summary bar
+- TPI numeric value displayed in trend table (e.g., `+0.50 LONG` or `-0.25 CASH`)
 - TPI composite now averages 4 signals: FTEMA, BLITZ, DESTINY, FLOW
+- Configurable FLOW parameters via `config.yaml` (rsi_length, rsi_threshold, fast_length, slow_length)
 
 ### Changed
 - TPI formula updated from 3-signal to 4-signal average
+- TPI column now shows: gauge + numeric value + colored LONG/CASH label
+- LONG labels render in green, CASH and SHORT labels render in red across all columns
+- Signal badge text alignment: ▲  LONG (7 chars) padded to match ▼ SHORT (7 chars)
+
+### Fixed
+- Signal badge colors not visible in trend table — theme styles were overridden by table
+  row styling. Fixed by using hardcoded foreground colors that survive row composition
+- Model receiver types converted to pointers to fix lint issues and prevent value copying
 
 ## [0.4.0] — 2026-04-15
 

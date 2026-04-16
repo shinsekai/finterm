@@ -40,15 +40,13 @@ It's designed for traders and analysts who live in the terminal and want a fast,
 - **DESTINY** — Consensus-based scoring using 7 moving averages (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA) confirmed by adaptive RSI. Conservative, high-conviction.
 - **FLOW** — Double-smoothed Heikin-Ashi momentum (Sebastine indicator) using OHLC data with adaptive RSI confirmation. Captures trend through synthetic candle structure.
 
-```
- QQQ     ░░░░░▓▓▓░░ LONG   ▲ LONG              ▼ SHORT   ▲ LONG     $604.52  67.97  ◇ Overval
- SPY     ░░░░░▓▓▓░░ LONG   ▲ LONG              ▼ SHORT   ▼ SHORT    $673.59  67.56  ◇ Overval
- BTC     ░░░░░▓░░░░ LONG   ▲ LONG              ▼ SHORT   ▲ LONG    $74,446    52.84  ○ Fair val
- SOL     ░░▓▓▓░░░░░ CASH   ▼ SHORT  ▼ SHORT    ▼ SHORT     $86.56  44.64  ◇ Underval
- SPY     ░░░░░▓▓▓░░ LONG   ▲ LONG              ▼ SHORT    $673.59  67.56  ◇ Overval
- BTC     ░░░░░▓░░░░ LONG   ▲ LONG              ▼ SHORT  $74,446    52.84  ○ Fair val
- SOL     ░░▓▓▓░░░░░ CASH   ▼ SHORT  ▼ SHORT    ▼ SHORT     $86.56  44.64  ◇ Underval
-```
+SYMBOL  TPI                     FTEMA      BLITZ      DESTINY    FLOW        PRICE    RSI  VALUATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QQQ     ░░░░░▓▓░░░ +0.25 LONG  ▲  LONG    ▲  LONG    ▼ SHORT              $604.52  67.97  ◇ Overval
+SPY     ░░░░░▓░░░░ +0.00 CASH  ▲  LONG               ▼ SHORT   ▼ SHORT   $673.59  67.56  ◇ Overval
+BTC     ░░░░░▓▓░░░ +0.25 LONG  ▲  LONG    ▲  LONG    ▼ SHORT              $74,179  62.06  ◇ Overval
+ETH     ░░░░░▓░░░░ +0.00 CASH  ▲  LONG    ▲  LONG    ▼ SHORT   ▼ SHORT   $2,323   64.11  ◇ Overval
+SOL     ░░▓▓▓▓░░░░░ -1.00 CASH  ▼ SHORT    ▼ SHORT    ▼ SHORT   ▼ SHORT     $83.76  53.55  ○ Fair val
 
 **Quote Lookup** — Type any ticker to get real-time price, volume, change, RSI gauge, and signal system analysis (FTEMA, BLITZ, DESTINY, FLOW, TPI composite with gauge).
 
@@ -311,8 +309,8 @@ finterm/
 │   │   ├── valuation/               # RSI-based valuation
 │   │   ├── dynamo/                  # Shared dynamic-length MA primitives (SMA, EMA, RMA, WMA, DEMA, TEMA, HMA, LSMA, RSI, TSI)
 │   │   ├── blitz/                   # BLITZ signal engine
-│   │   └── destiny/                 # DESTINY signal engine
-	│   │   └── flow/                    # FLOW signal engine
+│   │   ├── destiny/                 # DESTINY signal engine
+│   │   └── flow/                    # FLOW signal engine
 │   ├── alphavantage/                # API client + typed models
 │   ├── cache/                       # In-memory TTL cache
 │   └── config/                      # YAML + env var loading
@@ -341,11 +339,14 @@ finterm/
 
 **Why TradingView as the reference?** It's what most retail traders use. If Finterm's RSI says 52.3 and TradingView says 52.3 for the same data, trust is established immediately. The key subtlety: TradingView's RSI uses RMA smoothing (alpha = 1/length), not standard EMA smoothing (alpha = 2/(length+1)). Getting this wrong produces visibly different values.
 
-**Why four trend signals (FTEMA + BLITZ + DESTINY + FLOW)?** Each operates at a different speed and philosophy. FTEMA is a simple, lagging binary — the trend is up or down. BLITZ uses Pearson correlation for trend direction and is fast and reactive (3 conditions, all AND). DESTINY polls 7 different moving averages for consensus and is more conservative — it waits for broad agreement before calling a trend. The asymmetric exit logic (OR for shorts) makes DESTINY quick to protect but slow to commit. Four signals, four speeds:: when all agree, conviction is highest; when they diverge progressively, risk is rising.
+**Why four trend signals (FTEMA + BLITZ + DESTINY + FLOW)?** Each operates at a different speed and philosophy. FTEMA is a simple, lagging binary — the trend is up or down. BLITZ uses Pearson correlation for trend direction and is fast and reactive (3 conditions, all AND). DESTINY polls 7 different moving averages for consensus and is more conservative — it waits for broad agreement before calling a trend. The asymmetric exit logic (OR for shorts) makes DESTINY quick to protect but slow to commit. Four signals, four speeds: when all agree, conviction is highest; when they diverge progressively, risk is rising.
 
 **Why 7 moving averages in DESTINY?** Each MA type captures a different aspect of trend: SMA is stable but laggy, EMA reacts faster, DEMA and TEMA progressively reduce lag, WMA biases toward recent prices, HMA is the fastest responder, and LSMA projects the regression line forward. Averaging their direction votes creates a "wisdom of the crowd" signal — if 5+ out of 7 agree the trend is up, it's probably up. The TPI (Trend Probability Indicator) quantifies this consensus as a single number from -1 to +1.
 
 **Why does BLITZ use dynamic-length indicators?** Standard indicators produce NaN for the first N bars, which is fine on TradingView with thousands of bars but problematic when data is limited. The dynamic length pattern adapts: at bar 5, a "12-period RSI" uses a 5-period lookback. This is ported directly from the Pine Script `getDynamicLength()` pattern to preserve exact signal parity.
+
+**Why does FLOW use Heikin-Ashi instead of raw candles?** Standard OHLC data is noisy — every bar has shadows and gaps that make trend detection harder. Heikin-Ashi candles synthesize each bar from the previous bar's values, creating smoother candle bodies. FLOW goes further: it EMA-smooths the raw OHLC first, builds Heikin-Ashi from the smoothed data, then EMA-smooths the HA candles again. The result — the Sebastine indicator — is a percentage measuring how bullish or bearish the double-smoothed candle body is. Positive = close above open in the synthetic world = uptrend.
+
 **Why FLOW uses full OHLC data?** All other systems (FTEMA, BLITZ, DESTINY) operate on close prices only. FLOW uses open, high, low, and close to construct Heikin-Ashi candles, which captures candle structure — body size, wicks, and trend through synthetic close-open relationship. This provides a different dimension of trend information that close-only systems miss.
 
 ## License

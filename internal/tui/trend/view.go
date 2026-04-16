@@ -224,6 +224,33 @@ func (v *View) renderSummary() string {
 		summary.WriteString(v.theme.Muted().Render(flow.String()))
 	}
 
+	// VORTEX summary line (on a new line after FLOW)
+	vortexLong, vortexShort, vortexHold := v.model.GetVortexCounts()
+	if vortexLong > 0 || vortexShort > 0 || vortexHold > 0 {
+		var vortex strings.Builder
+		vortex.WriteString("VORTEX: ")
+		if vortexLong > 0 {
+			vortex.WriteString(v.theme.Bullish().Render(fmt.Sprintf("%d LONG", vortexLong)))
+		}
+		if vortexShort > 0 {
+			if vortex.Len() > 8 {
+				vortex.WriteString("  ")
+			}
+			vortex.WriteString(v.theme.Bearish().Render(fmt.Sprintf("%d SHORT", vortexShort)))
+		}
+		if vortexHold > 0 {
+			if vortex.Len() > 8 {
+				vortex.WriteString("  ")
+			}
+			vortex.WriteString(v.theme.Muted().Render(fmt.Sprintf("%d HOLD", vortexHold)))
+		}
+
+		if summary.Len() > 0 {
+			summary.WriteString("\n")
+		}
+		summary.WriteString(v.theme.Muted().Render(vortex.String()))
+	}
+
 	return summary.String()
 }
 
@@ -303,6 +330,13 @@ func (v *View) buildColumns() []components.Column {
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
+			Title:       "VORTEX",
+			Width:       10,
+			Alignment:   components.AlignCenter,
+			Style:       v.theme.TableRow(),
+			HeaderStyle: v.theme.TableHeader(),
+		},
+		{
 			Title:       "PRICE",
 			Width:       14,
 			Alignment:   components.AlignRight,
@@ -362,7 +396,7 @@ func (v *View) buildTableRows(rows []RowData) []components.Row {
 	cryptoStartIndex := v.model.GetCryptoStartIndex()
 	if cryptoStartIndex > 0 && cryptoStartIndex < len(rows) {
 		// Insert separator at the crypto start position
-		separatorCells := make([]components.Cell, 9)
+		separatorCells := make([]components.Cell, 10)
 		separatorCells[0].Text = v.theme.Divider().Render("── Crypto ──")
 		// All other cells remain empty
 
@@ -407,6 +441,7 @@ func (v *View) buildLoadingCells(row RowData) []components.Cell {
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -421,6 +456,7 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
 		{Text: v.renderDestinyBadge(result.DestinyScore)},
 		{Text: v.renderFlowBadge(result.FlowScore)},
+		{Text: v.renderVortexBadge(result.VortexScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
 		{Text: v.renderValuationBadge(result.Valuation)},
@@ -441,6 +477,7 @@ func (v *View) buildCachedCells(row RowData) []components.Cell {
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
 		{Text: v.renderDestinyBadge(result.DestinyScore)},
 		{Text: v.renderFlowBadge(result.FlowScore)},
+		{Text: v.renderVortexBadge(result.VortexScore)},
 		{Text: formatPrice(result.Price)},
 		{Text: v.renderRSIValue(result.RSI)},
 		{Text: v.renderValuationBadge(result.Valuation)},
@@ -465,6 +502,7 @@ func (v *View) buildErrorCells(row RowData) []components.Cell {
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
+		{Text: "—"},
 	}
 }
 
@@ -473,6 +511,7 @@ func (v *View) buildUnknownCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
 		{Text: v.theme.Muted().Render("Unknown")},
+		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
@@ -642,6 +681,18 @@ func (v *View) renderDestinyBadge(destinyScore int) string {
 // renderFlowBadge renders a FLOW score as a colored badge.
 func (v *View) renderFlowBadge(flowScore int) string {
 	switch flowScore {
+	case 1:
+		return greenStyle.Render("▲  LONG")
+	case -1:
+		return redStyle.Render("▼ SHORT")
+	default:
+		return ""
+	}
+}
+
+// renderVortexBadge renders a VORTEX score as a colored badge.
+func (v *View) renderVortexBadge(vortexScore int) string {
+	switch vortexScore {
 	case 1:
 		return greenStyle.Render("▲  LONG")
 	case -1:

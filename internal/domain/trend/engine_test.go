@@ -1091,14 +1091,192 @@ func TestEngine_TPIPopulated(t *testing.T) {
 		t.Errorf("TPI = %f (<= 0) but TPISignal = %q, want CASH", result.TPI, result.TPISignal)
 	}
 
-	// Verify TPI calculation: (emaSignal + blitzScore + destinyScore + flowScore) / 4
+	// Verify TPI calculation: (emaSignal + blitzScore + destinyScore + flowScore + vortexScore) / 5
 	expectedEma := 1.0
 	if result.Signal == Bearish {
 		expectedEma = -1.0
 	}
-	expectedTPI := (expectedEma + float64(result.BlitzScore) + float64(result.DestinyScore) + float64(result.FlowScore)) / 4.0
+	expectedTPI := (expectedEma + float64(result.BlitzScore) + float64(result.DestinyScore) + float64(result.FlowScore) + float64(result.VortexScore)) / 5.0
 	if result.TPI != expectedTPI {
-		t.Errorf("TPI = %f, want %f (computed from signal=%v, blitz=%d, destiny=%d, flow=%d)",
-			result.TPI, expectedTPI, result.Signal, result.BlitzScore, result.DestinyScore, result.FlowScore)
+		t.Errorf("TPI = %f, want %f (computed from signal=%v, blitz=%d, destiny=%d, flow=%d, vortex=%d)",
+			result.TPI, expectedTPI, result.Signal, result.BlitzScore, result.DestinyScore, result.FlowScore, result.VortexScore)
+	}
+}
+
+// TestEngine_VortexScore_Equity verifies VORTEX computation for equity symbols.
+func TestEngine_VortexScore_Equity(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 55.0},
+		},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 150.0},
+		},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	cfg.Trend.EMAFast = 10
+	cfg.Trend.EMASlow = 20
+
+	detector := indicators.NewAssetClassDetector(nil) // No crypto symbols → all equities
+
+	// Create mock time series data with enough data for VORTEX
+	timeSeries := &alphavantage.TimeSeriesDaily{
+		TimeSeries: make(map[string]alphavantage.TimeSeriesEntry),
+	}
+	// Add 50 days of data (VORTEX needs at least 45 data points)
+	startDate := time.Now().AddDate(0, 0, -50)
+	for i := 0; i < 50; i++ {
+		date := startDate.AddDate(0, 0, i).Format("2006-01-02")
+		price := 100.0 + float64(i)*0.5
+		timeSeries.TimeSeries[date] = alphavantage.TimeSeriesEntry{
+			Open:   fmt.Sprintf("%.2f", price),
+			High:   fmt.Sprintf("%.2f", price+1),
+			Low:    fmt.Sprintf("%.2f", price-1),
+			Close:  fmt.Sprintf("%.2f", price),
+			Volume: "1000000",
+		}
+	}
+
+	timeSeriesClient := &mockTimeSeriesClient{data: timeSeries}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Analyze() returned nil result")
+	}
+
+	// Verify VORTEX score is in valid range [-1, 1]
+	if result.VortexScore < -1 || result.VortexScore > 1 {
+		t.Errorf("VortexScore = %d, want -1, 0, or 1", result.VortexScore)
+	}
+
+	// TPI and RSISmooth should be populated with sufficient data
+	if result.VortexTPI == 0 && result.VortexRSISmooth == 0 {
+		t.Errorf("VortexTPI and VortexRSISmooth should be populated with sufficient data")
+	}
+
+	// Verify VORTEX TPI is within valid range [-1.0, 1.0]
+	if result.VortexTPI < -1.0 || result.VortexTPI > 1.0 {
+		t.Errorf("VortexTPI = %f, want between -1.0 and 1.0", result.VortexTPI)
+	}
+
+	// Verify VORTEX RSISmooth is within valid range [0.0, 100.0]
+	if result.VortexRSISmooth < 0 || result.VortexRSISmooth > 100 {
+		t.Errorf("VortexRSISmooth = %f, want between 0 and 100", result.VortexRSISmooth)
+	}
+}
+
+// TestEngine_VortexScore_Crypto verifies VORTEX computation for crypto symbols.
+func TestEngine_VortexScore_Crypto(t *testing.T) {
+	remoteRSI := &mockIndicator{}
+	remoteEMA := &mockIndicator{}
+
+	// Generate test OHLCV data with enough data for VORTEX
+	testData := GenerateTestOHLCV(50, 100.0, 0.02, time.Now().AddDate(0, 0, -50))
+
+	localRSI := indicators.NewLocalRSI(testData)
+	localEMA := indicators.NewLocalEMA(testData)
+
+	cfg := config.DefaultConfig()
+	cfg.Trend.EMAFast = 10
+	cfg.Trend.EMASlow = 20
+
+	detector := indicators.NewAssetClassDetector([]string{"BTC"})
+
+	cryptoFetcher := &mockCryptoFetcher{data: testData}
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher, nil, nil)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "BTC", indicators.Crypto)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Analyze() returned nil result")
+	}
+
+	// Verify VORTEX score is in valid range [-1, 1]
+	if result.VortexScore < -1 || result.VortexScore > 1 {
+		t.Errorf("VortexScore = %d, want -1, 0, or 1", result.VortexScore)
+	}
+
+	// TPI and RSISmooth should be populated with sufficient data
+	if result.VortexTPI == 0 && result.VortexRSISmooth == 0 {
+		t.Errorf("VortexTPI and VortexRSISmooth should be populated with sufficient data")
+	}
+}
+
+// TestEngine_VortexScore_FailureDefaults verifies that VORTEX defaults to 0 when computation fails.
+func TestEngine_VortexScore_FailureDefaults(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 55.0},
+		},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{
+			{Date: time.Now(), Value: 150.0},
+		},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// Use a time series client that returns empty data (insufficient for VORTEX)
+	timeSeries := &alphavantage.TimeSeriesDaily{
+		TimeSeries: make(map[string]alphavantage.TimeSeriesEntry),
+	}
+	timeSeriesClient := &mockTimeSeriesClient{data: timeSeries}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	// Analysis should succeed despite insufficient data for VORTEX
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v, want success despite insufficient VORTEX data", err)
+	}
+
+	if result == nil {
+		t.Fatal("Analyze() returned nil result")
+	}
+
+	// VORTEX should default to 0 when there's insufficient data
+	if result.VortexScore != 0 {
+		t.Errorf("VortexScore = %d, want 0 when insufficient data", result.VortexScore)
+	}
+	if result.VortexTPI != 0 {
+		t.Errorf("VortexTPI = %f, want 0 when insufficient data", result.VortexTPI)
+	}
+	if result.VortexRSISmooth != 0 {
+		t.Errorf("VortexRSISmooth = %f, want 0 when insufficient data", result.VortexRSISmooth)
+	}
+	if result.VortexWave != 0 {
+		t.Errorf("VortexWave = %f, want 0 when insufficient data", result.VortexWave)
+	}
+	if result.VortexMid != 0 {
+		t.Errorf("VortexMid = %f, want 0 when insufficient data", result.VortexMid)
 	}
 }

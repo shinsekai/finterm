@@ -123,6 +123,30 @@ flow:
   # Second EMA smoothing period applied to Heikin-Ashi candles.
   slow_length: 50
 
+# VORTEX trend following system configuration.
+# Uses 7-MA TPI gated by kernel-regression Mid band and Dynamic RSI.
+vortex:
+  # Base period for all 7 MAs. DEMA uses 2×, TEMA uses 3×.
+  ma_length: 45
+
+  # Dynamic RSI lookback period.
+  rsi_length: 16
+
+  # Smoothed RSI threshold for signal confirmation.
+  rsi_threshold: 56
+
+  # LSMA linear regression projection offset.
+  lsma_offset: 6
+
+  # Kernel bandwidth for Mid band calculation.
+  kernel_bandwidth: 45
+
+  # Wave width for wave-weighted regression.
+  wave_width: 2.0
+
+  # Mid band SMA length (long-term trend filter).
+  mid_length: 150
+
 # Cache TTL settings for different data types.
 cache:
   # Time to live for intraday quotes.

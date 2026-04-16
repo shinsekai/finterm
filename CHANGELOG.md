@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-04-16
+
+### Added
+- VORTEX trend following system — 7-MA TPI plus kernel-regression long-term trend filter
+  - Three kernel-weighted deviation ratios (Epanechnikov, Logistic, Wave) blended with close
+    into AV series, smoothed to 150-bar SMA Mid band
+  - Wave-weighted regression line for parity with the Pine source
+  - Asymmetric signal logic: LONG requires TPI > 0.5 AND close > Mid AND RSI rising AND RSI > 56
+    SHORT fires on TPI < -0.5 OR close < Mid OR (RSI falling AND RSI < 56).
+  - Latching score identical to DESTINY / FLOW
+- VORTEX column in the trend tab showing ▲ LONG / ▼ SHORT
+- VORTEX summary counts in the trend summary bar
+- VORTEX row in the Quote view Signal Systems section
+- VORTEX engine in `internal/domain/vortex/` with full test coverage
+- Configurable VORTEX parameters in `config.example.yaml` (documentation only — wiring
+    in a future task; `vortex.DefaultConfig()` is the current source of truth)
+
+### Changed
+- TPI formula updated from 4-signal to 5-signal average
+  (FTEMA + BLITZ + DESTINY + FLOW + VORTEX) / 5
+- TPI composite GoDoc updated to reflect the new 5-signal average
+
 ## [0.5.0] — 2026-04-15
 
 ### Added

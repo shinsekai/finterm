@@ -19,7 +19,7 @@
 
 ## What is Finterm?
 
-Finterm is a keyboard-driven financial analysis tool that runs entirely in your terminal. It provides three independent trend signal systems (EMA crossover, BLITZ, and DESTINY), RSI-based valuation, macroeconomic indicators, and sentiment-scored news — all powered by the [Alpha Vantage](https://www.alphavantage.co/) API.
+Finterm is a keyboard-driven financial analysis tool that runs entirely in your terminal. It provides five independent trend signal systems (EMA crossover, BLITZ, DESTINY, FLOW, and VORTEX), RSI-based valuation, macroeconomic indicators, and sentiment-scored news — all powered by the [Alpha Vantage](https://www.alphavantage.co/) API.
 
 It's designed for traders and analysts who live in the terminal and want a fast, unified view of market data without leaving their workflow.
 
@@ -32,23 +32,24 @@ It's designed for traders and analysts who live in the terminal and want a fast,
 
 ## Features
 
-**Trend Following** — Watchlist table with a TPI composite score and four independent signal systems per ticker:
+**Trend Following** — Watchlist table with a TPI composite score and five independent signal systems per ticker:
 
-- **TPI** — Trend Probability Indicator: averages FTEMA, BLITZ, DESTINY, and FLOW into a single score (-1 to +1) with a color-gradient gauge. TPI > 0 = LONG, TPI ≤ 0 = CASH.
+- **TPI** — Trend Probability Indicator: averages FTEMA, BLITZ, DESTINY, FLOW, and VORTEX into a single score (-1 to +1) with a color-gradient gauge. TPI > 0 = LONG, TPI ≤ 0 = CASH.
 - **FTEMA** — Fast/slow EMA crossover (EMA 10 vs EMA 20). The classic trend direction signal.
 - **BLITZ** — Correlation-based scoring combining TSI (Pearson correlation), adaptive RSI, and threshold confirmation. Fast and reactive.
 - **DESTINY** — Consensus-based scoring using 7 moving averages (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA) confirmed by adaptive RSI. Conservative, high-conviction.
 - **FLOW** — Double-smoothed Heikin-Ashi momentum (Sebastine indicator) using OHLC data with adaptive RSI confirmation. Captures trend through synthetic candle structure.
+- **VORTEX** — 7-MA TPI gated by a kernel-regression Mid band (Epanechnikov + Logistic + Wave) and Dynamic RSI. Long-term trend filter layered on DESTINY's consensus scoring.
 
-SYMBOL  TPI                     FTEMA      BLITZ      DESTINY    FLOW        PRICE    RSI  VALUATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-QQQ     ░░░░░▓▓░░░ +0.25 LONG  ▲  LONG    ▲  LONG    ▼ SHORT              $604.52  67.97  ◇ Overval
-SPY     ░░░░░▓░░░░ +0.00 CASH  ▲  LONG               ▼ SHORT   ▼ SHORT   $673.59  67.56  ◇ Overval
-BTC     ░░░░░▓▓░░░ +0.25 LONG  ▲  LONG    ▲  LONG    ▼ SHORT              $74,179  62.06  ◇ Overval
-ETH     ░░░░░▓░░░░ +0.00 CASH  ▲  LONG    ▲  LONG    ▼ SHORT   ▼ SHORT   $2,323   64.11  ◇ Overval
-SOL     ░░▓▓▓▓░░░░░ -1.00 CASH  ▼ SHORT    ▼ SHORT    ▼ SHORT   ▼ SHORT     $83.76  53.55  ○ Fair val
+SYMBOL  TPI                     FTEMA      BLITZ      DESTINY    FLOW       VORTEX     PRICE    RSI  VALUATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QQQ     ░░░░░▓▓░░░ +0.25 LONG  ▲  LONG    ▲  LONG    ▼ SHORT               $604.52  67.97  ◇ Overval
+SPY     ░░░░░▓░░░░ +0.00 CASH  ▲  LONG               ▼ SHORT   ▼ SHORT              $673.59  67.56  ◇ Overval
+BTC     ░░░░░▓▓░░░ +0.25 LONG  ▲  LONG    ▲  LONG    ▼ SHORT                           $74,179  62.06  ◇ Overval
+ETH     ░░░░░▓░░░░ +0.00 CASH  ▲  LONG    ▲  LONG    ▼ SHORT   ▼ SHORT              $2,323   64.11  ◇ Overval
+SOL     ░░▓▓▓▓░░░░░ -1.00 CASH  ▼ SHORT    ▼ SHORT    ▼ SHORT   ▼ SHORT   ▼ SHORT     $83.76  53.55  ○ Fair val
 
-**Quote Lookup** — Type any ticker to get real-time price, volume, change, RSI gauge, and signal system analysis (FTEMA, BLITZ, DESTINY, FLOW, TPI composite with gauge).
+**Quote Lookup** — Type any ticker to get real-time price, volume, change, RSI gauge, and signal system analysis (FTEMA, BLITZ, DESTINY, FLOW, VORTEX, TPI composite with gauge).
 
 **Macro Dashboard** — Paneled view of GDP, CPI, inflation, federal funds rate, treasury yields, unemployment, and nonfarm payroll.
 
@@ -83,7 +84,7 @@ The domain layer communicates with the data layer through interfaces — never c
 | Signal | Rule |
 |---|---|
 | **FTEMA** | `EMA(10) > EMA(20)` → LONG, `EMA(10) < EMA(20)` → SHORT |
-| **TPI** | Average of FTEMA (+1/-1), BLITZ (+1/-1/0), DESTINY (+1/-1/0), FLOW (+1/-1/0). TPI > 0 → LONG, TPI ≤ 0 → CASH |
+| **TPI** | Average of FTEMA (+1/-1), BLITZ (+1/-1/0), DESTINY (+1/-1/0), FLOW (+1/-1/0), VORTEX (+1/-1/0). TPI > 0 → LONG, TPI ≤ 0 → CASH |
 | **Valuation** | RSI < 30 → Oversold, 30–45 → Undervalued, 45–55 → Fair, 55–70 → Overvalued, > 70 → Overbought |
 
 ### BLITZ System
@@ -134,6 +135,23 @@ The FLOW trend following system uses double-smoothed Heikin-Ashi candles (Sebast
 **Signal rules**: LONG when `Sebastine > 0` AND `RSI Smooth is rising` AND `RSI Smooth > 55`. SHORT when `Sebastine < 0` OR (`RSI Smooth is falling` AND `RSI Smooth < 55`). The asymmetry matches DESTINY — entries require consensus, exits are more aggressive.
 
 **Dynamic length adaptation**: All components use the same adaptive-length pattern as BLITZ, allowing signals on limited data.
+
+### VORTEX System
+
+The VORTEX trend following system uses 7-MA TPI gated by a kernel-regression Mid band with Dynamic RSI for long-term trend filtering:
+
+| Component | Computation | Purpose |
+|---|---|---|
+| **7-MA TPI** | Same 7 MAs as DESTINY (SMA, EMA, DEMA, TEMA, WMA, HMA, LSMA) | Consensus trend indicator |
+| **Mid Band** | Kernel-weighted deviation ratios (Epanechnikov, Logistic, Wave) blended with close → EMA(150) | Long-term trend filter |
+| **Wave** | Wave-weighted regression line | Parity with Pine source |
+| **Dynamic RSI** | Wilder's RSI with adaptive lookback (length 16) | Momentum strength |
+| **RSI Smooth** | EMA of Dynamic RSI (length 16) | Noise reduction |
+
+**Signal rules**: LONG when `TPI > 0.5` AND `close > Mid` AND `RSI Smooth is rising` AND `RSI Smooth > 56`. SHORT when `TPI < -0.5` OR `close < Mid` OR (`RSI Smooth is falling` AND `RSI Smooth < 56`). The asymmetry follows DESTINY/FLOW — entries require all conditions (AND), exits are more aggressive (OR).
+
+**Dynamic length adaptation**: All components use the same adaptive-length pattern as BLITZ, allowing signals on limited data.
+
 ### Data Flow
 
 ```
@@ -220,6 +238,14 @@ flow:
   rsi_threshold: 55
   fast_length: 45
   slow_length: 50
+vortex:
+  ma_length: 45                     # Base period for 7 MAs (DEMA uses 2×, TEMA uses 3×)
+  rsi_length: 16                    # Dynamic RSI lookback period
+  rsi_threshold: 56                 # RSI smooth threshold for signal confirmation
+  lsma_offset: 6                    # LSMA projection offset
+  kernel_bandwidth: 45              # Kernel bandwidth for Mid band calculation
+  wave_width: 2.0                   # Wave width for wave-weighted regression
+  mid_length: 150                   # Mid band SMA length (long-term trend filter)
 
 
 cache:
@@ -310,7 +336,8 @@ finterm/
 │   │   ├── dynamo/                  # Shared dynamic-length MA primitives (SMA, EMA, RMA, WMA, DEMA, TEMA, HMA, LSMA, RSI, TSI)
 │   │   ├── blitz/                   # BLITZ signal engine
 │   │   ├── destiny/                 # DESTINY signal engine
-│   │   └── flow/                    # FLOW signal engine
+│   │   ├── flow/                    # FLOW signal engine
+│   │   └── vortex/                  # VORTEX signal engine
 │   ├── alphavantage/                # API client + typed models
 │   ├── cache/                       # In-memory TTL cache
 │   └── config/                      # YAML + env var loading
@@ -339,7 +366,7 @@ finterm/
 
 **Why TradingView as the reference?** It's what most retail traders use. If Finterm's RSI says 52.3 and TradingView says 52.3 for the same data, trust is established immediately. The key subtlety: TradingView's RSI uses RMA smoothing (alpha = 1/length), not standard EMA smoothing (alpha = 2/(length+1)). Getting this wrong produces visibly different values.
 
-**Why four trend signals (FTEMA + BLITZ + DESTINY + FLOW)?** Each operates at a different speed and philosophy. FTEMA is a simple, lagging binary — the trend is up or down. BLITZ uses Pearson correlation for trend direction and is fast and reactive (3 conditions, all AND). DESTINY polls 7 different moving averages for consensus and is more conservative — it waits for broad agreement before calling a trend. The asymmetric exit logic (OR for shorts) makes DESTINY quick to protect but slow to commit. Four signals, four speeds: when all agree, conviction is highest; when they diverge progressively, risk is rising.
+**Why five trend signals (FTEMA + BLITZ + DESTINY + FLOW + VORTEX)?** Each operates at a different speed and philosophy. FTEMA is a simple, lagging binary — the trend is up or down. BLITZ uses Pearson correlation for trend direction and is fast and reactive (3 conditions, all AND). DESTINY polls 7 different moving averages for consensus and is more conservative — it waits for broad agreement before calling a trend. The asymmetric exit logic (OR for shorts) makes DESTINY quick to protect but slow to commit. FLOW uses Heikin-Ashi candle structure to capture trend through synthetic body ratios. VORTEX adds a long-term trend filter using kernel regression, layering on DESTINY's consensus scoring. Five signals, five speeds: when all agree, conviction is highest; when they diverge progressively, risk is rising.
 
 **Why 7 moving averages in DESTINY?** Each MA type captures a different aspect of trend: SMA is stable but laggy, EMA reacts faster, DEMA and TEMA progressively reduce lag, WMA biases toward recent prices, HMA is the fastest responder, and LSMA projects the regression line forward. Averaging their direction votes creates a "wisdom of the crowd" signal — if 5+ out of 7 agree the trend is up, it's probably up. The TPI (Trend Probability Indicator) quantifies this consensus as a single number from -1 to +1.
 

@@ -15,6 +15,7 @@ import (
 	"github.com/shinsekai/finterm/internal/domain/destiny"
 	"github.com/shinsekai/finterm/internal/domain/flow"
 	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/domain/vortex"
 )
 
 // Result contains the complete analysis result for a symbol.
@@ -50,8 +51,14 @@ type Result struct {
 	FlowScore     int     // +1 (long), -1 (short), 0 (hold)
 	FlowSebastine float64 // Latest Sebastine value
 	FlowRSISmooth float64 // Smoothed RSI from FLOW
+	// VORTEX trend following system results.
+	VortexScore     int     // +1 (long), -1 (short), 0 (hold)
+	VortexTPI       float64 // Trend Probability Indicator from VORTEX
+	VortexRSISmooth float64 // Smoothed RSI from VORTEX
+	VortexWave      float64 // Latest wave-weighted regression value
+	VortexMid       float64 // Latest Mid band value
 	// TPI composite signal.
-	// TPI is the average of EMA signal, BLITZ, DESTINY, FLOW (-1 to +1).
+	// TPI is the average of EMA signal, BLITZ, DESTINY, FLOW, and VORTEX (-1 to +1).
 	TPI float64
 	// TPISignal is the TPI signal label: "LONG" or "CASH".
 	TPISignal string
@@ -149,6 +156,8 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	var destinyTPI, destinyRSISmooth float64
 	var flowScore int
 	var flowSebastine, flowRSISmooth float64
+	var vortexScore int
+	var vortexTPI, vortexRSISmooth, vortexWave, vortexMid float64
 
 	// Route to appropriate indicator path based on asset class
 	switch assetClass {
@@ -211,16 +220,19 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 			if tsData != nil {
 				opens, highs, lows, closePrices, err := extractOHLCFromTimeSeries(tsData)
 				if err != nil {
-					fmt.Printf("warning: failed to extract OHLC data for BLITZ/DESTINY/FLOW computation for %s: %v\n", symbol, err)
+					fmt.Printf("warning: failed to extract OHLC data for BLITZ/DESTINY/FLOW/VORTEX computation for %s: %v\n", symbol, err)
 					blitzScore, blitzTSI, blitzRSISmooth = 0, 0, 0
 					destinyScore, destinyTPI, destinyRSISmooth = 0, 0, 0
 					flowScore, flowSebastine, flowRSISmooth = 0, 0, 0
+					vortexScore, vortexTPI, vortexRSISmooth, vortexWave, vortexMid = 0, 0, 0, 0, 0
 				} else {
 					blitzScore, blitzTSI, blitzRSISmooth = computeBlitz(closePrices)
 					// Compute DESTINY after BLITZ
 					destinyScore, destinyTPI, destinyRSISmooth = computeDestiny(closePrices)
 					// Compute FLOW using full OHLC data
 					flowScore, flowSebastine, flowRSISmooth = computeFlow(opens, highs, lows, closePrices)
+					// Compute VORTEX using close prices
+					vortexScore, vortexTPI, vortexRSISmooth, vortexWave, vortexMid = computeVortex(closePrices)
 				}
 			}
 		}
@@ -277,6 +289,8 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 		destinyScore, destinyTPI, destinyRSISmooth = computeDestiny(closes)
 		// Compute FLOW score for crypto using full OHLCV data
 		flowScore, flowSebastine, flowRSISmooth = computeFlow(opens, highs, lows, closes)
+		// Compute VORTEX score for crypto using close prices
+		vortexScore, vortexTPI, vortexRSISmooth, vortexWave, vortexMid = computeVortex(closes)
 
 	default:
 		return nil, fmt.Errorf("unsupported asset class: %v", assetClass)
@@ -306,7 +320,7 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	valuation := computeValuation(rsi, e.cfg.Valuation)
 
 	// Compute TPI composite signal
-	tpi := TPI(signal, blitzScore, destinyScore, flowScore)
+	tpi := TPI(signal, blitzScore, destinyScore, flowScore, vortexScore)
 	tpiSignal := TPISignal(tpi)
 
 	return &Result{
@@ -326,6 +340,11 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 		FlowScore:        flowScore,
 		FlowSebastine:    flowSebastine,
 		FlowRSISmooth:    flowRSISmooth,
+		VortexScore:      vortexScore,
+		VortexTPI:        vortexTPI,
+		VortexRSISmooth:  vortexRSISmooth,
+		VortexWave:       vortexWave,
+		VortexMid:        vortexMid,
 		TPI:              tpi,
 		TPISignal:        tpiSignal,
 	}, nil
@@ -514,6 +533,20 @@ func computeDestiny(closes []float64) (score int, tpi, rsiSmooth float64) {
 		return 0, 0, 0
 	}
 	return destinyResult.Score, destinyResult.TPI, destinyResult.RSISmooth
+}
+
+// computeVortex computes the VORTEX signal from close prices.
+// Returns score = 0 if computation fails.
+func computeVortex(closes []float64) (score int, tpi, rsiSmooth, wave, mid float64) {
+	ohlcv := make([]vortex.OHLCV, len(closes))
+	for i, c := range closes {
+		ohlcv[i] = vortex.OHLCV{Close: c}
+	}
+	result, err := vortex.Compute(ohlcv, vortex.DefaultConfig())
+	if err != nil {
+		return 0, 0, 0, 0, 0
+	}
+	return result.Score, result.TPI, result.RSISmooth, result.Wave, result.Mid
 }
 
 // AnalyzeWithSymbolDetection performs trend analysis with automatic asset class detection.

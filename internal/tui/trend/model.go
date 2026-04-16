@@ -389,6 +389,29 @@ func (m Model) GetBlitzCounts() (long, short, hold int) {
 	return l, s, h
 }
 
+// GetVortexCounts returns the count of LONG, SHORT, and HOLD VORTEX signals
+// across all loaded rows. Loading and error rows are ignored.
+func (m Model) GetVortexCounts() (long, short, hold int) {
+	var l, s, h int
+	for _, row := range m.rows {
+		if row.State != StateLoaded && row.State != StateCached {
+			continue
+		}
+		if row.Result == nil {
+			continue
+		}
+		switch row.Result.VortexScore {
+		case 1:
+			l++
+		case -1:
+			s++
+		default:
+			h++
+		}
+	}
+	return l, s, h
+}
+
 // GetDestinyCounts returns the count of LONG, SHORT, and HOLD DESTINY signals
 // across all loaded rows. Loading and error rows are ignored.
 func (m Model) GetDestinyCounts() (long, short, hold int) {

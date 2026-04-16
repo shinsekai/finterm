@@ -198,56 +198,56 @@ func TestSignal_String(t *testing.T) {
 }
 
 func TestTPI_AllBullish(t *testing.T) {
-	// TPI(Bullish, 1, 1, 1) returns 1.0 (all agree long)
-	got := TPI(Bullish, 1, 1, 1)
+	// TPI(Bullish, 1, 1, 1, 1) returns 1.0 (all 5 signals agree long)
+	got := TPI(Bullish, 1, 1, 1, 1)
 	want := 1.0
 	if got != want {
-		t.Errorf("TPI(Bullish, 1, 1) = %f, want %f", got, want)
+		t.Errorf("TPI(Bullish, 1, 1, 1, 1) = %f, want %f", got, want)
 	}
 }
 
 func TestTPI_AllBearish(t *testing.T) {
-	// TPI(Bearish, -1, -1, -1) returns -1.0 (all agree short)
-	got := TPI(Bearish, -1, -1, -1)
+	// TPI(Bearish, -1, -1, -1, -1) returns -1.0 (all 5 signals agree short)
+	got := TPI(Bearish, -1, -1, -1, -1)
 	want := -1.0
 	if got != want {
-		t.Errorf("TPI(Bearish, -1, -1) = %f, want %f", got, want)
+		t.Errorf("TPI(Bearish, -1, -1, -1, -1) = %f, want %f", got, want)
 	}
 }
 
 func TestTPI_Mixed_BullishMajority(t *testing.T) {
-	// TPI(Bullish, 1, 0, 0) returns 0.5 (2 of 4 long → LONG)
-	got := TPI(Bullish, 1, 0, 0)
-	want := 0.5
+	// TPI(Bullish, 1, 0, 0, 0) returns 0.4 (2 of 5 long: EMA=1, blitz=1)
+	got := TPI(Bullish, 1, 0, 0, 0)
+	want := 0.4
 	if got != want {
-		t.Errorf("TPI(Bullish, 1, 0, 0) = %f, want %f", got, want)
+		t.Errorf("TPI(Bullish, 1, 0, 0, 0) = %f, want %f", got, want)
 	}
 }
 
 func TestTPI_Mixed_BearishMajority(t *testing.T) {
-	// TPI(Bearish, -1, 0, 0) returns -0.5 (2 of 4 short → CASH)
-	got := TPI(Bearish, -1, 0, 0)
-	want := -0.5
+	// TPI(Bearish, -1, 0, 0, 0) returns -0.4 (2 of 5 short: EMA=-1, blitz=-1)
+	got := TPI(Bearish, -1, 0, 0, 0)
+	want := -0.4
 	if got != want {
-		t.Errorf("TPI(Bearish, -1, 0, 0) = %f, want %f", got, want)
+		t.Errorf("TPI(Bearish, -1, 0, 0, 0) = %f, want %f", got, want)
 	}
 }
 
 func TestTPI_Neutral(t *testing.T) {
-	// TPI(Bullish, 0, -1, 0) returns 0.0 (mixed → CASH)
-	got := TPI(Bullish, 0, -1, 0)
-	want := 0.0
+	// TPI(Bullish, 1, 0, -1, 0) returns 0.2 (2 long, 1 short: EMA=1, blitz=1, destiny=-1 → (1+1+0-1+0)/5 = 1/5 = 0.2)
+	got := TPI(Bullish, 1, 0, -1, 0)
+	want := 0.2
 	if got != want {
-		t.Errorf("TPI(Bullish, 0, -1, 0) = %f, want %f", got, want)
+		t.Errorf("TPI(Bullish, 1, 0, -1, 0) = %f, want %f", got, want)
 	}
 }
 
 func TestTPI_AllHold(t *testing.T) {
-	// TPI(Bearish, 0, 0, 0) returns -0.25
-	got := TPI(Bearish, 0, 0, 0)
-	want := -1.0 / 4.0
+	// TPI(Bearish, 0, 0, 0, 0) returns -0.2 (only EMA is bearish at -1, all others HOLD at 0)
+	got := TPI(Bearish, 0, 0, 0, 0)
+	want := -1.0 / 5.0
 	if got != want {
-		t.Errorf("TPI(Bearish, 0, 0, 0) = %f, want %f", got, want)
+		t.Errorf("TPI(Bearish, 0, 0, 0, 0) = %f, want %f", got, want)
 	}
 }
 

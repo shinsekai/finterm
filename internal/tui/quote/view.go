@@ -345,7 +345,9 @@ func (v *View) renderError() string {
 	return content
 }
 
-// renderQuoteCards renders the quote data in two card sections.
+// renderQuoteCards renders the quote data as two side-by-side card sections.
+// On narrow terminals (where both cards don't fit horizontally) it falls back
+// to a vertical stack.
 func (v *View) renderQuoteCards() string {
 	if v.model.quoteData == nil || v.model.quoteData.Quote == nil {
 		return ""
@@ -354,19 +356,24 @@ func (v *View) renderQuoteCards() string {
 	quote := v.model.quoteData.Quote
 	indicators := v.model.quoteData.Indicators
 
-	var cards []string
-
-	// Price Card
 	priceCard := v.renderPriceCard(quote)
-	cards = append(cards, priceCard)
 
-	// Indicators Card
-	if indicators != nil {
-		indicatorsCard := v.renderIndicatorsCard(indicators, quote.LastTradingDay)
-		cards = append(cards, indicatorsCard)
+	// No indicators available — render the price card alone.
+	if indicators == nil {
+		return priceCard
 	}
 
-	return strings.Join(cards, "\n\n")
+	indicatorsCard := v.renderIndicatorsCard(indicators, quote.LastTradingDay)
+
+	// Prefer side-by-side with a 2-char gutter.
+	cards := lipgloss.JoinHorizontal(lipgloss.Top, priceCard, "  ", indicatorsCard)
+
+	// Fallback: if the joined width exceeds the terminal width, stack vertically.
+	if lipgloss.Width(cards) > v.model.GetWidth() {
+		return lipgloss.JoinVertical(lipgloss.Left, priceCard, "", indicatorsCard)
+	}
+
+	return cards
 }
 
 // renderPriceCard renders the price data in a card.
@@ -422,11 +429,11 @@ func (v *View) renderPriceCard(quote *alphavantage.GlobalQuote) string {
 	}
 
 	// OHLCV data rows with muted labels
-	v.writePriceField(&content, "Open", "$"+formatPrice(quote.Open), quote.Open)
-	v.writePriceField(&content, "High", "$"+formatPrice(quote.High), quote.High)
-	v.writePriceField(&content, "Low", "$"+formatPrice(quote.Low), quote.Low)
+	v.writePriceField(&content, "Open", formatPrice(quote.Open), quote.Open)
+	v.writePriceField(&content, "High", formatPrice(quote.High), quote.High)
+	v.writePriceField(&content, "Low", formatPrice(quote.Low), quote.Low)
 	v.writePriceField(&content, "Volume", formatVolume(quote.Volume, quote.Symbol, price), quote.Volume)
-	v.writePriceField(&content, "Prev Close", "$"+formatPrice(quote.PreviousClose), quote.PreviousClose)
+	v.writePriceField(&content, "Prev Close", formatPrice(quote.PreviousClose), quote.PreviousClose)
 
 	return v.theme.Card().Render(content.String())
 }
@@ -786,17 +793,24 @@ func (v *View) getValuationStyle(valuation string) lipgloss.Style {
 	}
 }
 
-// calculateBoxWidth calculates the appropriate box width based on terminal size.
+// calculateBoxWidth returns the target inner width for each card.
+// The target is sized so two cards can fit side-by-side on a typical wide
+// terminal (≥ 110 cols). On narrower terminals each card shrinks proportionally
+// down to a minimum readable width.
 func (v *View) calculateBoxWidth() int {
-	maxBoxWidth := 70
+	const maxBoxWidth = 48 // shrunk from 70 to allow two cards side-by-side
+	const minBoxWidth = 30
+	const gutterAndChrome = 10 // 2-char gutter + rounded-border padding on both cards
+
 	terminalWidth := v.model.GetWidth()
 	boxWidth := maxBoxWidth
 
-	if terminalWidth < maxBoxWidth+4 {
-		boxWidth = terminalWidth - 4
+	// If two cards at maxBoxWidth won't fit, shrink per-card width.
+	if terminalWidth < (maxBoxWidth*2)+gutterAndChrome {
+		boxWidth = (terminalWidth - gutterAndChrome) / 2
 	}
-	if boxWidth < 30 {
-		boxWidth = 30
+	if boxWidth < minBoxWidth {
+		boxWidth = minBoxWidth
 	}
 	return boxWidth
 }

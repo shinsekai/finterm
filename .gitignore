@@ -26,7 +26,7 @@ go.work.sum
 
 # Binary output directory
 bin/
-finterm
+/finterm
 
 # Goreleaser output directory
 dist/

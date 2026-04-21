@@ -7,6 +7,20 @@ import (
 	"time"
 )
 
+// Cache is the common interface implemented by Store and SQLiteStore.
+type Cache interface {
+	Get(key string) (interface{}, bool)
+	Set(key string, value interface{}, ttl time.Duration)
+	Delete(key string)
+	DeleteByPrefix(prefix string)
+	Flush()
+	Len() int
+	GetMetadata(key string) (time.Time, bool)
+	IsStale(key string, stalenessThreshold time.Duration) bool
+	GetWithMetadata(key string) (interface{}, time.Time, bool)
+	Close() error
+}
+
 // Store represents a thread-safe in-memory cache with per-key TTL support.
 type Store struct {
 	mu    sync.RWMutex
@@ -34,8 +48,9 @@ func New() *Store {
 }
 
 // Close stops the background cleanup goroutine.
-func (s *Store) Close() {
+func (s *Store) Close() error {
 	close(s.stop)
+	return nil
 }
 
 // Get retrieves the value for the given key.
@@ -79,6 +94,18 @@ func (s *Store) Delete(key string) {
 	defer s.mu.Unlock()
 
 	delete(s.items, key)
+}
+
+// DeleteByPrefix removes all entries whose key starts with the given prefix.
+func (s *Store) DeleteByPrefix(prefix string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for key := range s.items {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.items, key)
+		}
+	}
 }
 
 // Flush removes all entries from the cache.

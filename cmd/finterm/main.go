@@ -61,10 +61,13 @@ func main() {
 		MaxRetries: cfg.API.MaxRetries,
 	})
 
-	// Create cache store
-	// Note: No defer Close() needed here since cache is in-memory
-	// and cleanup goroutine will be terminated when process exits
-	cacheStore := cache.New()
+	// Create cache store — prefer persistent SQLite, fall back to in-memory.
+	var cacheStore cache.Cache
+	cacheStore, err = cache.NewSQLite(xdgDataPath())
+	if err != nil {
+		log.Printf("Warning: failed to open persistent cache (%v), falling back to in-memory cache\n", err)
+		cacheStore = cache.New()
+	}
 
 	// Create asset class detector with crypto symbols
 	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
@@ -131,11 +134,12 @@ func main() {
 	}()
 
 	// Wait for either program completion or signal
+	exitCode := 0
 	select {
 	case err := <-programDone:
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error running TUI: %v\n", err)
-			os.Exit(1)
+			exitCode = 1
 		}
 		// Normal exit - cancel context to clean up any background goroutines
 		cancel()
@@ -147,6 +151,11 @@ func main() {
 		<-programDone
 		cancel()
 	}
+
+	if err := cacheStore.Close(); err != nil {
+		log.Printf("Warning: failed to close cache: %v\n", err)
+	}
+	os.Exit(exitCode)
 }
 
 // getConfigPath returns the path to the config file.

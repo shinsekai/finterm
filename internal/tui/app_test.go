@@ -86,7 +86,7 @@ func (m *mockClient) GetNewsSentiment(_ context.Context, _ alphavantage.NewsOpts
 func newMockApp(t *testing.T) Model {
 	theme := NewTheme("default")
 	cacheStore := cache.New()
-	t.Cleanup(func() { cacheStore.Close() })
+	t.Cleanup(func() { _ = cacheStore.Close() })
 
 	watchlist := &config.WatchlistConfig{
 		Equities: []string{},

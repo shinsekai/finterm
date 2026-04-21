@@ -100,7 +100,7 @@ func NewApp(
 	macroClient macro.Client,
 	newsClient news.Client,
 	trendEngine quote.Engine,
-	cacheStore *cache.Store,
+	cacheStore cache.Cache,
 	watchlist *config.WatchlistConfig,
 	detector *indicators.AssetClassDetector,
 ) Model {

@@ -95,7 +95,7 @@ type Engine struct {
 	// timeSeriesClient fetches daily time series for equities (for BLITZ computation).
 	timeSeriesClient TimeSeriesClient
 	// cache is used to cache time series data for BLITZ computation.
-	cache *cache.Store
+	cache cache.Cache
 }
 
 // New creates a new Engine with the provided indicators and configuration.
@@ -111,7 +111,7 @@ func New(
 	detector *indicators.AssetClassDetector,
 	cryptoFetcher CryptoDataFetcher,
 	timeSeriesClient TimeSeriesClient,
-	cacheStore *cache.Store,
+	cacheStore cache.Cache,
 ) *Engine {
 	return &Engine{
 		remoteRSI:        remoteRSI,

@@ -16,6 +16,7 @@ import (
 	"github.com/shinsekai/finterm/internal/tui/components"
 	"github.com/shinsekai/finterm/internal/tui/macro"
 	"github.com/shinsekai/finterm/internal/tui/news"
+	palettepkg "github.com/shinsekai/finterm/internal/tui/palette"
 	"github.com/shinsekai/finterm/internal/tui/quote"
 	"github.com/shinsekai/finterm/internal/tui/trend"
 )
@@ -33,6 +34,7 @@ var globalBindings = []components.Binding{
 	{Key: "1-4", Description: "Switch tab"},
 	{Key: "Tab", Description: "Cycle tabs"},
 	{Key: "r", Description: "Refresh"},
+	{Key: "Ctrl+P", Description: "Command palette"},
 	{Key: "?", Description: "Toggle help"},
 	{Key: "q / Ctrl+C", Description: "Quit"},
 }
@@ -83,6 +85,7 @@ type Model struct {
 	tabs            []tab
 	activeTab       int
 	helpOverlay     *components.HelpOverlay
+	cmdPalette      *palettepkg.Model
 	lastUpdate      time.Time
 	errorCount      int
 	quit            bool
@@ -120,6 +123,18 @@ func NewApp(
 	newsModel := news.NewModel()
 	newsModel.Configure(context.Background(), newsClient, watchlist.Crypto)
 
+	// Create command palette with default commands
+	cmdPalette := palettepkg.New(palettepkg.BuildDefaultCommands(watchlist))
+	// Apply theme colors to palette
+	cmdPalette.SetBoxStyle(theme.Box())
+	cmdPalette.SetTitleStyle(theme.BoxTitle())
+	cmdPalette.SetCursorStyle(lipgloss.NewStyle().
+		Background(theme.Primary()).
+		Foreground(theme.Background()))
+	cmdPalette.SetLabelStyle(theme.Subtitle())
+	cmdPalette.SetDescStyle(theme.Muted())
+	cmdPalette.SetDimStyle(theme.Muted())
+
 	return Model{
 		theme: theme,
 		tabs: []tab{
@@ -130,6 +145,7 @@ func NewApp(
 		},
 		activeTab:       tabTrend,
 		helpOverlay:     nil,
+		cmdPalette:      cmdPalette,
 		lastUpdate:      time.Now(),
 		errorCount:      0,
 		quit:            false,
@@ -154,7 +170,59 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.helpOverlay = nil
 		return m, nil
 
+	case palettepkg.CloseMsg:
+		// Dismiss palette
+		m.cmdPalette.Hide()
+		return m, nil
+
+	case palettepkg.ExecuteMsg:
+		// Execute palette command and close palette
+		m.cmdPalette.Hide()
+		return m, msg.Cmd
+
+	case palettepkg.SwitchTabMsg:
+		// Switch to specific tab
+		if msg.Tab >= 0 && msg.Tab < numTabs {
+			m.activeTab = msg.Tab
+		}
+		return m, nil
+
+	case palettepkg.RefreshCurrentTabMsg:
+		// Refresh current tab
+		return m, m.refreshActiveTab()
+
+	case palettepkg.ChangeThemeMsg:
+		// Theme change would require rebuilding the app, not implemented in current architecture
+		// For now, just log it
+		return m, nil
+
+	case palettepkg.ShowHelpMsg:
+		// Show help overlay
+		return m.showHelpOverlay()
+
+	case palettepkg.OpenQuoteWithTickerMsg:
+		// Switch to quote tab and preload ticker
+		m.setActiveTab(tabQuote)
+		// TODO: Send message to quote model to prepopulate ticker
+		// This would require quote model to accept a prepopulate message
+		return m, nil
+
 	case tea.KeyMsg:
+		// Intercept Ctrl+P and Ctrl+K to open palette (if palette is not already visible)
+		if msg.Type == tea.KeyCtrlP || msg.Type == tea.KeyCtrlK {
+			if !m.cmdPalette.IsVisible() {
+				m.cmdPalette.Show()
+				return m, nil
+			}
+		}
+
+		// If palette is visible, route all keys to palette
+		if m.cmdPalette.IsVisible() {
+			overlay, cmd := m.cmdPalette.Update(msg)
+			m.cmdPalette = overlay.(*palettepkg.Model)
+			return m, cmd
+		}
+
 		// If help overlay is visible, only handle overlay keys
 		if m.helpOverlay != nil {
 			overlay, cmd := m.helpOverlay.Update(msg)
@@ -185,6 +253,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.helpOverlay != nil {
 			overlay, cmd := m.helpOverlay.Update(msg)
 			m.helpOverlay = overlay.(*components.HelpOverlay)
+			return m, cmd
+		}
+
+		if m.cmdPalette.IsVisible() {
+			overlay, cmd := m.cmdPalette.Update(msg)
+			m.cmdPalette = overlay.(*palettepkg.Model)
 			return m, cmd
 		}
 		return m, nil
@@ -237,11 +311,15 @@ func (m Model) View() string {
 	// Render tab bar
 	tabBar := m.renderTabBar()
 
-	// Render content (help or active child)
+	// Render content (help, palette, or active child)
 	var content string
-	if m.helpOverlay != nil {
+	switch {
+	case m.cmdPalette.IsVisible():
+		// Render active child in background, then overlay palette
+		content = m.tabs[m.activeTab].model.View()
+	case m.helpOverlay != nil:
 		content = m.helpOverlay.View()
-	} else {
+	default:
 		content = m.tabs[m.activeTab].model.View()
 	}
 
@@ -256,7 +334,14 @@ func (m Model) View() string {
 	statusBar := m.renderStatusBar()
 
 	// Join vertically
-	return lipgloss.JoinVertical(lipgloss.Left, tabBar, content, statusBar)
+	baseView := lipgloss.JoinVertical(lipgloss.Left, tabBar, content, statusBar)
+
+	// Overlay palette if visible
+	if m.cmdPalette.IsVisible() {
+		return m.cmdPalette.View()
+	}
+
+	return baseView
 }
 
 // handleKeyMsg handles keyboard input messages.

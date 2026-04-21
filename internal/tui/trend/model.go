@@ -148,24 +148,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.refreshAllCmd()
 
 	case TrendDataMsg:
-		// Handle data for a single ticker
+		// Handle data for a single ticker (parallel fetch)
 		m = m.handleTrendData(msg)
-		// Trigger next ticker fetch
-		nextIndex := msg.Index + 1
-		if nextIndex < len(m.watchlist) {
-			return m, m.fetchTickerCmd(nextIndex)
-		}
 		m = m.updateOverallState()
 		return m, nil
 
 	case TrendErrorMsg:
-		// Handle error for a single ticker
+		// Handle error for a single ticker (parallel fetch)
 		m = m.handleTrendError(msg)
-		// Continue to next ticker even on error
-		nextIndex := msg.Index + 1
-		if nextIndex < len(m.watchlist) {
-			return m, m.fetchTickerCmd(nextIndex)
-		}
 		m = m.updateOverallState()
 		return m, nil
 	}
@@ -241,14 +231,18 @@ func (m Model) refreshAllCmd() tea.Cmd {
 	return m.fetchAllCmd()
 }
 
-// fetchAllCmd returns a command that starts fetching tickers sequentially.
-// Each result/error triggers the next fetch via fetchTickerCmd.
+// fetchAllCmd returns a command that starts fetching all tickers in parallel.
+// The rate limiter in the API client handles throttling.
 func (m Model) fetchAllCmd() tea.Cmd {
 	if len(m.watchlist) == 0 {
 		return nil
 	}
-	// Start with the first ticker
-	return m.fetchTickerCmd(0)
+	// Fetch all tickers in parallel using tea.Batch
+	cmds := make([]tea.Cmd, len(m.watchlist))
+	for i := range m.watchlist {
+		cmds[i] = m.fetchTickerCmd(i)
+	}
+	return tea.Batch(cmds...)
 }
 
 // fetchTickerCmd fetches a single ticker and returns the result.

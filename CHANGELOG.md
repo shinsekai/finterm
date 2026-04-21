@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — 2026-04-21
+
+### Added
+- Global Ctrl+P command palette with fuzzy matching navigation
+  - Execute any command or navigate to any view from anywhere in the app
+  - Fuzzy search across commands, tickers, and actions
+  - Keyboard-first design: type to filter, arrows to navigate, Enter to execute, Esc to cancel
+  - Progress chip in trend view during parallel fetch operations
+  - Real-time fetch progress with ticker-by-ticker status (✓ completed / ⟳ in progress / ○ pending)
+- Parallel watchlist fetching for significantly reduced startup time
+  - Concurrent ticker fetch using goroutine pools
+  - Equities and crypto sections fetch in parallel batches
+  - Rate limiting integration maintains API compliance while maximizing throughput
+  - Overall fetch time reduced from O(n×rate_limit) to O(n/p + rate_limit) where p is parallelism
+- Pure-Go SQLite-based cache layer replacing in-memory store
+  - `internal/cache/sqlite.go` with full ACID compliance and WAL mode
+  - Persistent cache across application restarts
+  - Per-key TTL with automatic background cleanup
+  - Thread-safe concurrent access with SQLite internal locking
+  - Configurable cache path via `FINTERM_CACHE_PATH` environment variable or default to `~/.local/share/finterm/`
+
+### Changed
+- Cache architecture migrated from volatile memory-backed to persistent SQLite storage
+- Data fetching strategy from sequential to parallel for watchlist operations
+- Command accessibility streamlined through unified palette interface
+
 ## [0.6.0] — 2026-04-16
 
 ### Added

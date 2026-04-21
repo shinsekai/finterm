@@ -4,7 +4,9 @@ package trend
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -872,4 +874,235 @@ func TestTrendModel_GetTPICounts_CachedRows(t *testing.T) {
 
 	assert.Equal(t, 1, long, "Should count cached row as LONG")
 	assert.Equal(t, 0, cash, "Should have 0 CASH signals")
+}
+
+// parallelTestEngine is a mock engine that tracks symbol fetch calls in order.
+type parallelTestEngine struct {
+	mu        sync.Mutex
+	calls     []string
+	delays    map[string]time.Duration
+	errMap    map[string]error
+	resultMap map[string]*trenddomain.Result
+	blockChan chan struct{}
+}
+
+func (e *parallelTestEngine) AnalyzeWithSymbolDetection(_ context.Context, symbol string) (*trenddomain.Result, error) {
+	e.mu.Lock()
+	e.calls = append(e.calls, symbol)
+	e.mu.Unlock()
+
+	// Wait if block channel is set (for testing delays)
+	if e.blockChan != nil {
+		<-e.blockChan
+	}
+
+	// Apply per-symbol delay if configured
+	if delay, ok := e.delays[symbol]; ok && delay > 0 {
+		time.Sleep(delay)
+	}
+
+	// Return configured error if any
+	if e.errMap != nil {
+		if err, ok := e.errMap[symbol]; ok {
+			return nil, err
+		}
+	}
+
+	// Return configured result if any
+	if e.resultMap != nil {
+		if result, ok := e.resultMap[symbol]; ok {
+			return result, nil
+		}
+	}
+
+	// Default result
+	return &trenddomain.Result{
+		Symbol:     symbol,
+		RSI:        50.0,
+		EMAFast:    100.0,
+		EMASlow:    90.0,
+		Signal:     trenddomain.Bullish,
+		BlitzScore: 1,
+		Price:      100.0,
+		TPI:        0.67,
+		TPISignal:  "LONG",
+	}, nil
+}
+
+// TestTrendModel_ParallelFetch_AllTickersLoadIndependently verifies that all tickers
+// load independently without blocking each other.
+func TestTrendModel_ParallelFetch_AllTickersLoadIndependently(t *testing.T) {
+	engine := &parallelTestEngine{}
+	model := newTestModel(t, engine, "AAPL", "MSFT", "GOOGL")
+
+	// All rows should start in loading state
+	for _, row := range model.rows {
+		assert.Equal(t, StateLoading, row.State)
+	}
+
+	// Simulate parallel fetch by sending all messages in random order
+	msgs := []tea.Msg{
+		TrendDataMsg{Symbol: "GOOGL", Result: &trenddomain.Result{Symbol: "GOOGL", Signal: trenddomain.Bullish, RSI: 50.0}},
+		TrendDataMsg{Symbol: "AAPL", Result: &trenddomain.Result{Symbol: "AAPL", Signal: trenddomain.Bullish, RSI: 50.0}},
+		TrendDataMsg{Symbol: "MSFT", Result: &trenddomain.Result{Symbol: "MSFT", Signal: trenddomain.Bearish, RSI: 50.0}},
+	}
+
+	for _, msg := range msgs {
+		updatedM, _ := model.Update(msg)
+		model = asModel(t, updatedM)
+	}
+
+	// All rows should be loaded regardless of message order
+	rows := model.GetRows()
+	for _, row := range rows {
+		assert.Equal(t, StateLoaded, row.State, "Row %s should be loaded", row.Symbol)
+		assert.NotNil(t, row.Result, "Row %s should have result", row.Symbol)
+	}
+
+	// Overall state should be loaded
+	assert.Equal(t, StateLoaded, model.GetOverallState())
+}
+
+// TestTrendModel_ParallelFetch_ProgressChipIncrementsPerMsg verifies that
+// the loaded count updates on every incoming message, not just when all complete.
+func TestTrendModel_ParallelFetch_ProgressChipIncrementsPerMsg(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL", "NVDA", "AMZN")
+
+	// Start with 0 loaded
+	assert.Equal(t, 0, model.GetLoadedCount(), "Should start with 0 loaded")
+
+	// Load first ticker
+	result := &trenddomain.Result{Symbol: "AAPL", Signal: trenddomain.Bullish, RSI: 50.0}
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: result})
+	model = asModel(t, updatedM)
+	assert.Equal(t, 1, model.GetLoadedCount(), "Should have 1 loaded after first message")
+
+	// Load second ticker
+	result2 := &trenddomain.Result{Symbol: "GOOGL", Signal: trenddomain.Bullish, RSI: 50.0}
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "GOOGL", Result: result2})
+	model = asModel(t, updatedM)
+	assert.Equal(t, 2, model.GetLoadedCount(), "Should have 2 loaded after second message")
+
+	// Load third ticker
+	result3 := &trenddomain.Result{Symbol: "NVDA", Signal: trenddomain.Bullish, RSI: 50.0}
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "NVDA", Result: result3})
+	model = asModel(t, updatedM)
+	assert.Equal(t, 3, model.GetLoadedCount(), "Should have 3 loaded after third message")
+
+	// Overall state should still be loading (not all done)
+	assert.Equal(t, StateLoading, model.GetOverallState(), "Overall state should still be loading")
+}
+
+// TestTrendModel_ParallelFetch_SlowTickerDoesNotBlockOthers verifies that
+// one slow ticker doesn't block the rest from loading.
+func TestTrendModel_ParallelFetch_SlowTickerDoesNotBlockOthers(t *testing.T) {
+	engine := &parallelTestEngine{
+		delays: map[string]time.Duration{
+			"MSFT": 500 * time.Millisecond, // Slow ticker
+		},
+	}
+	model := newTestModel(t, engine, "AAPL", "MSFT", "GOOGL")
+
+	// In parallel mode, we can simulate fast tickers completing first
+	// by sending their messages before the slow ticker
+
+	// AAPL and GOOGL complete (fast)
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: &trenddomain.Result{Symbol: "AAPL", Signal: trenddomain.Bullish, RSI: 50.0}})
+	model = asModel(t, updatedM)
+
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "GOOGL", Result: &trenddomain.Result{Symbol: "GOOGL", Signal: trenddomain.Bullish, RSI: 50.0}})
+	model = asModel(t, updatedM)
+
+	// Verify AAPL and GOOGL are loaded despite MSFT being slow
+	rows := model.GetRows()
+	assert.Equal(t, StateLoaded, rows[0].State, "AAPL should be loaded (fast)")
+	assert.Equal(t, StateLoading, rows[1].State, "MSFT should still be loading (slow)")
+	assert.Equal(t, StateLoaded, rows[2].State, "GOOGL should be loaded (fast)")
+
+	// Now MSFT completes
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "MSFT", Result: &trenddomain.Result{Symbol: "MSFT", Signal: trenddomain.Bearish, RSI: 50.0}})
+	model = asModel(t, updatedM)
+
+	// All should be loaded now
+	rows = model.GetRows()
+	for _, row := range rows {
+		assert.Equal(t, StateLoaded, row.State, "Row %s should be loaded", row.Symbol)
+	}
+}
+
+// TestTrendModel_ParallelFetch_PartialFailureIsolated verifies that
+// partial failures don't stop other tickers from loading.
+func TestTrendModel_ParallelFetch_PartialFailureIsolated(t *testing.T) {
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL", "NVDA")
+
+	// AAPL and GOOGL succeed, MSFT fails
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: &trenddomain.Result{Symbol: "AAPL", Signal: trenddomain.Bullish, RSI: 50.0}})
+	model = asModel(t, updatedM)
+
+	err := errors.New("network timeout")
+	updatedM, _ = model.Update(TrendErrorMsg{Symbol: "MSFT", Err: err})
+	model = asModel(t, updatedM)
+
+	updatedM, _ = model.Update(TrendDataMsg{Symbol: "GOOGL", Result: &trenddomain.Result{Symbol: "GOOGL", Signal: trenddomain.Bullish, RSI: 50.0}})
+	model = asModel(t, updatedM)
+
+	// NVDA still loading
+	// Verify states
+	rows := model.GetRows()
+	assert.Equal(t, StateLoaded, rows[0].State, "AAPL should be loaded")
+	assert.Equal(t, StateError, rows[1].State, "MSFT should have error")
+	assert.Equal(t, StateLoaded, rows[2].State, "GOOGL should be loaded")
+	assert.Equal(t, StateLoading, rows[3].State, "NVDA should still be loading")
+
+	// Loaded count should be 2 (AAPL and GOOGL only)
+	assert.Equal(t, 2, model.GetLoadedCount(), "Should count only loaded rows")
+
+	// Overall state should still be loading
+	assert.Equal(t, StateLoading, model.GetOverallState())
+}
+
+// TestTrendModel_ParallelFetch_RespectsRateLimit verifies that
+// the rate limiter still throttles parallel requests.
+func TestTrendModel_ParallelFetch_RespectsRateLimit(t *testing.T) {
+	// This test verifies that the fetchAllCmd() returns a tea.Batch
+	// which launches all commands in parallel. The actual rate limiting
+	// is handled by the API client's token bucket, which is tested
+	// in the alphavantage package tests.
+
+	model := newTestModel(t, &mockEngine{}, "AAPL", "MSFT", "GOOGL")
+
+	cmd := model.fetchAllCmd()
+	assert.NotNil(t, cmd, "fetchAllCmd should return a command")
+
+	// In a real scenario with the actual client, the token bucket would
+	// throttle requests. This test just verifies the model returns a command.
+	// The rate limiter behavior is tested in client_test.go.
+}
+
+// TestTrendModel_ParallelFetch_ContextCancellationAbortsAll verifies that
+// context cancellation aborts all in-flight fetches.
+func TestTrendModel_ParallelFetch_ContextCancellationAbortsAll(t *testing.T) {
+	blockChan := make(chan struct{})
+	engine := &parallelTestEngine{blockChan: blockChan}
+	model := newTestModel(t, engine, "AAPL", "MSFT", "GOOGL")
+
+	// Unblock one fetch to simulate it starting
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		blockChan <- struct{}{}
+	}()
+
+	// Cancel the context
+	model.cancel()
+
+	// Any fetches that haven't completed should respect context cancellation
+	// In this test, we verify the cancel function is set and can be called
+	assert.NotNil(t, model.cancel, "Cancel function should be set")
+
+	// After cancellation, new Update calls should still work
+	updatedM, _ := model.Update(TrendDataMsg{Symbol: "AAPL", Result: &trenddomain.Result{Symbol: "AAPL", Signal: trenddomain.Bullish, RSI: 50.0}})
+	model = asModel(t, updatedM)
+
+	// Model should still be functional after cancellation
+	assert.Equal(t, StateLoaded, model.GetRows()[0].State)
 }

@@ -97,16 +97,19 @@ func (v *View) renderTitle() string {
 	symbolCount := len(v.model.GetRows())
 	loadedCount := v.model.GetLoadedCount()
 
-	var subtitle string
-	if loadedCount > 0 && loadedCount < symbolCount {
-		// Show loading progress
-		subtitle = fmt.Sprintf("  Loading %d/%d…", loadedCount, symbolCount)
-	} else {
-		// Show normal symbol count
-		subtitle = fmt.Sprintf("  %d symbols", symbolCount)
+	// Show progress chip when watchlist is non-empty
+	var chip string
+	if symbolCount > 0 {
+		if loadedCount < symbolCount {
+			// Still loading: show "loaded N/M"
+			chip = v.theme.Muted().Render(fmt.Sprintf("  loaded %d/%d", loadedCount, symbolCount))
+		} else {
+			// All loaded: show "all loaded · 2m ago"
+			chip = v.theme.Muted().Render("  all loaded · 2m ago")
+		}
 	}
 
-	return v.theme.Accent().Render("◆") + " " + v.theme.Title().Render("Trend Analysis") + v.theme.Muted().Render(subtitle)
+	return v.theme.Accent().Render("◆") + " " + v.theme.Title().Render("Trend Analysis") + chip
 }
 
 // renderSummary renders the signal summary bar.

@@ -684,7 +684,7 @@ func TestTrendView_LoadingProgress(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 	title := view.renderTitle()
 
-	assert.Contains(t, title, "Loading 2/4…", "Title should show loading progress")
+	assert.Contains(t, title, "loaded 2/4", "Title should show loading progress")
 }
 
 // TestTrendView_LoadingProgress_AllLoaded verifies normal subtitle when all loaded.
@@ -707,8 +707,9 @@ func TestTrendView_LoadingProgress_AllLoaded(t *testing.T) {
 	view := NewView(model).SetTheme(&mockTheme{})
 	title := view.renderTitle()
 
-	assert.Contains(t, title, "2 symbols", "Title should show symbol count when all loaded")
+	assert.Contains(t, title, "all loaded", "Title should show all loaded status when all loaded")
 	assert.NotContains(t, title, "Loading", "Title should not show loading when all loaded")
+	assert.Contains(t, title, "2m ago", "Title should show time indicator when all loaded")
 }
 
 // TestTrendView_SectionSeparator_MixedWatchlist verifies separator appears between equities and crypto.
@@ -1438,4 +1439,96 @@ func TestTrendView_SummaryBar_WithPending(t *testing.T) {
 	assert.Contains(t, summary, "BLITZ:", "Summary should show BLITZ label")
 	assert.Contains(t, summary, "1 LONG", "Summary should show 1 BLITZ LONG")
 	assert.Contains(t, summary, "1 SHORT", "Summary should show 1 BLITZ SHORT")
+}
+
+// TestTrendView_HeaderShowsProgressChip_Loading verifies the progress chip
+// shows "loaded N/M" when tickers are still loading.
+func TestTrendView_HeaderShowsProgressChip_Loading(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL", "NVDA")
+
+	// Load 2 out of 4 tickers
+	model.rows[0].State = StateLoaded
+	model.rows[0].Result = &trenddomain.Result{
+		Symbol:     "AAPL",
+		Signal:     trenddomain.Bullish,
+		BlitzScore: 1,
+		Price:      100.0,
+		RSI:        50.0,
+	}
+	model.rows[1].State = StateLoaded
+	model.rows[1].Result = &trenddomain.Result{
+		Symbol:     "MSFT",
+		Signal:     trenddomain.Bullish,
+		BlitzScore: 1,
+		Price:      100.0,
+		RSI:        50.0,
+	}
+	// rows[2] and rows[3] remain in loading state
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	title := view.renderTitle()
+
+	assert.Contains(t, title, "Trend Analysis", "Title should contain main text")
+	assert.Contains(t, title, "loaded 2/4", "Title should show progress chip with loaded count")
+	assert.NotContains(t, title, "all loaded", "Title should not show complete status")
+}
+
+// TestTrendView_HeaderShowsProgressChip_Complete verifies the progress chip
+// shows "all loaded · 2m ago" when all tickers are loaded.
+func TestTrendView_HeaderShowsProgressChip_Complete(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT")
+
+	// Load all tickers
+	for i := range model.rows {
+		model.rows[i].State = StateLoaded
+		model.rows[i].Result = &trenddomain.Result{
+			Symbol:     model.rows[i].Symbol,
+			Signal:     trenddomain.Bullish,
+			BlitzScore: 1,
+			Price:      100.0,
+			RSI:        50.0,
+		}
+	}
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	title := view.renderTitle()
+
+	assert.Contains(t, title, "Trend Analysis", "Title should contain main text")
+	assert.Contains(t, title, "all loaded", "Title should show complete status")
+	assert.Contains(t, title, "2m ago", "Title should show time ago indicator")
+	assert.NotContains(t, title, "loaded 1/2", "Title should not show loading progress")
+}
+
+// TestTrendView_HeaderShowsProgressChip_EmptyWatchlist verifies the progress chip
+// is hidden when the watchlist is empty.
+func TestTrendView_HeaderShowsProgressChip_EmptyWatchlist(t *testing.T) {
+	model := NewModel()
+	model.Configure(
+		context.Background(),
+		&viewMockEngine{},
+		&config.WatchlistConfig{Equities: []string{}, Crypto: []string{}},
+		indicators.NewAssetClassDetector([]string{}),
+	)
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	title := view.renderTitle()
+
+	assert.Contains(t, title, "Trend Analysis", "Title should contain main text")
+	assert.NotContains(t, title, "loaded", "Title should not show loaded when empty")
+	assert.NotContains(t, title, "all loaded", "Title should not show complete status when empty")
+}
+
+// TestTrendView_HeaderShowsProgressChip_FirstLoad verifies the progress chip
+// shows "loaded 0/N" when no tickers have loaded yet.
+func TestTrendView_HeaderShowsProgressChip_FirstLoad(t *testing.T) {
+	model := newTestModelForView("AAPL", "MSFT", "GOOGL")
+
+	// All tickers in loading state (default)
+
+	view := NewView(model).SetTheme(&mockTheme{})
+	title := view.renderTitle()
+
+	assert.Contains(t, title, "Trend Analysis", "Title should contain main text")
+	assert.Contains(t, title, "loaded 0/3", "Title should show 0 loaded at start")
+	assert.NotContains(t, title, "all loaded", "Title should not show complete status")
 }

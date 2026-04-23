@@ -127,16 +127,6 @@ func (c *Client) get(ctx context.Context, params map[string]string) ([]byte, err
 	var responseBody []byte
 
 	for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
-		if attempt > 0 {
-			// Apply exponential backoff with jitter
-			backoff := c.calculateBackoff(attempt)
-			select {
-			case <-time.After(backoff):
-			case <-ctx.Done():
-				return nil, fmt.Errorf("context canceled during backoff: %w", ctx.Err())
-			}
-		}
-
 		// Acquire burst limit token (blocks if per-second budget exhausted)
 		if err := c.burstLimiter.Wait(ctx); err != nil {
 			return nil, fmt.Errorf("burst limiter: %w", err)
@@ -156,8 +146,13 @@ func (c *Client) get(ctx context.Context, params map[string]string) ([]byte, err
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("executing request: %w", err)
-			// Retry on network errors and timeouts
+			// Retry on network errors and timeouts with backoff
 			if c.shouldRetryError(err) && attempt < c.config.MaxRetries {
+				select {
+				case <-time.After(backoffFor(attempt)):
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
 				continue
 			}
 			return nil, lastErr
@@ -168,8 +163,13 @@ func (c *Client) get(ctx context.Context, params map[string]string) ([]byte, err
 		_ = resp.Body.Close()
 		if err != nil {
 			lastErr = fmt.Errorf("reading response body: %w", err)
-			// Retry on read errors
+			// Retry on read errors with backoff
 			if attempt < c.config.MaxRetries {
+				select {
+				case <-time.After(backoffFor(attempt)):
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
 				continue
 			}
 			return nil, lastErr
@@ -181,6 +181,11 @@ func (c *Client) get(ctx context.Context, params map[string]string) ([]byte, err
 			// 429 - rate limit, retry with backoff
 			lastErr = c.newAPIError(resp.StatusCode, "rate limited", u.Path)
 			if attempt < c.config.MaxRetries {
+				select {
+				case <-time.After(backoffFor(attempt)):
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
 				continue
 			}
 			// Exhausted retries, return error
@@ -189,6 +194,11 @@ func (c *Client) get(ctx context.Context, params map[string]string) ([]byte, err
 			// 5xx - server error, retry with backoff
 			lastErr = c.newAPIError(resp.StatusCode, string(body), u.Path)
 			if attempt < c.config.MaxRetries {
+				select {
+				case <-time.After(backoffFor(attempt)):
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
 				continue
 			}
 			// Exhausted retries, return error
@@ -200,6 +210,15 @@ func (c *Client) get(ctx context.Context, params map[string]string) ([]byte, err
 
 		// Success - check for API-level errors in response body
 		if apiErr := c.checkAPIError(body); apiErr != nil {
+			if errors.Is(apiErr, ErrTransientAPIError) && attempt < c.config.MaxRetries {
+				lastErr = apiErr
+				select {
+				case <-time.After(backoffFor(attempt)):
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+				continue
+			}
 			return nil, apiErr
 		}
 
@@ -248,6 +267,29 @@ func (c *Client) calculateBackoff(attempt int) time.Duration {
 
 	// Add random jitter: ±200ms
 	jitter := time.Duration(rand.Int63n(int64(DefaultJitter*2))) - DefaultJitter
+
+	return backoff + jitter
+}
+
+// backoffFor calculates the backoff delay for a given retry attempt.
+// Uses exponential backoff with positive jitter only, capped at 5 seconds.
+// Formula: 250ms * 2^attempt + rand(0..100ms), max 5s.
+// Used for HTTP 429 and transient API error retries.
+func backoffFor(attempt int) time.Duration {
+	const (
+		baseDelay = 250 * time.Millisecond
+		maxDelay  = 5 * time.Second
+		jitterMax = 100 * time.Millisecond
+	)
+
+	// Exponential backoff: 250ms * 2^attempt
+	backoff := baseDelay * time.Duration(1<<uint(attempt))
+	if backoff > maxDelay {
+		backoff = maxDelay
+	}
+
+	// Add random jitter: 0..100ms
+	jitter := time.Duration(rand.Int63n(int64(jitterMax)))
 
 	return backoff + jitter
 }

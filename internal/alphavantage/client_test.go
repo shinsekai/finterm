@@ -1468,3 +1468,404 @@ func TestCheckAPIError_EmptyObject(t *testing.T) {
 		t.Fatalf("expected no error for empty object, got: %v", err)
 	}
 }
+
+func TestClient_Request_RetriesOnBurstPatternAndSucceeds(t *testing.T) {
+	attempts := 0
+	var mu sync.Mutex
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		attempts++
+
+		if attempts < 3 {
+			// Return burst pattern error on first two attempts
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprint(w, `{"Information": "Burst pattern detected: 5 requests per second allowed."}`)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"success": true}`)
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		MaxRetries: 5,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	data, err := client.get(context.Background(), map[string]string{"function": "TEST"})
+	if err != nil {
+		t.Fatalf("expected success after retries, got error: %v", err)
+	}
+
+	if attempts != 3 {
+		t.Errorf("expected 3 attempts, got %d", attempts)
+	}
+
+	if string(data) != `{"success": true}` {
+		t.Errorf("unexpected response: %s", string(data))
+	}
+}
+
+func TestClient_Request_ExhaustsRetriesOnPersistentBurst(t *testing.T) {
+	callCount := 0
+	var mu sync.Mutex
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		callCount++
+
+		// Always return burst pattern error
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"Information": "Burst pattern detected: 5 requests per second allowed."}`)
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		MaxRetries: 2, // 2 retries + initial = 3 total attempts
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	_, err := client.get(context.Background(), map[string]string{"function": "TEST"})
+	if err == nil {
+		t.Fatal("expected error after exhausting retries, got nil")
+	}
+
+	if !errors.Is(err, ErrTransientAPIError) {
+		t.Errorf("expected error to be ErrTransientAPIError, got: %T: %v", err, err)
+	}
+
+	if callCount != 3 {
+		t.Errorf("expected 3 calls (1 initial + 2 retries), got %d", callCount)
+	}
+}
+
+func TestClient_Request_DoesNotRetryOnNonTransientInformation(t *testing.T) {
+	callCount := 0
+	var mu sync.Mutex
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		callCount++
+
+		// Return non-transient information error
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"Information": "The premium API key is required."}`)
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		MaxRetries: 5,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	_, err := client.get(context.Background(), map[string]string{"function": "TEST"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if errors.Is(err, ErrTransientAPIError) {
+		t.Errorf("expected error NOT to be ErrTransientAPIError, got: %v", err)
+	}
+
+	expectedMsg := "API information: The premium API key is required."
+	if err.Error() != expectedMsg {
+		t.Errorf("expected error message %q, got %q", expectedMsg, err.Error())
+	}
+
+	if callCount != 1 {
+		t.Errorf("expected 1 call (no retry), got %d", callCount)
+	}
+}
+
+func TestClient_Request_BackoffRespectsContextCancellation(t *testing.T) {
+	attempts := 0
+	var mu sync.Mutex
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		attempts++
+
+		// Always return burst pattern error
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"Information": "Burst pattern detected: 5 requests per second allowed."}`)
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		MaxRetries: 10,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel after first attempt completes
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	_, err := client.get(ctx, map[string]string{"function": "TEST"})
+	if err == nil {
+		t.Fatal("expected context cancellation error, got nil")
+	}
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected error to be context.Canceled, got: %v", err)
+	}
+
+	// Should have only made 1-2 attempts due to context cancellation
+	if attempts > 2 {
+		t.Errorf("expected at most 2 attempts due to context cancellation, got %d", attempts)
+	}
+}
+
+func TestClient_Request_BurstAndHTTP429ShareBackoff(t *testing.T) {
+	tests := []struct {
+		name           string
+		handler        func(w http.ResponseWriter, attempts int)
+		expectedDelay  time.Duration
+		delayTolerance time.Duration
+	}{
+		{
+			name: "burst pattern",
+			handler: func(w http.ResponseWriter, attempts int) {
+				if attempts < 2 {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_, _ = fmt.Fprint(w, `{"Information": "Burst pattern detected: 5 requests per second allowed."}`)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = fmt.Fprint(w, `{"success": true}`)
+			},
+			expectedDelay:  250 * time.Millisecond,
+			delayTolerance: 100 * time.Millisecond,
+		},
+		{
+			name: "HTTP 429",
+			handler: func(w http.ResponseWriter, attempts int) {
+				if attempts < 2 {
+					w.WriteHeader(http.StatusTooManyRequests)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = fmt.Fprint(w, `{"success": true}`)
+			},
+			expectedDelay:  250 * time.Millisecond,
+			delayTolerance: 100 * time.Millisecond,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attempts := 0
+			var mu sync.Mutex
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				mu.Lock()
+				defer mu.Unlock()
+				attempts++
+				tt.handler(w, attempts)
+			}))
+			defer server.Close()
+
+			client := New(Config{
+				Key:        "test-key",
+				BaseURL:    server.URL,
+				MaxRetries: 5,
+				HTTPClient: &http.Client{Timeout: 5 * time.Second},
+			})
+
+			start := time.Now()
+			_, err := client.get(context.Background(), map[string]string{"function": "TEST"})
+			if err != nil {
+				t.Fatalf("expected success, got error: %v", err)
+			}
+			duration := time.Since(start)
+
+			// Verify that the delay is approximately the expected backoff time
+			// Allow tolerance for jitter
+			minExpected := tt.expectedDelay - tt.delayTolerance
+			maxExpected := tt.expectedDelay + tt.delayTolerance + 100*time.Millisecond // extra for processing
+
+			if duration < minExpected || duration > maxExpected {
+				t.Errorf("expected duration ~%v (±%v), got %v", tt.expectedDelay, tt.delayTolerance, duration)
+			}
+		})
+	}
+}
+
+func TestClient_Request_RetryCountCappedAtMaxRetries(t *testing.T) {
+	callCount := 0
+	var mu sync.Mutex
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		callCount++
+
+		// Always return burst pattern error
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"Information": "Burst pattern detected: 5 requests per second allowed."}`)
+	}))
+	defer server.Close()
+
+	maxRetries := 3
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		MaxRetries: maxRetries,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	_, err := client.get(context.Background(), map[string]string{"function": "TEST"})
+	if err == nil {
+		t.Fatal("expected error after exhausting retries, got nil")
+	}
+
+	expectedCalls := maxRetries + 1 // initial + retries
+	if callCount != expectedCalls {
+		t.Errorf("expected %d calls (1 initial + %d retries), got %d", expectedCalls, maxRetries, callCount)
+	}
+}
+
+func TestBackoffFor_MonotonicAndCapped(t *testing.T) {
+	// Test monotonic increase (without randomness)
+	// We'll sample multiple times and verify the trend
+	samples := make([]time.Duration, 10)
+	for i := range samples {
+		samples[i] = backoffFor(i)
+	}
+
+	// Verify each sample is non-negative
+	for i, d := range samples {
+		if d < 0 {
+			t.Errorf("attempt %d: backoff should be non-negative, got %v", i, d)
+		}
+	}
+
+	// Verify that with enough samples, we see the capped value
+	maxSeen := time.Duration(0)
+	maxBackoff := 5 * time.Second
+	foundCap := false
+	for i := 0; i < 20; i++ {
+		d := backoffFor(i)
+		if d > maxSeen {
+			maxSeen = d
+		}
+		// With jitter, we may see values slightly above maxBackoff (maxBackoff + maxJitter)
+		// We check if the value is at or very close to maxBackoff
+		if d >= maxBackoff && d <= maxBackoff+100*time.Millisecond {
+			foundCap = true
+		}
+	}
+
+	if !foundCap {
+		t.Errorf("expected to see capped backoff of 5s (±100ms jitter), max seen was %v", maxSeen)
+	}
+
+	// Verify exponential growth trend (min values, ignoring jitter)
+	// attempt 0: 250ms * 1 = 250ms + 0-100ms = 250-350ms
+	// attempt 1: 250ms * 2 = 500ms + 0-100ms = 500-600ms
+	// attempt 2: 250ms * 4 = 1000ms + 0-100ms = 1000-1100ms
+	minBackoffs := []struct {
+		attempt     int
+		minExpected time.Duration
+		maxExpected time.Duration
+	}{
+		{0, 250 * time.Millisecond, 350 * time.Millisecond},
+		{1, 500 * time.Millisecond, 600 * time.Millisecond},
+		{2, 1000 * time.Millisecond, 1100 * time.Millisecond},
+		{3, 2000 * time.Millisecond, 2100 * time.Millisecond},
+		{4, 4000 * time.Millisecond, 4100 * time.Millisecond},
+	}
+
+	for _, tc := range minBackoffs {
+		d := backoffFor(tc.attempt)
+		// We sample multiple times to account for jitter
+		foundInRange := false
+		for i := 0; i < 100; i++ {
+			d = backoffFor(tc.attempt)
+			if d >= tc.minExpected && d <= tc.maxExpected {
+				foundInRange = true
+				break
+			}
+		}
+		if !foundInRange {
+			t.Errorf("attempt %d: expected backoff in range [%v, %v], sampled %v", tc.attempt, tc.minExpected, tc.maxExpected, d)
+		}
+	}
+}
+
+func TestBackoffFor_WithJitterBoundedBy100ms(t *testing.T) {
+	const (
+		numSamples = 1000
+		maxJitter  = 100 * time.Millisecond
+		maxBackoff = 5 * time.Second
+	)
+
+	for attempt := 0; attempt < 5; attempt++ {
+		minSeen := time.Duration(^uint64(0) >> 1)
+		maxSeen := time.Duration(0)
+
+		for i := 0; i < numSamples; i++ {
+			d := backoffFor(attempt)
+			if d < minSeen {
+				minSeen = d
+			}
+			if d > maxSeen {
+				maxSeen = d
+			}
+		}
+
+		// Calculate expected base (without jitter)
+		base := 250 * time.Millisecond * time.Duration(1<<uint(attempt))
+		if base > maxBackoff {
+			base = maxBackoff
+		}
+
+		// Minimum should be base (jitter can be 0)
+		if minSeen < base {
+			t.Errorf("attempt %d: minimum backoff %v should be >= base %v", attempt, minSeen, base)
+		}
+
+		// Maximum should be base + maxJitter (or maxBackoff if base is already at maxBackoff)
+		expectedMax := base + maxJitter
+		if expectedMax > maxBackoff {
+			expectedMax = maxBackoff
+		}
+		if maxSeen > expectedMax {
+			t.Errorf("attempt %d: maximum backoff %v should be <= %v (base %v + jitter %v, maxBackoff %v)",
+				attempt, maxSeen, expectedMax, base, maxJitter, maxBackoff)
+		}
+
+		// Verify spread is roughly maxJitter (unless capped)
+		spread := maxSeen - minSeen
+		if base < maxBackoff && spread < maxJitter/2 {
+			t.Errorf("attempt %d: spread %v should be roughly maxJitter %v (min %v, max %v, base %v)",
+				attempt, spread, maxJitter, minSeen, maxSeen, base)
+		}
+	}
+}

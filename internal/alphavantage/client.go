@@ -19,6 +19,8 @@ import (
 const (
 	// DefaultRateLimit is the default requests per minute.
 	DefaultRateLimit = 70
+	// DefaultBurstLimit is the default requests per second (burst ceiling).
+	DefaultBurstLimit = 5
 	// DefaultTimeout is the default request timeout.
 	DefaultTimeout = 10 * time.Second
 	// DefaultMaxRetries is the default maximum number of retry attempts.
@@ -57,6 +59,7 @@ type Config struct {
 	Key        string
 	BaseURL    string
 	RateLimit  int // Requests per minute
+	BurstLimit int // Requests per second (burst ceiling)
 	Timeout    time.Duration
 	MaxRetries int
 	HTTPClient *http.Client // Optional, for testing
@@ -64,11 +67,12 @@ type Config struct {
 
 // Client is an Alpha Vantage API client with rate limiting and retry logic.
 type Client struct {
-	baseURL     string
-	apiKey      string
-	httpClient  *http.Client
-	rateLimiter *tokenBucket
-	config      Config
+	baseURL      string
+	apiKey       string
+	httpClient   *http.Client
+	rateLimiter  *tokenBucket
+	burstLimiter *tokenBucket
+	config       Config
 }
 
 // New creates a new Alpha Vantage API client.
@@ -78,6 +82,9 @@ func New(cfg Config) *Client {
 	}
 	if cfg.RateLimit <= 0 {
 		cfg.RateLimit = DefaultRateLimit
+	}
+	if cfg.BurstLimit <= 0 {
+		cfg.BurstLimit = DefaultBurstLimit
 	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = DefaultTimeout
@@ -92,11 +99,12 @@ func New(cfg Config) *Client {
 	}
 
 	return &Client{
-		baseURL:     cfg.BaseURL,
-		apiKey:      cfg.Key,
-		httpClient:  cfg.HTTPClient,
-		rateLimiter: newTokenBucket(cfg.RateLimit, time.Minute),
-		config:      cfg,
+		baseURL:      cfg.BaseURL,
+		apiKey:       cfg.Key,
+		httpClient:   cfg.HTTPClient,
+		rateLimiter:  newTokenBucket(cfg.RateLimit, time.Minute),
+		burstLimiter: newTokenBucket(cfg.BurstLimit, time.Second),
+		config:       cfg,
 	}
 }
 
@@ -126,7 +134,11 @@ func (c *Client) get(ctx context.Context, params map[string]string) ([]byte, err
 			}
 		}
 
-		// Acquire rate limit token (blocks if budget exhausted)
+		// Acquire burst limit token (blocks if per-second budget exhausted)
+		if err := c.burstLimiter.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("burst limiter: %w", err)
+		}
+		// Acquire rate limit token (blocks if per-minute budget exhausted)
 		if err := c.rateLimiter.Wait(ctx); err != nil {
 			return nil, fmt.Errorf("rate limiter: %w", err)
 		}
@@ -333,12 +345,25 @@ type tokenBucket struct {
 }
 
 // newTokenBucket creates a new token bucket with the given capacity and refill interval.
-func newTokenBucket(requestsPerMinute int, refillInterval time.Duration) *tokenBucket {
+// For large buckets (capacity > 5), starts with half-full tokens to prevent
+// "all tokens immediately available on cold start" behavior. Small buckets
+// (capacity <= 5, like the burst limiter) start full since they are the
+// spacing mechanism rather than the long-term rate limiter.
+func newTokenBucket(requestsPerInterval int, refillInterval time.Duration) *tokenBucket {
+	capacity := float64(requestsPerInterval)
+	var initialTokens float64
+	if requestsPerInterval > 5 {
+		// Half-fill large buckets to prevent cold-start burst
+		initialTokens = capacity / 2
+	} else {
+		// Small buckets (burst limiter) start full
+		initialTokens = capacity
+	}
 	return &tokenBucket{
-		capacity:     float64(requestsPerMinute),
-		tokens:       float64(requestsPerMinute), // Start with full bucket
-		refillRate:   float64(requestsPerMinute) / refillInterval.Seconds(),
-		refillAmount: float64(requestsPerMinute) / float64(refillInterval/time.Second),
+		capacity:     capacity,
+		tokens:       initialTokens,
+		refillRate:   float64(requestsPerInterval) / refillInterval.Seconds(),
+		refillAmount: float64(requestsPerInterval) / float64(refillInterval/time.Second),
 		lastRefill:   time.Now(),
 	}
 }

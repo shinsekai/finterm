@@ -29,6 +29,7 @@ type APIConfig struct {
 	Key        string        `yaml:"key"`
 	BaseURL    string        `yaml:"base_url"`
 	RateLimit  int           `yaml:"rate_limit"`
+	BurstLimit int           `yaml:"burst_limit"`
 	Timeout    time.Duration `yaml:"timeout"`
 	MaxRetries int           `yaml:"max_retries"`
 }
@@ -77,6 +78,7 @@ func DefaultConfig() *Config {
 		API: APIConfig{
 			BaseURL:    "https://www.alphavantage.co/query",
 			RateLimit:  70,
+			BurstLimit: 5,
 			Timeout:    10 * time.Second,
 			MaxRetries: 3,
 		},
@@ -173,6 +175,9 @@ func validateAPIConfig(api APIConfig) error {
 	}
 	if api.RateLimit <= 0 {
 		return fmt.Errorf("api.rate_limit must be positive, got %d", api.RateLimit)
+	}
+	if api.BurstLimit <= 0 {
+		return fmt.Errorf("api.burst_limit must be positive, got %d", api.BurstLimit)
 	}
 	if api.Timeout <= 0 {
 		return fmt.Errorf("api.timeout must be positive, got %v", api.Timeout)

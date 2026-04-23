@@ -11,6 +11,12 @@ api:
   # Premium tier allows 75/minute, so we use 70 to stay within limits.
   rate_limit: 70
 
+  # Maximum requests per second (burst ceiling).
+  # Alpha Vantage silently enforces ~5/sec in addition to the per-minute
+  # limit; exceeding it returns "Burst pattern detected" errors.
+  # Leave at 5 unless Alpha Vantage communicates a different ceiling.
+  burst_limit: 5
+
   # HTTP timeout for each request.
   timeout: 10s
 

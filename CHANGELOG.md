@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] — 2026-04-23
+
+### Fixed
+- Added second-tier per-second burst spacing limiter (≤5 req/s) composed with existing per-minute rate limit
+- Per-minute bucket now starts half-full to prevent cold-start burst of all tokens
+- Classified burst-pattern API responses as transient errors (detects "premium-only" and "call frequency" messages)
+- Retry transient API errors with exponential backoff (250ms base + 0-100ms jitter, capped at 5s)
+- Added explicit backoff to network/timeout/read error retry paths
+
 ## [0.7.0] — 2026-04-21
 
 ### Added

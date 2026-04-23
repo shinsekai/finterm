@@ -57,6 +57,7 @@ func main() {
 		Key:        cfg.API.Key,
 		BaseURL:    cfg.API.BaseURL,
 		RateLimit:  cfg.API.RateLimit,
+		BurstLimit: cfg.API.BurstLimit,
 		Timeout:    cfg.API.Timeout,
 		MaxRetries: cfg.API.MaxRetries,
 	})

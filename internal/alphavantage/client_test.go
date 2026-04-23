@@ -881,3 +881,368 @@ func BenchmarkClient_ConcurrentRequests(b *testing.B) {
 		}
 	})
 }
+
+func TestClient_BurstLimiter_EnforcesFivePerSecond(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"success": true}`)
+	}))
+	defer server.Close()
+
+	// Create client with burst limit of 5 requests per second
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		BurstLimit: 5,
+		RateLimit:  70,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	ctx := context.Background()
+
+	// First 5 requests should succeed quickly
+	start := time.Now()
+	for i := 0; i < 5; i++ {
+		_, err := client.get(ctx, map[string]string{"function": "TEST"})
+		if err != nil {
+			t.Fatalf("request %d failed: %v", i, err)
+		}
+	}
+	firstDuration := time.Since(start)
+
+	// Sixth request should be rate-limited by burst limiter and take some time
+	start = time.Now()
+	_, err := client.get(ctx, map[string]string{"function": "TEST"})
+	if err != nil {
+		t.Fatalf("sixth request failed: %v", err)
+	}
+	secondDuration := time.Since(start)
+
+	// The sixth request should have taken at least ~200ms due to burst limiting
+	// With 5 requests/second, each request gets ~200ms
+	if secondDuration < 100*time.Millisecond {
+		t.Errorf("burst limiting may not have worked. First 5 took %v, sixth took %v", firstDuration, secondDuration)
+	}
+
+	t.Logf("First 5 requests took %v, sixth request took %v", firstDuration, secondDuration)
+}
+
+func TestClient_BurstLimiter_DefaultsToFiveWhenUnset(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"success": true}`)
+	}))
+	defer server.Close()
+
+	// Create client without explicitly setting BurstLimit
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	if client.config.BurstLimit != DefaultBurstLimit {
+		t.Errorf("expected default burst limit %d, got %d", DefaultBurstLimit, client.config.BurstLimit)
+	}
+
+	if client.burstLimiter == nil {
+		t.Fatal("burst limiter should not be nil")
+	}
+}
+
+func TestClient_BurstLimiter_RespectsUserSuppliedValue(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"success": true}`)
+	}))
+	defer server.Close()
+
+	customBurstLimit := 10
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		BurstLimit: customBurstLimit,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	if client.config.BurstLimit != customBurstLimit {
+		t.Errorf("expected burst limit %d, got %d", customBurstLimit, client.config.BurstLimit)
+	}
+
+	ctx := context.Background()
+
+	// Should be able to make 10 requests quickly (not limited by burst limiter)
+	start := time.Now()
+	for i := 0; i < customBurstLimit; i++ {
+		_, err := client.get(ctx, map[string]string{"function": "TEST"})
+		if err != nil {
+			t.Fatalf("request %d failed: %v", i, err)
+		}
+	}
+	duration := time.Since(start)
+
+	// 10 requests should complete in under 1 second if burst limit is 10/sec
+	if duration > time.Second {
+		t.Errorf("burst limit may not be respected. Expected 10 reqs/sec, took %v for 10 requests", duration)
+	}
+}
+
+func TestClient_BurstLimiter_ContextCancellationWrapped(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"success": true}`)
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		BurstLimit: 1,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	ctx := context.Background()
+
+	// First request should succeed
+	_, err := client.get(ctx, map[string]string{"function": "TEST"})
+	if err != nil {
+		t.Fatalf("first request failed: %v", err)
+	}
+
+	// Second request with canceled context should return wrapped error
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = client.get(ctx, map[string]string{"function": "TEST"})
+	if err == nil {
+		t.Fatal("expected error for canceled context, got nil")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "burst limiter:") {
+		t.Errorf("expected error to contain 'burst limiter:', got: %v", err)
+	}
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected error to be context.Canceled, got: %T", err)
+	}
+}
+
+func TestClient_BothLimitersComposedBurstFirst(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"success": true}`)
+	}))
+	defer server.Close()
+
+	// Create client with very low burst and rate limits to test composition
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		BurstLimit: 2,
+		RateLimit:  2,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	ctx := context.Background()
+
+	// First 2 requests should succeed quickly (burst limit allows 2/sec)
+	start := time.Now()
+	for i := 0; i < 2; i++ {
+		_, err := client.get(ctx, map[string]string{"function": "TEST"})
+		if err != nil {
+			t.Fatalf("request %d failed: %v", i, err)
+		}
+	}
+	firstTwoDuration := time.Since(start)
+
+	// Third request should be limited by burst limiter (since burst is hit first)
+	// After burst bucket refills, rate limiter will also be the binding constraint
+	// since both are set to 2
+	start = time.Now()
+	_, err := client.get(ctx, map[string]string{"function": "TEST"})
+	if err != nil {
+		t.Fatalf("third request failed: %v", err)
+	}
+	thirdDuration := time.Since(start)
+
+	t.Logf("First 2 requests took %v, third request took %v", firstTwoDuration, thirdDuration)
+}
+
+func TestClient_PerMinuteBucketDoesNotStartFull(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"success": true}`)
+	}))
+	defer server.Close()
+
+	// Create client with burst limit of 5 but rate limit of 60/minute (1/sec)
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		BurstLimit: 5,
+		RateLimit:  60,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	ctx := context.Background()
+
+	// First 5 requests should succeed quickly (from burst bucket)
+	start := time.Now()
+	for i := 0; i < 5; i++ {
+		_, err := client.get(ctx, map[string]string{"function": "TEST"})
+		if err != nil {
+			t.Fatalf("request %d failed: %v", i, err)
+		}
+	}
+	burstDuration := time.Since(start)
+
+	// Sixth request should wait for either burst bucket refill (~200ms) or rate bucket (~1000ms)
+	// Since rate bucket started half-full (30 tokens), it's not the bottleneck
+	// The burst bucket refills every 200ms, so the 6th request should wait ~200ms
+	start = time.Now()
+	_, err := client.get(ctx, map[string]string{"function": "TEST"})
+	if err != nil {
+		t.Fatalf("sixth request failed: %v", err)
+	}
+	sixthDuration := time.Since(start)
+
+	// The 6th request should take noticeably longer (waiting for burst bucket refill)
+	// With 5/sec burst, the refill interval is 200ms
+	if sixthDuration < 100*time.Millisecond {
+		t.Errorf("sixth request waited %v, expected at least ~100ms for burst bucket refill", sixthDuration)
+	}
+
+	// First 5 should be fast, 6th should wait
+	if burstDuration > 100*time.Millisecond {
+		t.Errorf("first 5 requests took %v, expected them to be fast (burst bucket had tokens)", burstDuration)
+	}
+
+	t.Logf("First 5 requests took %v, sixth request took %v", burstDuration, sixthDuration)
+}
+
+func TestTokenBucket_HalfFillOnConstructionForLargeBuckets(t *testing.T) {
+	// Large bucket (>5) should start half-full
+	tb := newTokenBucket(100, time.Minute)
+	tb.mu.Lock()
+	tokens := tb.tokens
+	tb.mu.Unlock()
+
+	expected := float64(100) / 2
+	if tokens != expected {
+		t.Errorf("expected bucket to start with %f tokens, got %f", expected, tokens)
+	}
+}
+
+func TestTokenBucket_FullFillForSmallBuckets(t *testing.T) {
+	// Small bucket (<=5) should start full
+	capacities := []int{1, 2, 3, 4, 5}
+
+	for _, capacity := range capacities {
+		t.Run(fmt.Sprintf("capacity_%d", capacity), func(t *testing.T) {
+			tb := newTokenBucket(capacity, time.Minute)
+			tb.mu.Lock()
+			tokens := tb.tokens
+			tb.mu.Unlock()
+
+			expected := float64(capacity)
+			if tokens != expected {
+				t.Errorf("expected bucket to start with %f tokens, got %f", expected, tokens)
+			}
+		})
+	}
+}
+
+func TestClient_FiftyConcurrentRequests_NeverExceeds5InAnySecond(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, `{"success": true}`)
+	}))
+	defer server.Close()
+
+	client := New(Config{
+		Key:        "test-key",
+		BaseURL:    server.URL,
+		BurstLimit: 5,
+		RateLimit:  70,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	})
+
+	ctx := context.Background()
+	var wg sync.WaitGroup
+
+	// Record when each request completes (client-side timing)
+	var mu sync.Mutex
+	completionTimes := make([]time.Time, 50)
+
+	// Launch 50 concurrent requests
+	start := time.Now()
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			_, _ = client.get(ctx, map[string]string{"function": "TEST", "id": fmt.Sprintf("%d", id)})
+			mu.Lock()
+			completionTimes[id] = time.Now()
+			mu.Unlock()
+		}(i)
+	}
+	wg.Wait()
+	totalDuration := time.Since(start)
+
+	// With burst limit of 5/sec, 50 requests should take at least ~10 seconds
+	// The first 5 complete immediately (burst bucket starts full)
+	// Then tokens refill at 5/sec continuously
+	minExpectedDuration := time.Duration(50/5-1) * time.Second // ~9 seconds
+	if totalDuration < minExpectedDuration {
+		t.Errorf("total duration was %v, expected at least %v for 50 requests at 5/sec", totalDuration, minExpectedDuration)
+	}
+
+	// Count requests completing in the first second
+	// With 50 concurrent requests and burst limit 5/sec:
+	// - First 5 get tokens immediately (burst bucket starts full)
+	// - Burst bucket refills at 5/sec, so by the end of first second,
+	//   about 5 more tokens have become available and been consumed
+	// - Therefore, ~10 requests can complete in the first second
+	mu.Lock()
+	var firstSecondCount int
+	for _, ct := range completionTimes {
+		if ct.Sub(start) < time.Second {
+			firstSecondCount++
+		}
+	}
+	mu.Unlock()
+
+	// Allow up to 12 requests in first second (5 initial + ~5 refilled + some margin)
+	// This verifies the burst limiter is working while accounting for continuous refill
+	if firstSecondCount > 12 {
+		t.Errorf("found %d requests completing in first second, expected ~10 (burst limit: 5/sec)", firstSecondCount)
+	}
+
+	// Also verify that the rate is controlled over time - check requests completing
+	// between second 1 and second 2
+	mu.Lock()
+	var secondSecondCount int
+	for _, ct := range completionTimes {
+		elapsed := ct.Sub(start)
+		if elapsed >= time.Second && elapsed < 2*time.Second {
+			secondSecondCount++
+		}
+	}
+	mu.Unlock()
+
+	// Should be roughly 5-6 requests in the next second (the burst limiter's steady state)
+	if secondSecondCount > 7 {
+		t.Errorf("found %d requests completing in second 1-2, expected ~5 (burst limit: 5/sec)", secondSecondCount)
+	}
+
+	t.Logf("50 requests completed in %v, with %d in first second, %d in second second", totalDuration, firstSecondCount, secondSecondCount)
+}

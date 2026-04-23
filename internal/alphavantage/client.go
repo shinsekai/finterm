@@ -31,6 +31,9 @@ const (
 	DefaultJitter = 200 * time.Millisecond
 )
 
+// ErrTransientAPIError is a sentinel error for transient API errors that should be retried.
+var ErrTransientAPIError = errors.New("transient API error")
+
 // APIError represents an error returned by the Alpha Vantage API.
 type APIError struct {
 	StatusCode int
@@ -313,6 +316,16 @@ func (c *Client) extractErrorMessage(body []byte) string {
 	return msg
 }
 
+// isBurstPatternInfo returns true when an Information response is the
+// undocumented Alpha Vantage burst-pattern error, which is transient
+// and should be retried with backoff.
+func isBurstPatternInfo(msg string) bool {
+	lower := strings.ToLower(msg)
+	return strings.Contains(lower, "burst pattern") ||
+		strings.Contains(lower, "5 requests per second") ||
+		strings.Contains(lower, "5 requets per second") // sic: AV typo
+}
+
 // checkAPIError checks if the response body contains an API-level error.
 func (c *Client) checkAPIError(body []byte) error {
 	var jsonResp map[string]interface{}
@@ -328,6 +341,10 @@ func (c *Client) checkAPIError(body []byte) error {
 		return fmt.Errorf("API note: %s", note)
 	}
 	if info, ok := jsonResp["Information"].(string); ok {
+		// Burst-pattern errors are transient and should be retryable
+		if isBurstPatternInfo(info) {
+			return fmt.Errorf("%w: %s", ErrTransientAPIError, info)
+		}
 		return fmt.Errorf("API information: %s", info)
 	}
 

@@ -1246,3 +1246,225 @@ func TestClient_FiftyConcurrentRequests_NeverExceeds5InAnySecond(t *testing.T) {
 
 	t.Logf("50 requests completed in %v, with %d in first second, %d in second second", totalDuration, firstSecondCount, secondSecondCount)
 }
+
+func TestCheckAPIError_BurstPatternReturnsTransient(t *testing.T) {
+	client := New(Config{Key: "test-key"})
+	body := []byte(`{"Information": "Thank you for using Alpha Vantage! Our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits. Burst pattern detected: 5 requests per second allowed."}`)
+
+	err := client.checkAPIError(body)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !errors.Is(err, ErrTransientAPIError) {
+		t.Errorf("expected error to be ErrTransientAPIError, got: %T: %v", err, err)
+	}
+}
+
+func TestCheckAPIError_BurstPatternTypoReturnsTransient(t *testing.T) {
+	client := New(Config{Key: "test-key"})
+	body := []byte(`{"Information": "Burst pattern detected: 5 requets per second allowed."}`)
+
+	err := client.checkAPIError(body)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !errors.Is(err, ErrTransientAPIError) {
+		t.Errorf("expected error to be ErrTransientAPIError, got: %T: %v", err, err)
+	}
+}
+
+func TestCheckAPIError_BurstPatternCaseInsensitive(t *testing.T) {
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{
+			name: "uppercase",
+			body: []byte(`{"Information": "BURST PATTERN DETECTED: 5 REQUESTS PER SECOND ALLOWED."}`),
+		},
+		{
+			name: "mixed case",
+			body: []byte(`{"Information": "Burst Pattern Detected: 5 Requets Per Second Allowed."}`),
+		},
+		{
+			name: "lowercase",
+			body: []byte(`{"Information": "burst pattern detected: 5 requests per second allowed."}`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := New(Config{Key: "test-key"})
+			err := client.checkAPIError(tt.body)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+
+			if !errors.Is(err, ErrTransientAPIError) {
+				t.Errorf("expected error to be ErrTransientAPIError, got: %T: %v", err, err)
+			}
+		})
+	}
+}
+
+func TestCheckAPIError_GenericInformationNotTransient(t *testing.T) {
+	client := New(Config{Key: "test-key"})
+	body := []byte(`{"Information": "Thank you for using Alpha Vantage!"}`)
+
+	err := client.checkAPIError(body)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if errors.Is(err, ErrTransientAPIError) {
+		t.Errorf("expected error NOT to be ErrTransientAPIError, got: %v", err)
+	}
+
+	expectedMsg := "API information: Thank you for using Alpha Vantage!"
+	if err.Error() != expectedMsg {
+		t.Errorf("expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+func TestCheckAPIError_ErrorMessageNotTransient(t *testing.T) {
+	client := New(Config{Key: "test-key"})
+	body := []byte(`{"Error Message": "Invalid API key."}`)
+
+	err := client.checkAPIError(body)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if errors.Is(err, ErrTransientAPIError) {
+		t.Errorf("expected error NOT to be ErrTransientAPIError, got: %v", err)
+	}
+
+	expectedMsg := "API error: Invalid API key."
+	if err.Error() != expectedMsg {
+		t.Errorf("expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+func TestCheckAPIError_NoteNotTransient(t *testing.T) {
+	client := New(Config{Key: "test-key"})
+	body := []byte(`{"Note": "Thank you for using Alpha Vantage! Our standard API rate limit is 25 requests per day."}`)
+
+	err := client.checkAPIError(body)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if errors.Is(err, ErrTransientAPIError) {
+		t.Errorf("expected error NOT to be ErrTransientAPIError, got: %v", err)
+	}
+
+	expectedMsg := "API note: Thank you for using Alpha Vantage! Our standard API rate limit is 25 requests per day."
+	if err.Error() != expectedMsg {
+		t.Errorf("expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+func TestIsBurstPatternInfo_ExhaustiveTable(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want bool
+	}{
+		{
+			name: "burst pattern phrase",
+			msg:  "Burst pattern detected: 5 requests per second allowed.",
+			want: true,
+		},
+		{
+			name: "5 requests per second",
+			msg:  "You have exceeded 5 requests per second.",
+			want: true,
+		},
+		{
+			name: "5 requets per second typo",
+			msg:  "You have exceeded 5 requets per second.",
+			want: true,
+		},
+		{
+			name: "mixed case burst pattern",
+			msg:  "BURST PATTERN DETECTED",
+			want: true,
+		},
+		{
+			name: "generic information",
+			msg:  "Thank you for using Alpha Vantage!",
+			want: false,
+		},
+		{
+			name: "premium key message",
+			msg:  "The premium API key is required.",
+			want: false,
+		},
+		{
+			name: "standard rate limit message",
+			msg:  "Our standard API rate limit is 25 requests per day.",
+			want: false,
+		},
+		{
+			name: "empty string",
+			msg:  "",
+			want: false,
+		},
+		{
+			name: "partial match burst pattern",
+			msg:  "detecting a burst",
+			want: false,
+		},
+		{
+			name: "6 requests per second",
+			msg:  "6 requests per second allowed",
+			want: false,
+		},
+		{
+			name: "requests not requets",
+			msg:  "5 requests per second allowed",
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isBurstPatternInfo(tt.msg)
+			if got != tt.want {
+				t.Errorf("isBurstPatternInfo(%q) = %v, want %v", tt.msg, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCheckAPIError_Success(t *testing.T) {
+	client := New(Config{Key: "test-key"})
+	body := []byte(`{"success": true, "data": "test"}`)
+
+	err := client.checkAPIError(body)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestCheckAPIError_InvalidJSON(t *testing.T) {
+	client := New(Config{Key: "test-key"})
+	body := []byte(`not valid json`)
+
+	err := client.checkAPIError(body)
+	if err != nil {
+		t.Fatalf("expected no error for invalid JSON, got: %v", err)
+	}
+}
+
+func TestCheckAPIError_EmptyObject(t *testing.T) {
+	client := New(Config{Key: "test-key"})
+	body := []byte(`{}`)
+
+	err := client.checkAPIError(body)
+	if err != nil {
+		t.Fatalf("expected no error for empty object, got: %v", err)
+	}
+}

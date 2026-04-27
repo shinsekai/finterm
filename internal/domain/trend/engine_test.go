@@ -1280,3 +1280,255 @@ func TestEngine_VortexScore_FailureDefaults(t *testing.T) {
 		t.Errorf("VortexMid = %f, want 0 when insufficient data", result.VortexMid)
 	}
 }
+
+// TestTrendEngine_ResultIncludesPriceHistory verifies that Result contains PriceHistory.
+func TestTrendEngine_ResultIncludesPriceHistory(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{{Date: time.Now(), Value: 55.0}},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{{Date: time.Now(), Value: 150.0}},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// Create time series data with 10 close prices
+	timeSeries := &alphavantage.TimeSeriesDaily{
+		TimeSeries: make(map[string]alphavantage.TimeSeriesEntry),
+	}
+	baseDate := time.Now().AddDate(0, 0, -10)
+	for i := 0; i < 10; i++ {
+		dateStr := baseDate.AddDate(0, 0, i).Format("2006-01-02")
+		timeSeries.TimeSeries[dateStr] = alphavantage.TimeSeriesEntry{
+			Open:   fmt.Sprintf("%f", 100.0+float64(i)),
+			High:   fmt.Sprintf("%f", 105.0+float64(i)),
+			Low:    fmt.Sprintf("%f", 95.0+float64(i)),
+			Close:  fmt.Sprintf("%f", 100.0+float64(i)),
+			Volume: "1000000",
+		}
+	}
+	timeSeriesClient := &mockTimeSeriesClient{data: timeSeries}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Analyze() returned nil result")
+	}
+
+	// Verify PriceHistory is populated
+	if result.PriceHistory == nil {
+		t.Error("PriceHistory should not be nil")
+	} else if len(result.PriceHistory) != 10 {
+		t.Errorf("PriceHistory length = %d, want 10", len(result.PriceHistory))
+	}
+
+	// Verify values are in ascending order (oldest first)
+	for i := 1; i < len(result.PriceHistory); i++ {
+		if result.PriceHistory[i] <= result.PriceHistory[i-1] {
+			t.Errorf("PriceHistory should be oldest-first, but PriceHistory[%d] = %f <= PriceHistory[%d-1] = %f",
+				i, result.PriceHistory[i], i, result.PriceHistory[i-1])
+		}
+	}
+}
+
+// TestTrendEngine_ResultPriceHistoryCappedAt30 verifies that PriceHistory is capped at 30 elements.
+func TestTrendEngine_ResultPriceHistoryCappedAt30(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{{Date: time.Now(), Value: 55.0}},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{{Date: time.Now(), Value: 150.0}},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector(nil)
+
+	// Create time series data with 50 close prices (more than the 30 limit)
+	timeSeries := &alphavantage.TimeSeriesDaily{
+		TimeSeries: make(map[string]alphavantage.TimeSeriesEntry),
+	}
+	baseDate := time.Now().AddDate(0, 0, -50)
+	for i := 0; i < 50; i++ {
+		dateStr := baseDate.AddDate(0, 0, i).Format("2006-01-02")
+		timeSeries.TimeSeries[dateStr] = alphavantage.TimeSeriesEntry{
+			Open:   fmt.Sprintf("%f", 100.0+float64(i)),
+			High:   fmt.Sprintf("%f", 105.0+float64(i)),
+			Low:    fmt.Sprintf("%f", 95.0+float64(i)),
+			Close:  fmt.Sprintf("%f", 100.0+float64(i)),
+			Volume: "1000000",
+		}
+	}
+	timeSeriesClient := &mockTimeSeriesClient{data: timeSeries}
+	cacheStore := cache.New()
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, timeSeriesClient, cacheStore)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "AAPL", indicators.Equity)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Analyze() returned nil result")
+	}
+
+	// Verify PriceHistory is capped at 30
+	if result.PriceHistory == nil {
+		t.Fatal("PriceHistory should not be nil")
+	}
+	if len(result.PriceHistory) != 30 {
+		t.Errorf("PriceHistory length = %d, want 30 (capped)", len(result.PriceHistory))
+	}
+
+	// Verify the last value is the most recent price (highest in this case)
+	expectedLastPrice := 100.0 + 49.0 // The last close price
+	if result.PriceHistory[len(result.PriceHistory)-1] != expectedLastPrice {
+		t.Errorf("PriceHistory last element = %f, want %f (most recent price)",
+			result.PriceHistory[len(result.PriceHistory)-1], expectedLastPrice)
+	}
+
+	// Verify the first value is from 30 bars ago
+	expectedFirstPrice := 100.0 + 20.0 // 50 - 30 = 20, so we start from index 20
+	if result.PriceHistory[0] != expectedFirstPrice {
+		t.Errorf("PriceHistory first element = %f, want %f (30 bars ago)",
+			result.PriceHistory[0], expectedFirstPrice)
+	}
+}
+
+// TestTrendEngine_CryptoPriceHistory verifies that PriceHistory is populated for crypto.
+func TestTrendEngine_CryptoPriceHistory(t *testing.T) {
+	remoteRSI := &mockIndicator{
+		dataPoints: []indicators.DataPoint{{Date: time.Now(), Value: 55.0}},
+	}
+	remoteEMA := &mockIndicator{
+		dataPoints: []indicators.DataPoint{{Date: time.Now(), Value: 150.0}},
+	}
+
+	localRSI := &indicators.LocalRSI{}
+	localEMA := &indicators.LocalEMA{}
+
+	cfg := config.DefaultConfig()
+	detector := indicators.NewAssetClassDetector([]string{"BTC"}) // BTC is crypto
+
+	// Create crypto OHLCV data with 20 bars
+	cryptoData := make([]indicators.OHLCV, 20)
+	baseTime := time.Now().AddDate(0, 0, -20)
+	for i := 0; i < 20; i++ {
+		cryptoData[i] = indicators.OHLCV{
+			Date:   baseTime.AddDate(0, 0, i),
+			Open:   100.0 + float64(i),
+			High:   105.0 + float64(i),
+			Low:    95.0 + float64(i),
+			Close:  100.0 + float64(i),
+			Volume: 1000000.0,
+		}
+	}
+	cryptoFetcher := &mockCryptoFetcher{data: cryptoData}
+
+	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, cryptoFetcher, nil, nil)
+
+	ctx := context.Background()
+	result, err := engine.Analyze(ctx, "BTC", indicators.Crypto)
+
+	if err != nil {
+		t.Fatalf("Analyze() returned error: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Analyze() returned nil result")
+	}
+
+	// Verify PriceHistory is populated for crypto
+	if result.PriceHistory == nil {
+		t.Error("PriceHistory should not be nil for crypto")
+	} else if len(result.PriceHistory) != 20 {
+		t.Errorf("PriceHistory length = %d, want 20 for crypto", len(result.PriceHistory))
+	}
+
+	// Verify values are in ascending order (oldest first)
+	for i := 1; i < len(result.PriceHistory); i++ {
+		if result.PriceHistory[i] <= result.PriceHistory[i-1] {
+			t.Errorf("PriceHistory should be oldest-first, but PriceHistory[%d] = %f <= PriceHistory[%d-1] = %f",
+				i, result.PriceHistory[i], i, result.PriceHistory[i-1])
+		}
+	}
+}
+
+// TestExtractPriceHistoryFromCloses tests the PriceHistory extraction function.
+func TestExtractPriceHistoryFromCloses(t *testing.T) {
+	tests := []struct {
+		name     string
+		closes   []float64
+		expected []float64
+	}{
+		{
+			name:     "empty slice",
+			closes:   []float64{},
+			expected: nil,
+		},
+		{
+			name:     "less than 30 elements",
+			closes:   []float64{1.0, 2.0, 3.0, 4.0, 5.0},
+			expected: []float64{1.0, 2.0, 3.0, 4.0, 5.0},
+		},
+		{
+			name:     "exactly 30 elements",
+			closes:   makeFloatSlice(1.0, 30),
+			expected: makeFloatSlice(1.0, 30),
+		},
+		{
+			name:     "more than 30 elements",
+			closes:   makeFloatSlice(1.0, 50),
+			expected: makeFloatSlice(21.0, 30), // Last 30 elements
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractPriceHistoryFromCloses(tt.closes)
+			if !slicesEqual(result, tt.expected) {
+				t.Errorf("extractPriceHistoryFromCloses(%v) = %v, want %v",
+					tt.closes, result, tt.expected)
+			}
+		})
+	}
+}
+
+// makeFloatSlice creates a slice of floats starting from start with count elements.
+func makeFloatSlice(start float64, count int) []float64 {
+	result := make([]float64, count)
+	for i := 0; i < count; i++ {
+		result[i] = start + float64(i)
+	}
+	return result
+}
+
+// slicesEqual checks if two float slices are equal.
+func slicesEqual(a, b []float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

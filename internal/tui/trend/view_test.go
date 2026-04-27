@@ -944,7 +944,7 @@ func TestTrendView_BlitzColumn_Loading(t *testing.T) {
 	cells := view.buildLoadingCells(model.rows[0])
 
 	// BLITZ is the 4th column (index 3) in the new 8-column layout
-	assert.Equal(t, "—", cells[3].Text, "BLITZ column should show '—' for loading rows")
+	assert.Equal(t, "—", cells[4].Text, "BLITZ column should show '—' for loading rows")
 }
 
 // TestTrendView_BlitzColumn_Error verifies "—" for error rows in BLITZ column.
@@ -957,7 +957,7 @@ func TestTrendView_BlitzColumn_Error(t *testing.T) {
 	cells := view.buildErrorCells(model.rows[0])
 
 	// BLITZ is the 4th column (index 3) in the new 8-column layout
-	assert.Equal(t, "—", cells[3].Text, "BLITZ column should show '—' for error rows")
+	assert.Equal(t, "—", cells[4].Text, "BLITZ column should show '—' for error rows")
 }
 
 // TestTrendView_BlitzColumn_Unknown verifies "—" for unknown state rows in BLITZ column.
@@ -969,7 +969,7 @@ func TestTrendView_BlitzColumn_Unknown(t *testing.T) {
 	cells := view.buildUnknownCells(model.rows[0])
 
 	// BLITZ is the 4th column (index 3) in the new 8-column layout
-	assert.Equal(t, "—", cells[3].Text, "BLITZ column should show '—' for unknown state rows")
+	assert.Equal(t, "—", cells[4].Text, "BLITZ column should show '—' for unknown state rows")
 }
 
 // TestTrendView_BlitzColumn_Loaded verifies correct BLITZ badge for loaded rows.
@@ -1003,9 +1003,9 @@ func TestTrendView_BlitzColumn_Loaded(t *testing.T) {
 
 			// BLITZ is the 4th column (index 3) in the new 8-column layout
 			if tt.shouldHave == "" {
-				assert.Empty(t, cells[3].Text, "BLITZ column should be empty for HOLD")
+				assert.Empty(t, cells[4].Text, "BLITZ column should be empty for HOLD")
 			} else {
-				assert.Contains(t, cells[3].Text, tt.shouldHave, "BLITZ column should show correct badge")
+				assert.Contains(t, cells[4].Text, tt.shouldHave, "BLITZ column should show correct badge")
 			}
 		})
 	}
@@ -1029,7 +1029,7 @@ func TestTrendView_BlitzColumn_Cached(t *testing.T) {
 	cells := view.buildCachedCells(model.rows[0])
 
 	// BLITZ is the 4th column (index 3) in the new 8-column layout
-	assert.Contains(t, cells[3].Text, "▲  LONG", "BLITZ column should show LONG badge for cached rows")
+	assert.Contains(t, cells[4].Text, "▲  LONG", "BLITZ column should show LONG badge for cached rows")
 }
 
 // TestTrendView_ValuationColors verifies valuation color coding.
@@ -1181,9 +1181,9 @@ func TestTrendView_DestinyColumn_Loaded(t *testing.T) {
 
 			// DESTINY is 4th column (index 3)
 			if tt.shouldHave == "" {
-				assert.Empty(t, cells[4].Text, "DESTINY column should be empty for HOLD")
+				assert.Empty(t, cells[5].Text, "DESTINY column should be empty for HOLD")
 			} else {
-				assert.Contains(t, cells[4].Text, tt.shouldHave, "DESTINY column should show correct badge for loaded rows")
+				assert.Contains(t, cells[5].Text, tt.shouldHave, "DESTINY column should show correct badge for loaded rows")
 			}
 		})
 	}
@@ -1197,7 +1197,7 @@ func TestTrendView_DestinyColumn_Loading(t *testing.T) {
 	cells := view.buildLoadingCells(model.rows[0])
 
 	// DESTINY is 4th column (index 3)
-	assert.Equal(t, "—", cells[4].Text, "DESTINY column should show '—' for loading rows")
+	assert.Equal(t, "—", cells[5].Text, "DESTINY column should show '—' for loading rows")
 }
 
 // TestTrendView_DestinyColumn_Error verifies "—" for error rows in DESTINY column.
@@ -1210,7 +1210,7 @@ func TestTrendView_DestinyColumn_Error(t *testing.T) {
 	cells := view.buildErrorCells(model.rows[0])
 
 	// DESTINY is 4th column (index 3)
-	assert.Equal(t, "—", cells[4].Text, "DESTINY column should show '—' for error rows")
+	assert.Equal(t, "—", cells[5].Text, "DESTINY column should show '—' for error rows")
 }
 
 // TestTrendView_DestinyColumn_Unknown verifies "—" for unknown state rows in DESTINY column.
@@ -1222,7 +1222,7 @@ func TestTrendView_DestinyColumn_Unknown(t *testing.T) {
 	cells := view.buildUnknownCells(model.rows[0])
 
 	// DESTINY is 4th column (index 3)
-	assert.Equal(t, "—", cells[4].Text, "DESTINY column should show '—' for unknown state rows")
+	assert.Equal(t, "—", cells[5].Text, "DESTINY column should show '—' for unknown state rows")
 }
 
 // TestTrendView_DestinySummary verifies DESTINY summary line with correct counts.

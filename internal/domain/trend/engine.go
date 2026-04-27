@@ -62,6 +62,9 @@ type Result struct {
 	TPI float64
 	// TPISignal is the TPI signal label: "LONG" or "CASH".
 	TPISignal string
+	// PriceHistory is up to 30 most recent close prices, oldest-first.
+	// Contains only completed (closed) bars, never the in-progress bar.
+	PriceHistory []float64
 }
 
 // CryptoDataFetcher fetches OHLCV data for cryptocurrency symbols.
@@ -158,6 +161,7 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 	var flowSebastine, flowRSISmooth float64
 	var vortexScore int
 	var vortexTPI, vortexRSISmooth, vortexWave, vortexMid float64
+	var priceHistory []float64
 
 	// Route to appropriate indicator path based on asset class
 	switch assetClass {
@@ -233,6 +237,8 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 					flowScore, flowSebastine, flowRSISmooth = computeFlow(opens, highs, lows, closePrices)
 					// Compute VORTEX using close prices
 					vortexScore, vortexTPI, vortexRSISmooth, vortexWave, vortexMid = computeVortex(closePrices)
+					// Extract price history for sparkline rendering
+					priceHistory = extractPriceHistoryFromCloses(closePrices)
 				}
 			}
 		}
@@ -285,6 +291,8 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 			lows[i] = ohlcv.Low
 		}
 		blitzScore, blitzTSI, blitzRSISmooth = computeBlitz(closes)
+		// Extract price history (up to 30 most recent closes, oldest-first)
+		priceHistory = extractPriceHistoryFromCloses(closes)
 		// Compute DESTINY score for crypto using existing OHLCV data
 		destinyScore, destinyTPI, destinyRSISmooth = computeDestiny(closes)
 		// Compute FLOW score for crypto using full OHLCV data
@@ -347,6 +355,7 @@ func (e *Engine) Analyze(ctx context.Context, symbol string, assetClass indicato
 		VortexMid:        vortexMid,
 		TPI:              tpi,
 		TPISignal:        tpiSignal,
+		PriceHistory:     priceHistory,
 	}, nil
 }
 
@@ -547,6 +556,23 @@ func computeVortex(closes []float64) (score int, tpi, rsiSmooth, wave, mid float
 		return 0, 0, 0, 0, 0
 	}
 	return result.Score, result.TPI, result.RSISmooth, result.Wave, result.Mid
+}
+
+// extractPriceHistoryFromCloses extracts up to 30 most recent close prices,
+// sorted oldest-first. This is used for sparkline rendering.
+func extractPriceHistoryFromCloses(closes []float64) []float64 {
+	if len(closes) == 0 {
+		return nil
+	}
+
+	// Take up to 30 most recent prices (last 30 elements, since closes is oldest-first)
+	start := len(closes) - 30
+	if start < 0 {
+		start = 0
+	}
+	result := make([]float64, len(closes)-start)
+	copy(result, closes[start:])
+	return result
 }
 
 // AnalyzeWithSymbolDetection performs trend analysis with automatic asset class detection.

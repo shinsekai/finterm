@@ -55,7 +55,9 @@ SOL     ░░▓▓▓▓░░░░░ -1.00 CASH  ▼ SHORT    ▼ SHORT    
 
 **News Feed** — Scrollable, sentiment-scored articles with ticker/topic filters, color-coded by sentiment (bullish/bearish/neutral).
 
-**Navigation** — Fully keyboard-driven: `1-4` for tabs, `j/k` or arrows for rows, `r` to refresh, `?` for help, `q` to quit.
+**Chart View** — Candlestick chart with TPI overlay showing price action (~70% height) and composite TPI trajectory (~30% height). Supports multiple timeframes (intraday, daily, weekly, monthly), zoom (+/-), pan (h/l), and ticker cycling (j/k). Uses cell-based OHLC rendering and braille canvas for 2×4 subpixel TPI resolution.
+
+**Navigation** — Fully keyboard-driven: `1-5` for tabs, `j/k` or arrows for rows, `r` to refresh, `?` for help, `q` to quit.
 
 ## Architecture
 
@@ -263,11 +265,14 @@ theme:
 
 | Key | Action |
 |---|---|
-| `1` / `2` / `3` / `4` | Switch to Trend / Quote / Macro / News tab |
+| `1` / `2` / `3` / `4` / `5` | Switch to Trend / Quote / Macro / News / Chart tab |
 | `Tab` | Cycle to next tab |
-| `j` / `k` or `↑` / `↓` | Navigate rows |
+| `j` / `k` or `↑` / `↓` | Navigate rows (Trend, News) / Cycle ticker (Chart) |
 | `Enter` | Submit ticker (Quote view) / Open article (News view) |
 | `r` | Refresh current view |
+| `1` / `2` / `3` / `4` | Chart: Set timeframe (intraday/daily/weekly/monthly) |
+| `+` / `-` | Chart: Zoom in/out (window: 30/60/110 bars) |
+| `h` / `l` or `←` / `→` | Chart: Pan left/right |
 | `f` | Toggle filter (News view) |
 | `s` | Toggle sort (News view) |
 | `?` | Show help overlay |
@@ -324,6 +329,7 @@ finterm/
 ├── internal/
 │   ├── tui/                         # Bubbletea views and components
 │   │   ├── app.go                   # Root model + tab router
+│   │   ├── chart/                   # Candlestick chart with TPI overlay
 │   │   ├── trend/                   # Trend following view
 │   │   ├── quote/                   # Quote lookup view
 │   │   ├── macro/                   # Macro dashboard view

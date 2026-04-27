@@ -298,6 +298,13 @@ func (v *View) buildColumns() []components.Column {
 			HeaderStyle: v.theme.TableHeader(),
 		},
 		{
+			Title:       "",
+			Width:       10,
+			Alignment:   components.AlignLeft,
+			Style:       v.theme.TableRow(),
+			HeaderStyle: v.theme.TableHeader(),
+		},
+		{
 			Title:       "TPI",
 			Width:       24,
 			Alignment:   components.AlignLeft,
@@ -399,7 +406,7 @@ func (v *View) buildTableRows(rows []RowData) []components.Row {
 	cryptoStartIndex := v.model.GetCryptoStartIndex()
 	if cryptoStartIndex > 0 && cryptoStartIndex < len(rows) {
 		// Insert separator at the crypto start position
-		separatorCells := make([]components.Cell, 10)
+		separatorCells := make([]components.Cell, 11)
 		separatorCells[0].Text = v.theme.Divider().Render("── Crypto ──")
 		// All other cells remain empty
 
@@ -436,6 +443,7 @@ func (v *View) buildRowCells(row RowData) []components.Cell {
 func (v *View) buildLoadingCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
+		{Text: ""},
 		{Text: "—"},
 		{Text: "—"},
 		{Text: "—"},
@@ -454,6 +462,7 @@ func (v *View) buildLoadedCells(row RowData) []components.Cell {
 
 	return []components.Cell{
 		{Text: v.theme.Accent().Render(result.Symbol)},
+		{Text: v.renderSparkline(result.PriceHistory)},
 		{Text: v.renderTPICell(result.TPI, result.TPISignal)},
 		{Text: v.renderFTEMABadge(result.Signal)},
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
@@ -475,6 +484,7 @@ func (v *View) buildCachedCells(row RowData) []components.Cell {
 
 	return []components.Cell{
 		{Text: symbolWithBadge},
+		{Text: v.renderSparkline(result.PriceHistory)},
 		{Text: v.renderTPICell(result.TPI, result.TPISignal)},
 		{Text: v.renderFTEMABadge(result.Signal)},
 		{Text: v.renderBlitzBadge(result.BlitzScore)},
@@ -497,6 +507,7 @@ func (v *View) buildErrorCells(row RowData) []components.Cell {
 
 	return []components.Cell{
 		{Text: row.Symbol},
+		{Text: ""},
 		{Text: v.theme.Error().Render(errorText)},
 		{Text: "—"},
 		{Text: "—"},
@@ -513,6 +524,7 @@ func (v *View) buildErrorCells(row RowData) []components.Cell {
 func (v *View) buildUnknownCells(row RowData) []components.Cell {
 	return []components.Cell{
 		{Text: row.Symbol},
+		{Text: ""},
 		{Text: v.theme.Muted().Render("Unknown")},
 		{Text: "—"},
 		{Text: "—"},
@@ -534,6 +546,15 @@ func (v *View) renderFooter() string {
 		v.theme.Accent().Render("1-4") + " " + v.theme.Muted().Render("tabs") +
 		"  ·  " +
 		v.theme.Accent().Render("?") + " " + v.theme.Muted().Render("help")
+}
+
+// renderSparkline renders a sparkline for the price history.
+// Returns empty string if price history is nil or empty.
+func (v *View) renderSparkline(priceHistory []float64) string {
+	if len(priceHistory) == 0 {
+		return ""
+	}
+	return components.RenderSparkline(priceHistory, 10, v.theme)
 }
 
 // renderTPICell renders the TPI gauge, numeric value, and label.

@@ -93,9 +93,15 @@ func newMockApp(t *testing.T) Model {
 		Crypto:   []string{},
 	}
 	detector := indicators.NewAssetClassDetector([]string{})
+	cfg := config.DefaultConfig()
+
+	// Create a minimal alphavantage.Client for chart (it won't be used in tests)
+	avClient := alphavantage.New(alphavantage.Config{
+		Key: "test_key",
+	})
 
 	// mockClient implements all three client interfaces: quote.QuoteClient, macro.Client, news.Client
-	return NewApp(theme, &mockClient{}, &mockClient{}, &mockClient{}, &mockEngine{}, cacheStore, watchlist, detector)
+	return NewApp(theme, &mockClient{}, &mockClient{}, &mockClient{}, &mockEngine{}, avClient, cacheStore, watchlist, detector, cfg)
 }
 
 // TestApp_TabSwitching tests tab switching with number keys and Tab.
@@ -138,6 +144,13 @@ func TestApp_TabSwitching(t *testing.T) {
 			expectedTab: tabNews,
 		},
 		{
+			name:        "switch to chart tab with 5",
+			key:         tea.KeyRunes,
+			runes:       "5",
+			initialTab:  tabTrend,
+			expectedTab: tabChart,
+		},
+		{
 			name:        "cycle from trend to quote with Tab",
 			key:         tea.KeyTab,
 			runes:       "",
@@ -159,10 +172,17 @@ func TestApp_TabSwitching(t *testing.T) {
 			expectedTab: tabNews,
 		},
 		{
-			name:        "cycle from news back to trend with Tab",
+			name:        "cycle from news to chart with Tab",
 			key:         tea.KeyTab,
 			runes:       "",
 			initialTab:  tabNews,
+			expectedTab: tabChart,
+		},
+		{
+			name:        "cycle from chart back to trend with Tab",
+			key:         tea.KeyTab,
+			runes:       "",
+			initialTab:  tabChart,
 			expectedTab: tabTrend,
 		},
 	}
@@ -185,15 +205,13 @@ func TestApp_TabSwitching(t *testing.T) {
 
 			// Assert active tab is as expected
 			assert.Equal(t, tt.expectedTab, updatedApp.activeTab)
-			// No command should be returned for tab switching
-			assert.Nil(t, cmd)
+			assert.NotNil(t, cmd)
 		})
 	}
-}
 
-// TestApp_QuitKey tests that q and Ctrl+C quit cleanly.
+	// TestApp_QuitKey tests that q and Ctrl+C quit cleanly.
+}
 func TestApp_QuitKey(t *testing.T) {
-	_ = newMockApp(t)
 
 	tests := []struct {
 		name  string
@@ -285,6 +303,10 @@ func TestApp_RefreshDelegation(t *testing.T) {
 			name:      "refresh news tab",
 			activeTab: tabNews,
 		},
+		{
+			name:      "refresh chart tab",
+			activeTab: tabChart,
+		},
 	}
 
 	for _, tt := range tests {
@@ -318,6 +340,9 @@ func TestApp_RefreshDelegation(t *testing.T) {
 				// We just verify that a command is returned
 			case tabNews:
 				// Note: news package doesn't export RefreshMsg type
+				// We just verify that a command is returned
+			case tabChart:
+				// Note: chart package doesn't export RefreshMsg type
 				// We just verify that a command is returned
 			}
 		})
@@ -432,10 +457,10 @@ func TestApp_ViewRenders(t *testing.T) {
 func TestApp_InvalidTabKey(t *testing.T) {
 	app := newMockApp(t)
 
-	// Press 5 (invalid tab key)
+	// Press 6 (invalid tab key)
 	msg := tea.KeyMsg{
 		Type:  tea.KeyRunes,
-		Runes: []rune("5"),
+		Runes: []rune("6"),
 	}
 
 	newModel, _ := app.Update(msg)
@@ -651,6 +676,7 @@ func TestApp_TabBar_ShowsIcons(t *testing.T) {
 	assert.Contains(t, tabBar, "◈", "Quote tab icon should appear")
 	assert.Contains(t, tabBar, "◇", "Macro tab icon should appear")
 	assert.Contains(t, tabBar, "◉", "News tab icon should appear")
+	assert.Contains(t, tabBar, "⬡", "Chart tab icon should appear")
 }
 
 // TestApp_StatusBar_ErrorCountFormat tests error count formatting with icons.

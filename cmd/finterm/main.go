@@ -109,9 +109,11 @@ func main() {
 		avClient, // macro.Client
 		avClient, // news.Client
 		trendEngine,
+		avClient, // alphavantage.Client for chart
 		cacheStore,
 		&cfg.Watchlist,
 		detector,
+		cfg,
 	)
 
 	// Setup signal handling for graceful shutdown

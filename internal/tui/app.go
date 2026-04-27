@@ -10,9 +10,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/shinsekai/finterm/internal/alphavantage"
 	"github.com/shinsekai/finterm/internal/cache"
 	"github.com/shinsekai/finterm/internal/config"
 	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
+	"github.com/shinsekai/finterm/internal/tui/chart"
 	"github.com/shinsekai/finterm/internal/tui/components"
 	"github.com/shinsekai/finterm/internal/tui/macro"
 	"github.com/shinsekai/finterm/internal/tui/news"
@@ -26,12 +28,13 @@ const (
 	tabQuote
 	tabMacro
 	tabNews
+	tabChart
 	numTabs
 )
 
 // globalBindings are keyboard bindings available in all views.
 var globalBindings = []components.Binding{
-	{Key: "1-4", Description: "Switch tab"},
+	{Key: "1-5", Description: "Switch tab"},
 	{Key: "Tab", Description: "Cycle tabs"},
 	{Key: "r", Description: "Refresh"},
 	{Key: "Ctrl+P", Description: "Command palette"},
@@ -103,9 +106,11 @@ func NewApp(
 	macroClient macro.Client,
 	newsClient news.Client,
 	trendEngine quote.Engine,
+	avClient *alphavantage.Client,
 	cacheStore cache.Cache,
 	watchlist *config.WatchlistConfig,
 	detector *indicators.AssetClassDetector,
+	cfg *config.Config,
 ) Model {
 	// Create and configure trend model
 	trendModel := trend.NewModel()
@@ -122,6 +127,15 @@ func NewApp(
 	// Create and configure news model
 	newsModel := news.NewModel()
 	newsModel.Configure(context.Background(), newsClient, watchlist.Crypto)
+
+	// Create and configure chart model
+	chartModel := chart.NewModel()
+	// Create crypto fetcher for chart (will be nil if avClient is nil)
+	var cryptoFetcher *cryptoFetcherAdapter
+	if avClient != nil {
+		cryptoFetcher = &cryptoFetcherAdapter{client: avClient}
+	}
+	chartModel = chartModel.Configure(context.Background(), trendEngine, avClient, cacheStore, watchlist, detector, cfg, cryptoFetcher)
 
 	// Create command palette with default commands
 	cmdPalette := palettepkg.New(palettepkg.BuildDefaultCommands(watchlist))
@@ -142,6 +156,7 @@ func NewApp(
 			{name: "Quote", model: quoteModel},
 			{name: "Macro", model: macroModel},
 			{name: "News", model: newsModel},
+			{name: "Chart", model: chartModel},
 		},
 		activeTab:       tabTrend,
 		helpOverlay:     nil,
@@ -153,6 +168,61 @@ func NewApp(
 		rateLimitReset:  time.Time{},
 		retryQueue:      []retryItem{},
 	}
+}
+
+// cryptoFetcherAdapter adapts the Alpha Vantage client to chart.CryptoDataFetcher interface.
+type cryptoFetcherAdapter struct {
+	client *alphavantage.Client
+}
+
+// FetchCryptoOHLCV fetches and converts crypto daily OHLCV data to domain types.
+func (a *cryptoFetcherAdapter) FetchCryptoOHLCV(ctx context.Context, symbol string) ([]indicators.OHLCV, error) {
+	data, err := a.client.GetCryptoDaily(ctx, symbol, "USD")
+	if err != nil {
+		return nil, err
+	}
+
+	// Get today's date in UTC to skip the in-progress bar
+	today := time.Now().UTC().Format("2006-01-02")
+
+	// Convert to OHLCV slice
+	ohlcvSlice := make([]indicators.OHLCV, 0, len(data.TimeSeries))
+	for dateStr, entry := range data.TimeSeries {
+		// Skip today's in-progress bar (bar-close-only rule)
+		if dateStr >= today {
+			continue
+		}
+
+		date, err := alphavantage.ParseDate(dateStr)
+		if err != nil {
+			continue
+		}
+		open, _ := alphavantage.ParseFloat(entry.Open)
+		high, _ := alphavantage.ParseFloat(entry.High)
+		low, _ := alphavantage.ParseFloat(entry.Low)
+		closeVal, _ := alphavantage.ParseFloat(entry.Close)
+		volume, _ := alphavantage.ParseFloat(entry.Volume)
+
+		ohlcvSlice = append(ohlcvSlice, indicators.OHLCV{
+			Date:   date,
+			Open:   open,
+			High:   high,
+			Low:    low,
+			Close:  closeVal,
+			Volume: volume,
+		})
+	}
+
+	// Sort oldest-first
+	for i := 0; i < len(ohlcvSlice)-1; i++ {
+		for j := i + 1; j < len(ohlcvSlice); j++ {
+			if ohlcvSlice[i].Date.After(ohlcvSlice[j].Date) {
+				ohlcvSlice[i], ohlcvSlice[j] = ohlcvSlice[j], ohlcvSlice[i]
+			}
+		}
+	}
+
+	return ohlcvSlice, nil
 }
 
 // Init initializes the application and returns an initial command.
@@ -184,6 +254,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Switch to specific tab
 		if msg.Tab >= 0 && msg.Tab < numTabs {
 			m.activeTab = msg.Tab
+			return m, m.refreshActiveTab()
 		}
 		return m, nil
 
@@ -374,24 +445,28 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		case "1":
 			m.setActiveTab(tabTrend)
-			return m, nil
+			return m, m.refreshActiveTab()
 
 		case "2":
 			m.setActiveTab(tabQuote)
-			return m, nil
+			return m, m.refreshActiveTab()
 
 		case "3":
 			m.setActiveTab(tabMacro)
-			return m, nil
+			return m, m.refreshActiveTab()
 
 		case "4":
 			m.setActiveTab(tabNews)
-			return m, nil
+			return m, m.refreshActiveTab()
+
+		case "5":
+			m.setActiveTab(tabChart)
+			return m, m.refreshActiveTab()
 		}
 
 	case tea.KeyTab:
 		m.cycleTab()
-		return m, nil
+		return m, m.refreshActiveTab()
 	}
 
 	// Delegate to active child model
@@ -400,7 +475,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // renderTabBar renders the tab navigation bar.
 func (m Model) renderTabBar() string {
-	tabIcons := []string{"◆", "◈", "◇", "◉"}
+	tabIcons := []string{"◆", "◈", "◇", "◉", "⬡"}
 	var tabs []string
 	for i, tab := range m.tabs {
 		style := m.theme.Tab()
@@ -413,7 +488,7 @@ func (m Model) renderTabBar() string {
 
 	// Join tabs with subtle separator
 	divider := m.theme.Divider().Render("│")
-	tabRow := lipgloss.JoinHorizontal(lipgloss.Top, tabs[0], divider, tabs[1], divider, tabs[2], divider, tabs[3])
+	tabRow := lipgloss.JoinHorizontal(lipgloss.Top, tabs[0], divider, tabs[1], divider, tabs[2], divider, tabs[3], divider, tabs[4])
 
 	// Add full-width bottom accent line
 	accentLine := m.theme.Divider().Render(strings.Repeat("━", m.width))
@@ -531,6 +606,8 @@ func (m Model) refreshActiveTab() tea.Cmd {
 		return func() tea.Msg { return macro.RefreshMsg{} }
 	case tabNews:
 		return func() tea.Msg { return news.RefreshMsg{} }
+	case tabChart:
+		return func() tea.Msg { return chart.RefreshMsg{} }
 	default:
 		return nil
 	}

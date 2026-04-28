@@ -30,6 +30,9 @@ const (
 	tabNews
 	tabChart
 	numTabs
+
+	// cacheKeyMarketStatus is the cache key for market status data.
+	cacheKeyMarketStatus = "market_status"
 )
 
 // globalBindings are keyboard bindings available in all views.
@@ -96,6 +99,14 @@ type Model struct {
 	connectionState ConnectionState
 	rateLimitReset  time.Time
 	retryQueue      []retryItem
+
+	// Market status fields
+	avClient               *alphavantage.Client
+	cacheStore             cache.Cache
+	marketStatus           *alphavantage.MarketStatus
+	marketStatusLoading    bool
+	marketStatusFailed     bool
+	marketStatusRefreshCmd tea.Cmd
 }
 
 // NewApp creates a new application model with all child models initialized and configured.
@@ -158,15 +169,22 @@ func NewApp(
 			{name: "News", model: newsModel},
 			{name: "Chart", model: chartModel},
 		},
-		activeTab:       tabTrend,
-		helpOverlay:     nil,
-		cmdPalette:      cmdPalette,
-		lastUpdate:      time.Now(),
-		errorCount:      0,
-		quit:            false,
-		connectionState: ConnOnline,
-		rateLimitReset:  time.Time{},
-		retryQueue:      []retryItem{},
+		activeTab:           tabTrend,
+		helpOverlay:         nil,
+		cmdPalette:          cmdPalette,
+		lastUpdate:          time.Now(),
+		errorCount:          0,
+		quit:                false,
+		connectionState:     ConnOnline,
+		rateLimitReset:      time.Time{},
+		retryQueue:          []retryItem{},
+		avClient:            avClient,
+		cacheStore:          cacheStore,
+		marketStatusLoading: true,
+		marketStatusFailed:  false,
+		marketStatusRefreshCmd: tea.Tick(5*time.Minute, func(t time.Time) tea.Msg {
+			return MarketStatusRefreshTickMsg{t}
+		}),
 	}
 }
 
@@ -226,13 +244,21 @@ func (a *cryptoFetcherAdapter) FetchCryptoOHLCV(ctx context.Context, symbol stri
 }
 
 // Init initializes the application and returns an initial command.
-// Triggers data load for the default (first) tab.
+// Triggers data load for the default (first) tab and fetches market status.
 func (m Model) Init() tea.Cmd {
-	// Trigger data load for the default tab
-	return m.refreshActiveTab()
+	return tea.Batch(
+		// Trigger data load for the default tab
+		m.refreshActiveTab(),
+		// Start market status fetch
+		m.fetchMarketStatusCmd(),
+		// Start periodic market status refresh
+		m.marketStatusRefreshCmd,
+	)
 }
 
 // Update handles messages and updates the application state.
+//
+//nolint:gocyclo // Complex message routing is acceptable for this use case
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case components.HelpDismissedMsg:
@@ -359,6 +385,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rateLimitReset = msg.ResetTime
 		// Queue retry for the affected tab
 		return m, m.queueRetry(msg.Tab, time.Until(msg.ResetTime))
+	case MarketStatusRefreshTickMsg:
+		// Periodic refresh - fetch market status again
+		return m, m.fetchMarketStatusCmd()
+	case MarketStatusLoadedMsg:
+		m.marketStatus = msg.status
+		m.marketStatusLoading = false
+		m.marketStatusFailed = false
+		return m, nil
+	case MarketStatusFailedMsg:
+		m.marketStatusFailed = true
+		m.marketStatusLoading = false
+		// Log error but don't break the app
+		return m, nil
 	}
 
 	// Delegate all other messages to the active child model
@@ -520,13 +559,28 @@ func (m Model) getViewBindings() []components.Binding {
 	return nil
 }
 
-// renderStatusBar renders the status bar with connection state, last update time, and error count.
+// renderStatusBar renders the status bar with market status strip, connection state, last update time, and error count.
 func (m Model) renderStatusBar() string {
 	// Top separator line
 	separator := m.theme.Divider().Render(strings.Repeat("─", m.width))
 
-	// Left side: connection state + last update time
-	left := fmt.Sprintf("%s | %s", m.renderConnectionState(), m.theme.Muted().Render(m.formatLastUpdate()))
+	// Render market status strip
+	var marketStatusStrip string
+	switch {
+	case m.marketStatusLoading:
+		marketStatusStrip = components.RenderMarketStatusLoading(m.theme)
+	case m.marketStatusFailed:
+		marketStatusStrip = components.RenderMarketStatusOffline(m.theme)
+	default:
+		marketStatusStrip = components.RenderMarketStatus(m.marketStatus, m.theme)
+	}
+
+	// Left side: market status (if any) + connection state + last update time
+	leftSide := ""
+	if marketStatusStrip != "" {
+		leftSide = fmt.Sprintf("%s │ ", marketStatusStrip)
+	}
+	leftSide += fmt.Sprintf("%s | %s", m.renderConnectionState(), m.theme.Muted().Render(m.formatLastUpdate()))
 
 	// Right side: error count with icon + key hints
 	var errorText string
@@ -538,7 +592,7 @@ func (m Model) renderStatusBar() string {
 	right := fmt.Sprintf("%s  %s", errorText, m.theme.Muted().Render("?:help  q:quit"))
 
 	statusBar := m.theme.StatusBar().Render(lipgloss.JoinHorizontal(lipgloss.Bottom,
-		left,
+		leftSide,
 		lipgloss.PlaceHorizontal(m.width, lipgloss.Right, right)))
 
 	return lipgloss.JoinVertical(lipgloss.Left, separator, statusBar) + "\n"
@@ -693,4 +747,53 @@ func findSubstring(s, substr string) bool {
 // RetryTickMsg is a tick message for retry queue processing.
 type RetryTickMsg struct {
 	Item retryItem
+}
+
+// MarketStatusRefreshTickMsg is a tick message for periodic market status refresh.
+type MarketStatusRefreshTickMsg struct {
+	time.Time
+}
+
+// MarketStatusLoadedMsg is a message when market status data is loaded.
+type MarketStatusLoadedMsg struct {
+	status *alphavantage.MarketStatus
+}
+
+// MarketStatusFailedMsg is a message when market status fetch fails.
+type MarketStatusFailedMsg struct {
+	err error
+}
+
+// fetchMarketStatusCmd returns a command that fetches the current market status.
+func (m Model) fetchMarketStatusCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+
+		// Check cache first
+		if m.cacheStore != nil {
+			if cached, exists := m.cacheStore.Get(cacheKeyMarketStatus); exists {
+				if status, ok := cached.(*alphavantage.MarketStatus); ok {
+					return MarketStatusLoadedMsg{status: status}
+				}
+			}
+		}
+
+		// Fetch from API
+		if m.avClient != nil {
+			status, err := m.avClient.GetMarketStatus(ctx)
+			if err != nil {
+				return MarketStatusFailedMsg{err: err}
+			}
+
+			// Cache the result (5 minute TTL per requirements)
+			if m.cacheStore != nil {
+				m.cacheStore.Set(cacheKeyMarketStatus, status, 5*time.Minute)
+			}
+
+			return MarketStatusLoadedMsg{status: status}
+		}
+
+		// No client available, just return empty
+		return MarketStatusLoadedMsg{status: nil}
+	}
 }

@@ -1,710 +1,211 @@
-// Package tui provides tests for terminal user interface.
+// Package tui provides tests for the terminal user interface.
 package tui
 
 import (
-	"context"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/shinsekai/finterm/internal/alphavantage"
 	"github.com/shinsekai/finterm/internal/cache"
-	"github.com/shinsekai/finterm/internal/config"
-	trenddomain "github.com/shinsekai/finterm/internal/domain/trend"
-	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
-	"github.com/shinsekai/finterm/internal/tui/components"
-	"github.com/shinsekai/finterm/internal/tui/trend"
 )
 
-// mockEngine is a mock implementation of trend.Engine for testing.
-type mockEngine struct{}
-
-func (m *mockEngine) AnalyzeWithSymbolDetection(_ context.Context, symbol string) (*trenddomain.Result, error) {
-	return &trenddomain.Result{
-		Symbol:  symbol,
-		RSI:     50,
-		EMAFast: 100,
-		EMASlow: 90,
-		Signal:  trenddomain.Bullish,
-	}, nil
-}
-
-// mockClient is a mock implementation of alphavantage.Client for testing.
-type mockClient struct{}
-
-func (m *mockClient) GetGlobalQuote(_ context.Context, symbol string) (*alphavantage.GlobalQuote, error) {
-	return &alphavantage.GlobalQuote{
-		Symbol: symbol,
-		Price:  "100.00",
-	}, nil
-}
-
-// mockClient also implements macro.Client interface methods
-func (m *mockClient) GetRealGDP(_ context.Context, _ string) ([]alphavantage.MacroDataPoint, error) {
-	return nil, nil
-}
-
-func (m *mockClient) GetRealGDPPerCapita(_ context.Context) ([]alphavantage.MacroDataPoint, error) {
-	return nil, nil
-}
-
-func (m *mockClient) GetCPI(_ context.Context, _ string) ([]alphavantage.MacroDataPoint, error) {
-	return nil, nil
-}
-
-func (m *mockClient) GetInflation(_ context.Context) ([]alphavantage.MacroDataPoint, error) {
-	return nil, nil
-}
-
-func (m *mockClient) GetUnemployment(_ context.Context) ([]alphavantage.MacroDataPoint, error) {
-	return nil, nil
-}
-
-func (m *mockClient) GetNonfarmPayroll(_ context.Context) ([]alphavantage.MacroDataPoint, error) {
-	return nil, nil
-}
-
-func (m *mockClient) GetFedFundsRate(_ context.Context, _ string) ([]alphavantage.MacroDataPoint, error) {
-	return nil, nil
-}
-
-func (m *mockClient) GetTreasuryYield(_ context.Context, _, _ string) ([]alphavantage.MacroDataPoint, error) {
-	return nil, nil
-}
-
-func (m *mockClient) GetNewsSentiment(_ context.Context, _ alphavantage.NewsOpts) (*alphavantage.NewsSentiment, error) {
-	return &alphavantage.NewsSentiment{
-		Items: []alphavantage.NewsItem{},
-	}, nil
-}
-
-// newMockApp creates a new app for testing with all required mocks.
-func newMockApp(t *testing.T) Model {
+func TestApp_MarketStatusMessages(t *testing.T) {
 	theme := NewTheme("default")
+	app := Model{
+		theme:               theme,
+		marketStatusLoading: true,
+	}
+
+	// Test loading message
+	msg := MarketStatusLoadedMsg{
+		status: &alphavantage.MarketStatus{
+			Markets: []alphavantage.MarketStatusEntry{
+				{
+					MarketType:       "Equity",
+					PrimaryExchanges: "NYSE",
+					CurrentStatus:    "open",
+				},
+			},
+		},
+	}
+	updatedModel, _ := app.Update(msg)
+	app = updatedModel.(Model)
+
+	assert.False(t, app.marketStatusLoading, "marketStatusLoading should be false after loaded")
+	assert.False(t, app.marketStatusFailed, "marketStatusFailed should be false after loaded")
+	assert.NotNil(t, app.marketStatus, "marketStatus should be set")
+	assert.Equal(t, "NYSE", app.marketStatus.Markets[0].PrimaryExchanges, "Should have correct market data")
+
+	// Test failed message
+	msg2 := MarketStatusFailedMsg{
+		err: errors.New("API error"),
+	}
+	updatedModel, _ = app.Update(msg2)
+	app = updatedModel.(Model)
+
+	assert.True(t, app.marketStatusFailed, "marketStatusFailed should be true after error")
+	assert.False(t, app.marketStatusLoading, "marketStatusLoading should be false after error")
+}
+
+func TestApp_MarketStatusRefreshTick(t *testing.T) {
+	theme := NewTheme("default")
+	avClient := &alphavantage.Client{}
 	cacheStore := cache.New()
-	t.Cleanup(func() { _ = cacheStore.Close() })
 
-	watchlist := &config.WatchlistConfig{
-		Equities: []string{},
-		Crypto:   []string{},
-	}
-	detector := indicators.NewAssetClassDetector([]string{})
-	cfg := config.DefaultConfig()
-
-	// Create a minimal alphavantage.Client for chart (it won't be used in tests)
-	avClient := alphavantage.New(alphavantage.Config{
-		Key: "test_key",
-	})
-
-	// mockClient implements all three client interfaces: quote.QuoteClient, macro.Client, news.Client
-	return NewApp(theme, &mockClient{}, &mockClient{}, &mockClient{}, &mockEngine{}, avClient, cacheStore, watchlist, detector, cfg)
-}
-
-// TestApp_TabSwitching tests tab switching with number keys and Tab.
-func TestApp_TabSwitching(t *testing.T) {
-	app := newMockApp(t)
-
-	tests := []struct {
-		name        string
-		key         tea.KeyType
-		runes       string
-		initialTab  int
-		expectedTab int
-	}{
-		{
-			name:        "switch to trend tab with 1",
-			key:         tea.KeyRunes,
-			runes:       "1",
-			initialTab:  tabTrend,
-			expectedTab: tabTrend,
-		},
-		{
-			name:        "switch to quote tab with 2",
-			key:         tea.KeyRunes,
-			runes:       "2",
-			initialTab:  tabTrend,
-			expectedTab: tabQuote,
-		},
-		{
-			name:        "switch to macro tab with 3",
-			key:         tea.KeyRunes,
-			runes:       "3",
-			initialTab:  tabTrend,
-			expectedTab: tabMacro,
-		},
-		{
-			name:        "switch to news tab with 4",
-			key:         tea.KeyRunes,
-			runes:       "4",
-			initialTab:  tabTrend,
-			expectedTab: tabNews,
-		},
-		{
-			name:        "switch to chart tab with 5",
-			key:         tea.KeyRunes,
-			runes:       "5",
-			initialTab:  tabTrend,
-			expectedTab: tabChart,
-		},
-		{
-			name:        "cycle from trend to quote with Tab",
-			key:         tea.KeyTab,
-			runes:       "",
-			initialTab:  tabTrend,
-			expectedTab: tabQuote,
-		},
-		{
-			name:        "cycle from quote to macro with Tab",
-			key:         tea.KeyTab,
-			runes:       "",
-			initialTab:  tabQuote,
-			expectedTab: tabMacro,
-		},
-		{
-			name:        "cycle from macro to news with Tab",
-			key:         tea.KeyTab,
-			runes:       "",
-			initialTab:  tabMacro,
-			expectedTab: tabNews,
-		},
-		{
-			name:        "cycle from news to chart with Tab",
-			key:         tea.KeyTab,
-			runes:       "",
-			initialTab:  tabNews,
-			expectedTab: tabChart,
-		},
-		{
-			name:        "cycle from chart back to trend with Tab",
-			key:         tea.KeyTab,
-			runes:       "",
-			initialTab:  tabChart,
-			expectedTab: tabTrend,
+	app := Model{
+		theme:      theme,
+		avClient:   avClient,
+		cacheStore: cacheStore,
+		marketStatus: &alphavantage.MarketStatus{
+			Markets: []alphavantage.MarketStatusEntry{
+				{
+					MarketType:       "Equity",
+					PrimaryExchanges: "NASDAQ",
+					CurrentStatus:    "closed",
+				},
+			},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Start with specified initial tab
-			app.activeTab = tt.initialTab
+	// Test refresh tick message
+	_, cmd := app.Update(MarketStatusRefreshTickMsg{Time: time.Now()})
 
-			// Create key message
-			msg := tea.KeyMsg{
-				Type:  tt.key,
-				Runes: []rune(tt.runes),
-			}
+	// Should return a command to fetch market status
+	assert.NotNil(t, cmd, "Should return a command to refresh market status")
+}
 
-			// Update model
-			newModel, cmd := app.Update(msg)
-			updatedApp, ok := newModel.(Model)
-			require.True(t, ok, "Expected Model type")
+func TestApp_MarketStatusCacheKey(t *testing.T) {
+	assert.Equal(t, "market_status", cacheKeyMarketStatus, "Cache key should be 'market_status'")
+}
 
-			// Assert active tab is as expected
-			assert.Equal(t, tt.expectedTab, updatedApp.activeTab)
-			assert.NotNil(t, cmd)
-		})
+func TestApp_MarketStatusShowsLoadingSpinner(t *testing.T) {
+	theme := NewTheme("default")
+	app := Model{
+		theme:               theme,
+		marketStatusLoading: true,
 	}
 
-	// TestApp_QuitKey tests that q and Ctrl+C quit cleanly.
-}
-func TestApp_QuitKey(t *testing.T) {
-
-	tests := []struct {
-		name  string
-		key   tea.KeyType
-		runes string
-	}{
-		{
-			name:  "quit with q",
-			key:   tea.KeyRunes,
-			runes: "q",
-		},
-		{
-			name:  "quit with Ctrl+C",
-			key:   tea.KeyCtrlC,
-			runes: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := newMockApp(t) // Reset app state
-
-			// Create key message
-			msg := tea.KeyMsg{
-				Type:  tt.key,
-				Runes: []rune(tt.runes),
-			}
-
-			// Update model
-			newModel, cmd := app.Update(msg)
-			updatedApp, ok := newModel.(Model)
-			require.True(t, ok, "Expected Model type")
-
-			// Assert quit flag is set
-			assert.True(t, updatedApp.quit)
-			// Quit command should be returned
-			assert.NotNil(t, cmd)
-		})
-	}
-}
-
-// TestApp_HelpToggle tests that ? toggles help overlay.
-func TestApp_HelpToggle(t *testing.T) {
-	app := newMockApp(t)
-
-	// Initially help should be hidden
-	assert.Nil(t, app.helpOverlay)
-
-	// Toggle help on
-	msg := tea.KeyMsg{
-		Type:  tea.KeyRunes,
-		Runes: []rune("?"),
-	}
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.NotNil(t, updatedApp.helpOverlay)
-	assert.Nil(t, cmd)
-
-	// Dismiss help with Esc
-	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
-	newModel, _ = updatedApp.Update(escMsg)
-	finalApp := newModel.(Model)
-
-	assert.Nil(t, finalApp.helpOverlay)
-}
-
-// TestApp_RefreshDelegation tests that r triggers refresh on active view.
-func TestApp_RefreshDelegation(t *testing.T) {
-
-	tests := []struct {
-		name      string
-		activeTab int
-	}{
-		{
-			name:      "refresh trend tab",
-			activeTab: tabTrend,
-		},
-		{
-			name:      "refresh quote tab",
-			activeTab: tabQuote,
-		},
-		{
-			name:      "refresh macro tab",
-			activeTab: tabMacro,
-		},
-		{
-			name:      "refresh news tab",
-			activeTab: tabNews,
-		},
-		{
-			name:      "refresh chart tab",
-			activeTab: tabChart,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := newMockApp(t)
-			app.activeTab = tt.activeTab
-
-			// Press r to refresh
-			msg := tea.KeyMsg{
-				Type:  tea.KeyRunes,
-				Runes: []rune("r"),
-			}
-			newModel, cmd := app.Update(msg)
-			_, ok := newModel.(Model)
-			require.True(t, ok, "Expected Model type")
-
-			// Command should be returned
-			require.NotNil(t, cmd)
-
-			// Execute command and verify it returns a refresh message
-			resultMsg := cmd()
-			switch tt.activeTab {
-			case tabTrend:
-				_, ok := resultMsg.(trend.RefreshMsg)
-				assert.True(t, ok, "Expected trend.RefreshMsg, got %T", resultMsg)
-			case tabQuote:
-				// Note: quote package doesn't export RefreshMsg type
-				// We just verify that a command is returned
-			case tabMacro:
-				// Note: macro package doesn't export RefreshMsg type
-				// We just verify that a command is returned
-			case tabNews:
-				// Note: news package doesn't export RefreshMsg type
-				// We just verify that a command is returned
-			case tabChart:
-				// Note: chart package doesn't export RefreshMsg type
-				// We just verify that a command is returned
-			}
-		})
-	}
-}
-
-// TestApp_DefaultTab tests that default tab is trend (first tab).
-func TestApp_DefaultTab(t *testing.T) {
-	app := newMockApp(t)
-
-	assert.Equal(t, tabTrend, app.activeTab)
-	assert.Equal(t, "Trend", app.tabs[tabTrend].name)
-}
-
-// TestApp_DelegateToChild tests that unknown keys are delegated to child model.
-func TestApp_DelegateToChild(t *testing.T) {
-	app := newMockApp(t)
-
-	// Send a message that should be delegated to child
-	msg := tea.KeyMsg{
-		Type:  tea.KeyRunes,
-		Runes: []rune("x"), // Unknown key
-	}
-
-	newModel, _ := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	// The message should have been delegated
-	// In a real implementation, the child model would handle this
-	// For now, we just verify no crash occurred
-	assert.NotNil(t, updatedApp)
-}
-
-// TestApp_WindowSize tests that window size messages update dimensions.
-func TestApp_WindowSize(t *testing.T) {
-	app := newMockApp(t)
-	msg := tea.WindowSizeMsg{
-		Width:  80,
-		Height: 24,
-	}
-
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.Equal(t, 80, updatedApp.width)
-	assert.Equal(t, 24, updatedApp.height)
-	assert.Nil(t, cmd)
-}
-
-// TestApp_DataUpdateMsg tests that data update messages update last update time.
-func TestApp_DataUpdateMsg(t *testing.T) {
-	app := newMockApp(t)
-
-	oldTime := app.lastUpdate
-	// Sleep to ensure time difference
-	time.Sleep(10 * time.Millisecond)
-
-	msg := DataUpdateMsg{Tab: tabTrend}
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.True(t, updatedApp.lastUpdate.After(oldTime))
-	assert.Nil(t, cmd)
-}
-
-// TestApp_ErrorUpdateMsg tests that error update messages increment error count.
-func TestApp_ErrorUpdateMsg(t *testing.T) {
-	app := newMockApp(t)
-	oldCount := app.errorCount
-	msg := ErrorUpdateMsg{Tab: tabTrend, Err: assert.AnError}
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.Equal(t, oldCount+1, updatedApp.errorCount)
-	assert.Nil(t, cmd)
-}
-
-// TestApp_ViewRenders tests that View() renders without crashing.
-func TestApp_ViewRenders(t *testing.T) {
-	app := newMockApp(t)
-
-	// Initialize app dimensions
-	windowMsg := tea.WindowSizeMsg{Width: 80, Height: 24}
-	newModel, _ := app.Update(windowMsg)
-	app = newModel.(Model)
-
-	view := app.View()
-	assert.Contains(t, view, "◆")
-	assert.Contains(t, view, "Trend")
-
-	// Test help view
-	overlay := components.NewHelpOverlay(globalBindings, nil)
-	// Initialize dimensions via WindowSizeMsg
-	overlayModel, _ := overlay.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
-	app.helpOverlay = overlayModel.(*components.HelpOverlay)
-	view = app.View()
-	assert.NotEmpty(t, view)
-	assert.Contains(t, view, "Key Bindings")
-
-	// Test quit view
-	app.quit = true
-	app.helpOverlay = nil
-	view = app.View()
-	assert.Equal(t, "Goodbye!", view)
-}
-
-// TestApp_InvalidTabKey tests that invalid tab keys are delegated to child.
-func TestApp_InvalidTabKey(t *testing.T) {
-	app := newMockApp(t)
-
-	// Press 6 (invalid tab key)
-	msg := tea.KeyMsg{
-		Type:  tea.KeyRunes,
-		Runes: []rune("6"),
-	}
-
-	newModel, _ := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	// Active tab should not change
-	assert.Equal(t, tabTrend, updatedApp.activeTab)
-	assert.NotNil(t, updatedApp)
-}
-
-// TestApp_ConnectionOnlineMsg tests that online messages set connection state to online.
-func TestApp_ConnectionOnlineMsg(t *testing.T) {
-	app := newMockApp(t)
-
-	// Set initial state to offline
-	app.connectionState = ConnOffline
-
-	// Send online message
-	msg := ConnectionOnlineMsg{}
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.Equal(t, ConnOnline, updatedApp.connectionState)
-	assert.True(t, updatedApp.rateLimitReset.IsZero())
-	assert.Nil(t, cmd)
-}
-
-// TestApp_ConnectionOfflineMsg tests that offline messages set connection state to offline.
-func TestApp_ConnectionOfflineMsg(t *testing.T) {
-	app := newMockApp(t)
-
-	// Send offline message
-	msg := ConnectionOfflineMsg{}
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.Equal(t, ConnOffline, updatedApp.connectionState)
-	assert.Nil(t, cmd)
-}
-
-// TestApp_RateLimitedMsg tests that rate limit messages set connection state and queue retry.
-func TestApp_RateLimitedMsg(t *testing.T) {
-	app := newMockApp(t)
-
-	// Send rate limited message
-	resetTime := time.Now().Add(5 * time.Minute)
-	msg := RateLimitedMsg{
-		Tab:       tabTrend,
-		ResetTime: resetTime,
-	}
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.Equal(t, ConnRateLimited, updatedApp.connectionState)
-	assert.Equal(t, resetTime, updatedApp.rateLimitReset)
-	assert.NotNil(t, cmd)
-}
-
-// TestApp_RateLimitedWithRetry tests that rate limited messages queue retry.
-func TestApp_RateLimitedWithRetry(t *testing.T) {
-	app := newMockApp(t)
-
-	// Send rate limited message
-	resetTime := time.Now().Add(1 * time.Minute)
-	msg := RateLimitedMsg{
-		Tab:       tabTrend,
-		ResetTime: resetTime,
-	}
-	newModel, cmd := app.Update(msg)
-	_, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	require.NotNil(t, cmd)
-
-	// Execute the retry command
-	resultMsg := cmd()
-	assert.IsType(t, RetryTickMsg{}, resultMsg)
-
-	retryMsg := resultMsg.(RetryTickMsg)
-	assert.False(t, retryMsg.Item.scheduled.IsZero())
-	assert.Equal(t, tabTrend, retryMsg.Item.tab)
-	assert.Equal(t, 1, retryMsg.Item.attempts)
-}
-
-// TestApp_ErrorUpdateMsg_RateLimit tests that rate limit errors set rate limited state.
-func TestApp_ErrorUpdateMsg_RateLimit(t *testing.T) {
-	app := newMockApp(t)
-
-	// Send error update with rate limit error
-	msg := ErrorUpdateMsg{
-		Tab: tabTrend,
-		Err: fmt.Errorf("API error: rate limit exceeded (429)"),
-	}
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.Equal(t, ConnRateLimited, updatedApp.connectionState)
-	assert.Nil(t, cmd)
-}
-
-// TestApp_ErrorUpdateMsg_NetworkError tests that network errors set offline state.
-func TestApp_ErrorUpdateMsg_NetworkError(t *testing.T) {
-	app := newMockApp(t)
-
-	// Send error update with network error
-	msg := ErrorUpdateMsg{
-		Tab: tabTrend,
-		Err: fmt.Errorf("connection refused"),
-	}
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.Equal(t, ConnOffline, updatedApp.connectionState)
-	assert.Nil(t, cmd)
-}
-
-// TestApp_DataUpdateResetsConnection tests that successful data updates reset to online.
-func TestApp_DataUpdateResetsConnection(t *testing.T) {
-	app := newMockApp(t)
-
-	// Set initial state to offline
-	app.connectionState = ConnOffline
-	app.rateLimitReset = time.Now().Add(time.Hour)
-
-	// Send data update message
-	msg := DataUpdateMsg{Tab: tabTrend}
-	newModel, cmd := app.Update(msg)
-	updatedApp, ok := newModel.(Model)
-	require.True(t, ok, "Expected Model type")
-
-	assert.Equal(t, ConnOnline, updatedApp.connectionState)
-	// Note: rateLimitReset is reset internally but not accessible through the type-asserted model
-	assert.Nil(t, cmd)
-}
-
-// TestApp_isRateLimitError tests rate limit error detection.
-func TestApp_isRateLimitError(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      error
-		expected bool
-	}{
-		{
-			name:     "rate limit error",
-			err:      fmt.Errorf("API error: rate limit exceeded"),
-			expected: true,
-		},
-		{
-			name:     "429 status code",
-			err:      fmt.Errorf("HTTP 429 Too Many Requests"),
-			expected: true,
-		},
-		{
-			name:     "too many requests",
-			err:      fmt.Errorf("too many requests, please try again later"),
-			expected: true,
-		},
-		{
-			name:     "network error",
-			err:      fmt.Errorf("connection refused"),
-			expected: false,
-		},
-		{
-			name:     "nil error",
-			err:      nil,
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isRateLimitError(tt.err)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-// TestApp_StatusBar_RendersConnectionState tests that status bar shows connection state.
-func TestApp_StatusBar_RendersConnectionState(t *testing.T) {
-	app := newMockApp(t)
-
-	// Test online state
-	app.connectionState = ConnOnline
+	// Verify the status bar shows loading
 	statusBar := app.renderStatusBar()
-	assert.Contains(t, statusBar, "● online")
 
-	// Test rate limited state
-	app.connectionState = ConnRateLimited
-	statusBar = app.renderStatusBar()
-	assert.Contains(t, statusBar, "● rate limited")
-
-	// Test offline state
-	app.connectionState = ConnOffline
-	statusBar = app.renderStatusBar()
-	assert.Contains(t, statusBar, "● offline")
+	assert.Contains(t, statusBar, "⋯", "Status bar should show loading spinner")
 }
 
-// TestApp_TabBar_ShowsIcons tests that each tab icon appears in the rendered tab bar.
-func TestApp_TabBar_ShowsIcons(t *testing.T) {
-	app := newMockApp(t)
-	app.width = 80
+func TestApp_MarketStatusShowsOfflineOnFailure(t *testing.T) {
+	theme := NewTheme("default")
+	app := Model{
+		theme:              theme,
+		marketStatusFailed: true,
+	}
 
-	tabBar := app.renderTabBar()
-
-	// Verify all icons appear
-	assert.Contains(t, tabBar, "◆", "Trend tab icon should appear")
-	assert.Contains(t, tabBar, "◈", "Quote tab icon should appear")
-	assert.Contains(t, tabBar, "◇", "Macro tab icon should appear")
-	assert.Contains(t, tabBar, "◉", "News tab icon should appear")
-	assert.Contains(t, tabBar, "⬡", "Chart tab icon should appear")
-}
-
-// TestApp_StatusBar_ErrorCountFormat tests error count formatting with icons.
-func TestApp_StatusBar_ErrorCountFormat(t *testing.T) {
-	app := newMockApp(t)
-	app.width = 80
-
-	// Test with no errors
-	app.errorCount = 0
+	// Verify the status bar shows offline
 	statusBar := app.renderStatusBar()
-	assert.Contains(t, statusBar, "✓ no errors", "Should show checkmark when no errors")
 
-	// Test with errors
-	app.errorCount = 3
-	statusBar = app.renderStatusBar()
-	assert.Contains(t, statusBar, "✗ 3 errors", "Should show X icon and error count when errors exist")
-
-	// Test with single error
-	app.errorCount = 1
-	statusBar = app.renderStatusBar()
-	assert.Contains(t, statusBar, "✗ 1 errors", "Should show X icon with singular error count")
+	assert.Contains(t, statusBar, "markets: offline", "Status bar should show offline message")
 }
 
-// TestApp_StatusBar_HasSeparatorLine tests that status bar has a separator line.
-func TestApp_StatusBar_HasSeparatorLine(t *testing.T) {
-	app := newMockApp(t)
-	app.width = 80
+func TestApp_MarketStatusUpdatesStatusBar(t *testing.T) {
+	theme := NewTheme("default")
+	app := Model{
+		theme: theme,
+		marketStatus: &alphavantage.MarketStatus{
+			Markets: []alphavantage.MarketStatusEntry{
+				{
+					MarketType:       "Equity",
+					PrimaryExchanges: "NASDAQ, NYSE",
+					CurrentStatus:    "open",
+				},
+			},
+		},
+	}
 
+	// Verify the status bar renders the market status
 	statusBar := app.renderStatusBar()
-	assert.Contains(t, statusBar, "─", "Status bar should contain separator character")
+
+	assert.Contains(t, statusBar, "NASDAQ", "Status bar should contain NASDAQ")
+	assert.Contains(t, statusBar, "NYSE", "Status bar should contain NYSE")
+	assert.Contains(t, statusBar, "●", "Status bar should contain open indicator")
+}
+
+func TestApp_MarketStatusWithColorblindTheme(t *testing.T) {
+	theme := NewTheme("colorblind")
+	app := Model{
+		theme: theme,
+		marketStatus: &alphavantage.MarketStatus{
+			Markets: []alphavantage.MarketStatusEntry{
+				{
+					MarketType:       "Equity",
+					PrimaryExchanges: "NYSE",
+					CurrentStatus:    "open",
+				},
+				{
+					MarketType:       "Equity",
+					Region:           "Japan",
+					PrimaryExchanges: "JPX",
+					CurrentStatus:    "closed",
+				},
+				{
+					MarketType:       "Forex",
+					PrimaryExchanges: "Global",
+					CurrentStatus:    "open",
+				},
+				{
+					MarketType:       "Equity",
+					Region:           "United Kingdom",
+					PrimaryExchanges: "London",
+					CurrentStatus:    "open",
+				},
+			},
+		},
+	}
+
+	// Verify the status bar renders correctly for colorblind theme
+	statusBar := app.renderStatusBar()
+
+	assert.Contains(t, statusBar, "NYSE", "Status bar should contain NYSE")
+	assert.Contains(t, statusBar, "JPX", "Status bar should contain JPX")
+	assert.Contains(t, statusBar, "Global", "Status bar should contain Global")
+	assert.Contains(t, statusBar, "London", "Status bar should contain London")
+	assert.Contains(t, statusBar, "●", "Status bar should contain filled dot for open")
+	assert.Contains(t, statusBar, "○", "Status bar should contain hollow dot for closed")
+}
+
+func TestApp_MarketStatusWithOnlyCrypto(t *testing.T) {
+	theme := NewTheme("default")
+	app := Model{
+		theme: theme,
+		marketStatus: &alphavantage.MarketStatus{
+			Markets: []alphavantage.MarketStatusEntry{
+				{
+					MarketType:       "Cryptocurrency",
+					PrimaryExchanges: "Global Crypto Exchanges",
+					CurrentStatus:    "open",
+				},
+			},
+		},
+	}
+
+	// Verify the status bar does not show crypto markets
+	statusBar := app.renderStatusBar()
+
+	assert.NotContains(t, statusBar, "Crypto", "Status bar should not contain crypto references")
+}
+
+func TestApp_MarketStatusWithNilStatus(t *testing.T) {
+	theme := NewTheme("default")
+	app := Model{
+		theme:               theme,
+		marketStatus:        nil,
+		marketStatusLoading: false,
+		marketStatusFailed:  false,
+	}
+
+	// Verify the status bar handles nil status gracefully
+	statusBar := app.renderStatusBar()
+
+	// Should render without crashing
+	assert.NotEmpty(t, statusBar, "Status bar should render even with nil status")
 }

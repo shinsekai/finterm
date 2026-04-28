@@ -28,5 +28,5 @@ func init() {
 	gob.Register(&alphavantage.MacroDataPoint{})
 	gob.Register(&alphavantage.MacroResponse{})
 	gob.Register(&alphavantage.MarketStatus{})
-	gob.Register(&alphavantage.MarketStatusResponse{})
+	gob.Register(&alphavantage.MarketStatusEntry{})
 }

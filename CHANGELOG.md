@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-04-28
+
+### Added
+- Chart tab (tab `5`) with dual-pane visualization
+  - Price pane: cell-based OHLC candlesticks using Unicode block characters
+    - Bullish body: `█` (green), bearish body: `▓` (red), doji: `─` (neutral)
+    - Wicks: `│` extending to high/low from body edge
+  - TPI pane: braille line plotting composite TPI trajectory (FTEMA + BLITZ + DESTINY + FLOW + VORTEX) / 5
+    - Zero reference line at LONG/CASH boundary
+    - Fill below line: green (TPI > 0), red (TPI < 0), muted gray (±0.05 dead zone)
+  - Keyboard navigation: `j`/`k` for ticker cycle, `1`/`2`/`3`/`4` for timeframes, `+`/`-` for zoom, `h`/`l` for pan, `r` for refresh
+  - Status chip shows symbol, timeframe, window size, and bar-close date
+  - Bar-close-only rule preserved — in-progress bars never plotted
+- Sparkline component using Unicode block characters (`▁▂▃▄▅▆▇█`)
+  - New Sparkline column in trend table between SYMBOL and TPI (fixed width 10 chars)
+  - Color by net direction: bullish theme color when close-up, bearish when close-down, neutral when flat
+  - Extended `trend.Result` with `PriceHistory []float64` (up to 30 most recent closes, bar-close-only)
+- Braille canvas primitive with 2×4 subpixel resolution per character cell
+  - `Canvas` struct with `Set`, `Line`, and `Render` methods for pixel-level control
+  - Bresenham line algorithm for smooth curves
+  - Foundation for chart TPI pane rendering
+- Alpha Vantage MARKET_STATUS endpoint support
+  - `GetMarketStatus()` client method returning typed `MarketStatus` and `MarketStatusEntry` structs
+  - Covers Equity, Forex, Commodity, and Cryptocurrency market types with regional status data
+- Market status strip in persistent app status bar (visible across all tabs)
+  - Displays open/closed dots: `●` green (open), `○` gray (closed)
+  - Layout: `NYSE ● · NASDAQ ● · LSE ○ · TSE ○ · FX ●`
+  - Crypto venues excluded (24/7 markets convey no information)
+  - Groups duplicate entries by primary exchange
+  - Refreshes every 5 minutes via tea.Tick with 5-minute cache TTL
+  - Loading state: `⋯` spinner; API failure: `markets: offline` in muted color
+  - Colorblind theme uses glyph differentiation (`●` vs `○`) rather than hue
+
 ## [0.7.1] — 2026-04-23
 
 ### Fixed

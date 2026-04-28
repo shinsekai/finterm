@@ -1,0 +1,41 @@
+{
+  "endpoint": "Market Status",
+  "markets": [
+    {
+      "market_type": "Equity",
+      "region": "United States",
+      "primary_exchanges": "NASDAQ, NYSE, AMEX",
+      "local_open": "09:30",
+      "local_close": "16:00",
+      "current_status": "open",
+      "notes": ""
+    },
+    {
+      "market_type": "Equity",
+      "region": "United Kingdom",
+      "primary_exchanges": "LSE",
+      "local_open": "08:00",
+      "local_close": "16:30",
+      "current_status": "closed",
+      "notes": "Market closed on weekends"
+    },
+    {
+      "market_type": "Forex",
+      "region": "Global",
+      "primary_exchanges": "",
+      "local_open": "00:00",
+      "local_close": "23:59",
+      "current_status": "open",
+      "notes": "Forex markets operate 24/5"
+    },
+    {
+      "market_type": "Cryptocurrency",
+      "region": "Global",
+      "primary_exchanges": "",
+      "local_open": "00:00",
+      "local_close": "23:59",
+      "current_status": "open",
+      "notes": "Crypto markets operate 24/7"
+    }
+  ]
+}

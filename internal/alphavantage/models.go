@@ -167,19 +167,21 @@ type MacroResponse struct {
 	Data     []MacroDataPoint `json:"data"`
 }
 
-// MarketStatus represents the market status for a single market.
+// MarketStatus represents the market status response.
 type MarketStatus struct {
-	MarketID      string `json:"market_id"`
-	MarketName    string `json:"market_name"`
-	Region        string `json:"region"`
-	LocalOpen     string `json:"local_open"`
-	LocalClose    string `json:"local_close"`
-	CurrentStatus string `json:"current_status"`
+	Endpoint string              `json:"endpoint"`
+	Markets  []MarketStatusEntry `json:"markets"`
 }
 
-// MarketStatusResponse represents the market status response.
-type MarketStatusResponse struct {
-	Markets []MarketStatus `json:"markets"`
+// MarketStatusEntry represents the market status for a single market.
+type MarketStatusEntry struct {
+	MarketType       string `json:"market_type"`       // "Equity", "Forex", "Commodity", "Cryptocurrency"
+	Region           string `json:"region"`            // "United States", "United Kingdom", …
+	PrimaryExchanges string `json:"primary_exchanges"` // "NASDAQ, NYSE, …" (comma-joined)
+	LocalOpen        string `json:"local_open"`
+	LocalClose       string `json:"local_close"`
+	CurrentStatus    string `json:"current_status"` // "open" | "closed"
+	Notes            string `json:"notes"`
 }
 
 // ParseFloat converts an Alpha Vantage string-encoded number to float64.

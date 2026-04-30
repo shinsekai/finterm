@@ -69,6 +69,12 @@ func renderCandlesWithReferencesAndClips(bars []indicators.OHLCV, minPrice, maxP
 		barWidth = 1
 	}
 
+	// Number of body columns: barWidth-1 when barWidth >= 2, otherwise 1 (no gap at barWidth == 1)
+	bodyCols := barWidth - 1
+	if bodyCols < 1 {
+		bodyCols = 1
+	}
+
 	// Get colors - use predefined colors
 	bullishColor := lipgloss.Color("#50FA7B")
 	bearishColor := lipgloss.Color("#FF5555")
@@ -99,9 +105,11 @@ func renderCandlesWithReferencesAndClips(bars []indicators.OHLCV, minPrice, maxP
 		// Determine bar direction
 		isBullish := bar.Close >= bar.Open
 
-		// Determine body character
+		// Determine body character: doji when |close-open|/open < 0.001 (10 basis points)
 		bodyChar := "█"
-		if math.Abs(bar.Close-bar.Open) < priceRange/float64(height) {
+		bodyHeight := math.Abs(bar.Close - bar.Open)
+		relativeBodyHeight := bodyHeight / bar.Open
+		if relativeBodyHeight < 0.001 {
 			bodyChar = "─" // Doji
 		}
 
@@ -113,24 +121,31 @@ func renderCandlesWithReferencesAndClips(bars []indicators.OHLCV, minPrice, maxP
 			barColor = bearishColor
 		}
 
-		// Render wicks (clamped to visible range)
+		// Render wicks (clamped to visible range) - drawn across bodyCols columns
 		for y := minInt(clampedHighPos, clampedLowPos); y <= maxInt(clampedHighPos, clampedLowPos); y++ {
-			if x < width {
-				grid[y][x] = lipgloss.NewStyle().Foreground(barColor).Render("│")
+			for colOffset := 0; colOffset < bodyCols; colOffset++ {
+				col := x + colOffset
+				if col < width {
+					grid[y][col] = lipgloss.NewStyle().Foreground(barColor).Render("│")
+				}
 			}
 		}
 
-		// Render body (clamped to visible range)
+		// Render body (clamped to visible range) - drawn across bodyCols columns
 		bodyTop := minInt(clampedOpenPos, clampedClosePos)
 		bodyBottom := maxInt(clampedOpenPos, clampedClosePos)
 		for y := bodyTop; y <= bodyBottom; y++ {
-			if x < width {
-				grid[y][x] = lipgloss.NewStyle().Foreground(barColor).Render(bodyChar)
+			for colOffset := 0; colOffset < bodyCols; colOffset++ {
+				col := x + colOffset
+				if col < width {
+					grid[y][col] = lipgloss.NewStyle().Foreground(barColor).Render(bodyChar)
+				}
 			}
 		}
 
 		// Render clip indicators
 		// ▲ for bars extending above range, ▼ for bars extending below range
+		// Render at the left edge of the bar
 		if highAboveRange && x < width {
 			// Render ▲ at top edge
 			grid[0][x] = lipgloss.NewStyle().Foreground(barColor).Render("▲")

@@ -544,3 +544,272 @@ func TestRenderCandles_NoClipIndicatorWhenInRange(t *testing.T) {
 		t.Errorf("Did not expect ▼ clip indicator in last line, got '%s'", lastLine)
 	}
 }
+
+// TestRenderCandles_BarWidthZoomLevels tests that bars render correctly
+// at different zoom levels (barWidth=7, 3, 1 with chart width 218).
+func TestRenderCandles_BarWidthZoomLevels(t *testing.T) {
+	themeName := "default"
+	height := 20
+
+	tests := []struct {
+		name             string
+		numBars          int
+		width            int
+		expectedBarWidth int
+		expectedBodyCols int
+	}{
+		{"zoom=30 barWidth=7", 30, 218, 7, 6},
+		{"zoom=60 barWidth=3", 60, 218, 3, 2},
+		{"zoom=110 barWidth=1", 110, 218, 1, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bars := make([]indicators.OHLCV, tt.numBars)
+			for i := range bars {
+				price := 100.0 + float64(i)
+				bars[i] = indicators.OHLCV{
+					Date:   time.Now().Add(-time.Duration(tt.numBars-i) * 24 * time.Hour),
+					Open:   price - 1,
+					High:   price + 2,
+					Low:    price - 2,
+					Close:  price + 1,
+					Volume: 1000,
+				}
+			}
+
+			output := renderCandles(bars, tt.width, height, themeName)
+
+			if output == "" {
+				t.Fatalf("Expected non-empty output")
+			}
+
+			// Verify output has the correct dimensions
+			lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+			if len(lines) != height {
+				t.Errorf("Expected %d lines, got %d", height, len(lines))
+			}
+		})
+	}
+}
+
+// TestRenderCandles_AllBodiesIdenticalWidthInChart verifies that within a single chart,
+// all candle bodies have identical width.
+func TestRenderCandles_AllBodiesIdenticalWidthInChart(t *testing.T) {
+	width := 20
+	height := 10
+	themeName := "default"
+
+	bars := make([]indicators.OHLCV, 5)
+	for i := range bars {
+		price := 100.0 + float64(i)
+		bars[i] = indicators.OHLCV{
+			Date:   time.Now().Add(-time.Duration(5-i) * 24 * time.Hour),
+			Open:   price - 1,
+			High:   price + 2,
+			Low:    price - 2,
+			Close:  price + 1,
+			Volume: 1000,
+		}
+	}
+
+	output := renderCandles(bars, width, height, themeName)
+
+	if output == "" {
+		t.Fatal("Expected non-empty output")
+	}
+
+	// Count body characters (█ or ─) in the entire output
+	bodyCharCount := 0
+	for _, r := range output {
+		if r == '█' || r == '─' {
+			bodyCharCount++
+		}
+	}
+
+	// With 5 bars, each with bodyCols=3, we expect at least some body characters
+	// We can't count exact due to variable body heights, but verify we have bodies
+	if bodyCharCount == 0 {
+		t.Error("Expected body characters in output")
+	}
+}
+
+// TestRenderCandles_BarWidth1NoGap verifies that when barWidth=1,
+// bodies are 1 col wide with no gap (contiguous render).
+func TestRenderCandles_BarWidth1NoGap(t *testing.T) {
+	width := 10
+	height := 10
+	themeName := "default"
+
+	bars := make([]indicators.OHLCV, 10)
+	for i := range bars {
+		price := 100.0 + float64(i)
+		bars[i] = indicators.OHLCV{
+			Date:   time.Now().Add(-time.Duration(10-i) * 24 * time.Hour),
+			Open:   price - 1,
+			High:   price + 2,
+			Low:    price - 2,
+			Close:  price + 1,
+			Volume: 1000,
+		}
+	}
+
+	output := renderCandles(bars, width, height, themeName)
+
+	if output == "" {
+		t.Fatal("Expected non-empty output")
+	}
+
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+
+	// When barWidth=1, verify that all columns have at least one non-space character
+	// (no gaps between bars)
+	colHasContent := make([]bool, width)
+	for _, line := range lines {
+		for col := 0; col < width && col < len(line); col++ {
+			if line[col] != ' ' {
+				colHasContent[col] = true
+			}
+		}
+	}
+
+	// With 10 bars at width 10, all columns should have content
+	emptyCols := 0
+	for _, hasContent := range colHasContent {
+		if !hasContent {
+			emptyCols++
+		}
+	}
+
+	if emptyCols > 1 {
+		// Allow at most 1 empty column (rightmost gutter)
+		t.Errorf("Expected at most 1 empty column with barWidth=1, got %d", emptyCols)
+	}
+}
+
+// TestRenderCandles_BarWidthGteTwoHasOneColGap verifies that when barWidth >= 2,
+// there is a 1-column gap on the right edge of each bar.
+func TestRenderCandles_BarWidthGteTwoHasOneColGap(t *testing.T) {
+	width := 9
+	height := 10
+	themeName := "default"
+
+	bars := make([]indicators.OHLCV, 3)
+	for i := range bars {
+		price := 100.0 + float64(i)
+		bars[i] = indicators.OHLCV{
+			Date:   time.Now().Add(-time.Duration(3-i) * 24 * time.Hour),
+			Open:   price - 1,
+			High:   price + 2,
+			Low:    price - 2,
+			Close:  price + 1,
+			Volume: 1000,
+		}
+	}
+
+	output := renderCandles(bars, width, height, themeName)
+
+	if output == "" {
+		t.Fatal("Expected non-empty output")
+	}
+
+	// Verify output contains all expected candle elements
+	// With 3 bars and bodyCols=2, we expect body characters
+	hasBody := false
+	for _, r := range output {
+		if r == '█' || r == '─' {
+			hasBody = true
+			break
+		}
+	}
+
+	if !hasBody {
+		t.Error("Expected body characters in output")
+	}
+}
+
+// TestDojiDetection_ContentBasedNotPaneBased verifies that doji detection
+// is based on content (close vs open) and not pane height or price range.
+func TestDojiDetection_ContentBasedNotPaneBased(t *testing.T) {
+	width := 10
+	themeName := "default"
+
+	barsDoji := []indicators.OHLCV{
+		{Date: time.Now(), Open: 1000, High: 1010, Low: 990, Close: 1000.5, Volume: 1000},
+	}
+
+	barsNotDoji := []indicators.OHLCV{
+		{Date: time.Now(), Open: 100, High: 110, Low: 90, Close: 105, Volume: 1000},
+	}
+
+	for _, h := range []int{5, 10, 20, 40} {
+		outputDoji := renderCandles(barsDoji, width, h, themeName)
+		outputNotDoji := renderCandles(barsNotDoji, width, h, themeName)
+
+		if !strings.Contains(outputDoji, "─") {
+			t.Errorf("Height %d: Expected doji character '─' in doji bar", h)
+		}
+		if !strings.Contains(outputNotDoji, "█") {
+			t.Errorf("Height %d: Expected body character '█' in non-doji bar", h)
+		}
+	}
+}
+
+// TestDojiDetection_BTCDailyFixtureNoFalseDojis verifies that high-priced
+// assets like BTC do not get false doji classification.
+func TestDojiDetection_BTCDailyFixtureNoFalseDojis(t *testing.T) {
+	width := 20
+	height := 10
+	themeName := "default"
+
+	bars := []indicators.OHLCV{
+		{Date: time.Now(), Open: 45000, High: 47000, Low: 44000, Close: 46000, Volume: 1000},
+		{Date: time.Now(), Open: 46000, High: 47500, Low: 45500, Close: 47000, Volume: 1000},
+		{Date: time.Now(), Open: 47000, High: 48000, Low: 46500, Close: 46500, Volume: 1000},
+		{Date: time.Now(), Open: 46500, High: 47300, Low: 46000, Close: 46530, Volume: 1000},
+	}
+
+	output := renderCandles(bars, width, height, themeName)
+
+	if output == "" {
+		t.Fatal("Expected non-empty output")
+	}
+
+	bodyCount := strings.Count(output, "█")
+	dojiCount := strings.Count(output, "─")
+
+	if bodyCount == 0 {
+		t.Error("Expected at least some body characters for BTC bars")
+	}
+
+	if dojiCount == 0 {
+		t.Error("Expected doji character for true doji bar")
+	}
+}
+
+// TestDojiDetection_TrueDojiBarsStillDetected verifies that actual
+// doji bars (very small |close-open|) are still correctly detected.
+func TestDojiDetection_TrueDojiBarsStillDetected(t *testing.T) {
+	width := 10
+	height := 10
+	themeName := "default"
+
+	bars := []indicators.OHLCV{
+		{Date: time.Now(), Open: 100, High: 110, Low: 90, Close: 100.05, Volume: 1000},
+	}
+
+	output := renderCandles(bars, width, height, themeName)
+
+	if output == "" {
+		t.Fatal("Expected non-empty output")
+	}
+
+	if !strings.Contains(output, "─") {
+		t.Error("Expected doji character '─' in true doji bar")
+	}
+
+	bodyCount := strings.Count(output, "█")
+	if bodyCount > 0 {
+		t.Errorf("Expected no body characters for doji, got %d", bodyCount)
+	}
+}

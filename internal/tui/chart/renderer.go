@@ -11,18 +11,31 @@ import (
 
 // renderCandles renders cell-based candlesticks for the price pane.
 func renderCandles(bars []indicators.OHLCV, width, height int, _ string) string {
-	return renderCandlesWithReferences(bars, width, height, "", nil)
+	minPrice, maxPrice, _ := getPriceRangeRobust(bars, outlierPercentile)
+	return renderCandlesWithReferencesAndClips(bars, minPrice, maxPrice, width, height, "", nil)
 }
 
 // renderCandlesWithReferences renders cell-based candlesticks with optional reference lines.
 // Reference lines are drawn first, then candles overwrite them where they overlap.
+//
+// Deprecated: Use renderCandlesWithReferencesAndClips for clip indicator support.
+//
+//nolint:unused // Kept for backwards compatibility
 func renderCandlesWithReferences(bars []indicators.OHLCV, width, height int, _ string, references []float64) string {
+	minPrice, maxPrice, _ := getPriceRangeRobust(bars, outlierPercentile)
+	return renderCandlesWithReferencesAndClips(bars, minPrice, maxPrice, width, height, "", references)
+}
+
+// renderCandlesWithReferencesAndClips renders cell-based candlesticks with optional reference lines
+// and clip indicators for bars that extend beyond the visible range.
+// Reference lines are drawn first, then candles overwrite them where they overlap.
+// Clip indicators (▲ for above-range, ▼ for below-range) are rendered at pane edges.
+func renderCandlesWithReferencesAndClips(bars []indicators.OHLCV, minPrice, maxPrice float64, width, height int, _ string, references []float64) string {
 	if len(bars) == 0 || height <= 0 {
 		return ""
 	}
 
-	// Calculate price range
-	minPrice, maxPrice := getPriceRange(bars)
+	// Calculate price range (now using the provided clipped range)
 	priceRange := maxPrice - minPrice
 	if priceRange == 0 {
 		priceRange = 1
@@ -67,17 +80,21 @@ func renderCandlesWithReferences(bars []indicators.OHLCV, width, height int, _ s
 			break
 		}
 
-		// Calculate positions (0 at top, height-1 at bottom)
+		// Calculate unclamped positions (0 at top, height-1 at bottom)
 		highPos := int(float64(height-1) * (1 - (bar.High-minPrice)/priceRange))
 		lowPos := int(float64(height-1) * (1 - (bar.Low-minPrice)/priceRange))
 		openPos := int(float64(height-1) * (1 - (bar.Open-minPrice)/priceRange))
 		closePos := int(float64(height-1) * (1 - (bar.Close-minPrice)/priceRange))
 
-		// Clamp positions
-		highPos = clamp(highPos, 0, height-1)
-		lowPos = clamp(lowPos, 0, height-1)
-		openPos = clamp(openPos, 0, height-1)
-		closePos = clamp(closePos, 0, height-1)
+		// Determine if bar extends beyond the visible range
+		highAboveRange := highPos < 0
+		lowBelowRange := lowPos > height-1
+
+		// Clamp positions for rendering
+		clampedHighPos := clamp(highPos, 0, height-1)
+		clampedLowPos := clamp(lowPos, 0, height-1)
+		clampedOpenPos := clamp(openPos, 0, height-1)
+		clampedClosePos := clamp(closePos, 0, height-1)
 
 		// Determine bar direction
 		isBullish := bar.Close >= bar.Open
@@ -96,20 +113,31 @@ func renderCandlesWithReferences(bars []indicators.OHLCV, width, height int, _ s
 			barColor = bearishColor
 		}
 
-		// Render wicks
-		for y := minInt(highPos, lowPos); y <= maxInt(highPos, lowPos); y++ {
+		// Render wicks (clamped to visible range)
+		for y := minInt(clampedHighPos, clampedLowPos); y <= maxInt(clampedHighPos, clampedLowPos); y++ {
 			if x < width {
 				grid[y][x] = lipgloss.NewStyle().Foreground(barColor).Render("│")
 			}
 		}
 
-		// Render body
-		bodyTop := minInt(openPos, closePos)
-		bodyBottom := maxInt(openPos, closePos)
+		// Render body (clamped to visible range)
+		bodyTop := minInt(clampedOpenPos, clampedClosePos)
+		bodyBottom := maxInt(clampedOpenPos, clampedClosePos)
 		for y := bodyTop; y <= bodyBottom; y++ {
 			if x < width {
 				grid[y][x] = lipgloss.NewStyle().Foreground(barColor).Render(bodyChar)
 			}
+		}
+
+		// Render clip indicators
+		// ▲ for bars extending above range, ▼ for bars extending below range
+		if highAboveRange && x < width {
+			// Render ▲ at top edge
+			grid[0][x] = lipgloss.NewStyle().Foreground(barColor).Render("▲")
+		}
+		if lowBelowRange && x < width {
+			// Render ▼ at bottom edge
+			grid[height-1][x] = lipgloss.NewStyle().Foreground(barColor).Render("▼")
 		}
 	}
 

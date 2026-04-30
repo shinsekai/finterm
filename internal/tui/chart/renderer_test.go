@@ -2,6 +2,7 @@
 package chart
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -365,5 +366,181 @@ func BenchmarkTPI_Render120x40With110Bars(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		renderTPI(tpi, 120, 12, themeName) // ~30% of 40 height
+	}
+}
+
+// TestRenderCandles_AboveRangeClipIndicator tests that a bar with High above
+// the rendered range shows a ▲ clip indicator at the top edge.
+func TestRenderCandles_AboveRangeClipIndicator(t *testing.T) {
+	width := 10
+	height := 10
+
+	// Create more bars so robust 2% clipping actually clips the outlier
+	bars := []indicators.OHLCV{
+		{Date: time.Now(), Open: 100, High: 1000, Low: 95, Close: 105, Volume: 1000}, // Outlier high
+	}
+	for i := 0; i < 100; i++ {
+		price := 100.0 + float64(i)
+		bars = append(bars, indicators.OHLCV{
+			Date:   time.Now(),
+			Open:   price,
+			High:   price + 2,
+			Low:    price - 2,
+			Close:  price + 1,
+			Volume: 1000,
+		})
+	}
+
+	// Use a clipped range that excludes the outlier
+	minPrice, maxPrice, _ := getPriceRangeRobust(bars, outlierPercentile)
+	output := renderCandlesWithReferencesAndClips(bars, minPrice, maxPrice, width, height, "default", nil)
+
+	if output == "" {
+		t.Fatal("Expected non-empty output")
+	}
+
+	// Check for ▲ in the first line (top edge)
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) == 0 {
+		t.Fatal("Expected at least one line")
+	}
+
+	firstLine := lines[0]
+	hasClipIndicator := strings.Contains(firstLine, "▲")
+	if !hasClipIndicator {
+		t.Errorf("Expected ▲ clip indicator in first line, got '%s'", firstLine)
+	}
+}
+
+// TestRenderCandles_BelowRangeClipIndicator tests that a bar with Low below
+// the rendered range shows a ▼ clip indicator at the bottom edge.
+func TestRenderCandles_BelowRangeClipIndicator(t *testing.T) {
+	width := 10
+	height := 10
+
+	// Create more bars so robust 2% clipping actually clips the outlier
+	bars := []indicators.OHLCV{
+		{Date: time.Now(), Open: 100, High: 110, Low: 5, Close: 105, Volume: 1000}, // Outlier low
+	}
+	for i := 0; i < 100; i++ {
+		price := 100.0 + float64(i)
+		bars = append(bars, indicators.OHLCV{
+			Date:   time.Now(),
+			Open:   price,
+			High:   price + 2,
+			Low:    price - 2,
+			Close:  price + 1,
+			Volume: 1000,
+		})
+	}
+
+	// Use a clipped range that excludes the outlier
+	minPrice, maxPrice, _ := getPriceRangeRobust(bars, outlierPercentile)
+	output := renderCandlesWithReferencesAndClips(bars, minPrice, maxPrice, width, height, "default", nil)
+
+	if output == "" {
+		t.Fatal("Expected non-empty output")
+	}
+
+	// Check for ▼ in the last line (bottom edge)
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) == 0 {
+		t.Fatal("Expected at least one line")
+	}
+
+	lastLine := lines[len(lines)-1]
+	hasClipIndicator := strings.Contains(lastLine, "▼")
+	if !hasClipIndicator {
+		t.Errorf("Expected ▼ clip indicator in last line, got '%s'", lastLine)
+	}
+}
+
+// TestRenderCandles_BothEdgesClippedSameBar tests that a gap-up day with crash
+// (both High above and Low below range) shows both clip indicators.
+func TestRenderCandles_BothEdgesClippedSameBar(t *testing.T) {
+	width := 10
+	height := 10
+
+	// Create more bars so robust 2% clipping actually clips the outlier
+	bars := []indicators.OHLCV{
+		{Date: time.Now(), Open: 100, High: 110, Low: 95, Close: 105, Volume: 1000},
+		{Date: time.Now(), Open: 1000, High: 2000, Low: 50, Close: 500, Volume: 1000}, // Both edges clipped
+	}
+	for i := 0; i < 100; i++ {
+		price := 100.0 + float64(i)
+		bars = append(bars, indicators.OHLCV{
+			Date:   time.Now(),
+			Open:   price,
+			High:   price + 2,
+			Low:    price - 2,
+			Close:  price + 1,
+			Volume: 1000,
+		})
+	}
+
+	// Use a clipped range that excludes the outlier
+	minPrice, maxPrice, _ := getPriceRangeRobust(bars, outlierPercentile)
+	output := renderCandlesWithReferencesAndClips(bars, minPrice, maxPrice, width, height, "default", nil)
+
+	if output == "" {
+		t.Fatal("Expected non-empty output")
+	}
+
+	// Check for both clip indicators
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) == 0 {
+		t.Fatal("Expected at least one line")
+	}
+
+	firstLine := lines[0]
+	lastLine := lines[len(lines)-1]
+
+	hasTopClip := strings.Contains(firstLine, "▲")
+	hasBottomClip := strings.Contains(lastLine, "▼")
+
+	if !hasTopClip {
+		t.Errorf("Expected ▲ clip indicator in first line, got '%s'", firstLine)
+	}
+	if !hasBottomClip {
+		t.Errorf("Expected ▼ clip indicator in last line, got '%s'", lastLine)
+	}
+}
+
+// TestRenderCandles_NoClipIndicatorWhenInRange tests that bars entirely
+// within the rendered range do not show clip indicators.
+func TestRenderCandles_NoClipIndicatorWhenInRange(t *testing.T) {
+	width := 10
+	height := 10
+
+	bars := []indicators.OHLCV{
+		{Date: time.Now(), Open: 100, High: 110, Low: 95, Close: 105, Volume: 1000},
+		{Date: time.Now(), Open: 105, High: 115, Low: 100, Close: 110, Volume: 1000},
+	}
+
+	// Use a range that includes all bars
+	minPrice, maxPrice, _ := getPriceRangeRobust(bars, 0)
+	output := renderCandlesWithReferencesAndClips(bars, minPrice, maxPrice, width, height, "default", nil)
+
+	if output == "" {
+		t.Fatal("Expected non-empty output")
+	}
+
+	// Check for absence of clip indicators
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) == 0 {
+		t.Fatal("Expected at least one line")
+	}
+
+	firstLine := lines[0]
+	lastLine := lines[len(lines)-1]
+
+	hasTopClip := strings.Contains(firstLine, "▲")
+	hasBottomClip := strings.Contains(lastLine, "▼")
+
+	if hasTopClip {
+		t.Errorf("Did not expect ▲ clip indicator in first line, got '%s'", firstLine)
+	}
+	if hasBottomClip {
+		t.Errorf("Did not expect ▼ clip indicator in last line, got '%s'", lastLine)
 	}
 }

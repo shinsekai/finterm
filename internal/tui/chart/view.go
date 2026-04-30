@@ -3,6 +3,7 @@ package chart
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
@@ -13,8 +14,17 @@ import (
 func renderView(m *Model) string {
 	var builder strings.Builder
 
+	// Calculate clipped count for header chip
+	clippedCount := 0
+	if m.state == StateLoaded && len(m.data.Bars) > 0 {
+		visibleBars := m.getVisibleBars()
+		if len(visibleBars) > 0 {
+			_, _, clippedCount = getPriceRangeRobust(visibleBars, outlierPercentile)
+		}
+	}
+
 	// Render header with status chip
-	builder.WriteString(m.renderHeader())
+	builder.WriteString(m.renderHeader(clippedCount))
 	builder.WriteString("\n")
 
 	// Render chart content based on state
@@ -35,7 +45,8 @@ func renderView(m *Model) string {
 }
 
 // renderHeader renders the status chip at the top.
-func (m *Model) renderHeader() string {
+// clippedCount is the number of bars clipped from the visible range.
+func (m *Model) renderHeader(clippedCount int) string {
 	symbol := m.symbol
 	if symbol == "" {
 		symbol = "N/A"
@@ -47,8 +58,14 @@ func (m *Model) renderHeader() string {
 		barCloseStr = m.barClose.Format("2006-01-02")
 	}
 
-	chip := fmt.Sprintf("─ %s · %s · window %d · bar-close: %s ─",
+	chip := fmt.Sprintf("─ %s · %s · window %d · bar-close: %s",
 		symbol, timeframeStr, m.window, barCloseStr)
+
+	// Add clip chip if any bars were clipped
+	if clippedCount > 0 {
+		chip += fmt.Sprintf(" · (%d bars clipped)", clippedCount)
+	}
+	chip += " ─"
 
 	return chip
 }
@@ -85,9 +102,6 @@ func (m *Model) renderChart() string {
 		return "No data to display in current view."
 	}
 
-	// Calculate price range
-	minPrice, maxPrice := getPriceRange(visibleBars)
-
 	// Get current price (last visible bar's close)
 	var currentPrice float64
 	if len(visibleBars) > 0 {
@@ -101,8 +115,8 @@ func (m *Model) renderChart() string {
 		currentTPI = m.data.TPI[tpiIndex]
 	}
 
-	// Render price pane
-	pricePane := renderPricePane(visibleBars, minPrice, maxPrice, currentPrice, m.width, priceHeight)
+	// Render price pane (includes robust price range with outlier clipping)
+	pricePane, _ := renderPricePane(visibleBars, currentPrice, m.width, priceHeight)
 
 	// Render TPI pane
 	tpiPane := renderTPIPane(visibleBars, m.data.TPI, currentTPI, m.offset, m.width, tpiHeight)
@@ -137,6 +151,10 @@ func (m *Model) getVisibleBars() []indicators.OHLCV {
 }
 
 // getPriceRange returns the min and max price for the given bars.
+//
+// Deprecated: Use getPriceRangeRobust for outlier handling.
+//
+//nolint:unused // Kept for potential future use
 func getPriceRange(bars []indicators.OHLCV) (float64, float64) {
 	if len(bars) == 0 {
 		return 0, 0
@@ -157,18 +175,85 @@ func getPriceRange(bars []indicators.OHLCV) (float64, float64) {
 	return minPrice, maxPrice
 }
 
-// renderPricePane renders the price candlestick pane with Y-axis labels.
-func renderPricePane(bars []indicators.OHLCV, minPrice, maxPrice, currentPrice float64, width, height int) string {
-	if height <= 0 {
-		return ""
+// outlierPercentile is the default percentile to clip from both ends.
+// Clip top and bottom 2% of values to handle outliers.
+const outlierPercentile = 0.02
+
+// getPriceRangeRobust computes a robust price range by clipping outliers.
+// It computes the percentile and 1-percentile quantiles of all Low and High values,
+// and always includes the most recent bar's High and Low in the returned range.
+// Returns (clippedMin, clippedMax, clippedCount) where clippedCount is the number
+// of bars that had High or Low outside the clipped range.
+func getPriceRangeRobust(bars []indicators.OHLCV, percentile float64) (float64, float64, int) {
+	if len(bars) == 0 {
+		return 0, 0, 0
 	}
+
+	// Collect all Low and High values
+	allPrices := make([]float64, 0, len(bars)*2)
+	for _, bar := range bars {
+		allPrices = append(allPrices, bar.Low, bar.High)
+	}
+
+	// Sort for percentile computation
+	sort.Float64s(allPrices)
+
+	// Compute quantile indices
+	lowerIdx := int(float64(len(allPrices)) * percentile)
+	upperIdx := int(float64(len(allPrices)) * (1 - percentile))
+
+	// Clamp indices to valid range
+	if lowerIdx < 0 {
+		lowerIdx = 0
+	}
+	if upperIdx >= len(allPrices) {
+		upperIdx = len(allPrices) - 1
+	}
+	if lowerIdx >= upperIdx {
+		lowerIdx = 0
+		upperIdx = len(allPrices) - 1
+	}
+
+	clippedMin := allPrices[lowerIdx]
+	clippedMax := allPrices[upperIdx]
+
+	// Always include the latest bar (the most recent closed bar must always be visible)
+	latestBar := bars[len(bars)-1]
+	if latestBar.Low < clippedMin {
+		clippedMin = latestBar.Low
+	}
+	if latestBar.High > clippedMax {
+		clippedMax = latestBar.High
+	}
+
+	// Count how many bars are clipped (have High or Low outside the range)
+	clippedCount := 0
+	for _, bar := range bars {
+		if bar.Low < clippedMin || bar.High > clippedMax {
+			clippedCount++
+		}
+	}
+
+	return clippedMin, clippedMax, clippedCount
+}
+
+// renderPricePane renders the price candlestick pane with Y-axis labels.
+// Uses robust price range with outlier clipping and returns the rendered string
+// along with the count of clipped bars for the chip display.
+func renderPricePane(bars []indicators.OHLCV, currentPrice float64, width, height int) (string, int) {
+	if height <= 0 {
+		return "", 0
+	}
+
+	// Calculate robust price range with outlier clipping
+	minPrice, maxPrice, clippedCount := getPriceRangeRobust(bars, outlierPercentile)
 
 	// Calculate chart width (subtract space for Y-axis labels)
 	gutterWidth := 10  // 9 for price labels + 1 space
 	currentWidth := 10 // 9 for current price + 1 space
 	chartWidth := width - gutterWidth - currentWidth
 	if chartWidth <= 0 {
-		return fmt.Sprintf("Width %d too small for price pane", width)
+		return fmt.Sprintf("Width %d too small for price pane", width), clippedCount
 	}
 
 	// Calculate quartile prices for reference lines
@@ -179,9 +264,9 @@ func renderPricePane(bars []indicators.OHLCV, minPrice, maxPrice, currentPrice f
 	upperQuartilePrice := maxPrice - (priceRange * 0.25)
 	lowerQuartilePrice := maxPrice - (priceRange * 0.75)
 
-	// Render the candlestick chart with reference lines
+	// Render the candlestick chart with reference lines and clip indicators
 	references := []float64{upperQuartilePrice, lowerQuartilePrice}
-	chart := renderCandlesWithReferences(bars, chartWidth, height, "default", references)
+	chart := renderCandlesWithReferencesAndClips(bars, minPrice, maxPrice, chartWidth, height, "default", references)
 
 	// Split chart into lines
 	chartLines := strings.Split(chart, "\n")
@@ -230,7 +315,7 @@ func renderPricePane(bars []indicators.OHLCV, minPrice, maxPrice, currentPrice f
 		result.WriteString("\n")
 	}
 
-	return result.String()
+	return result.String(), clippedCount
 }
 
 // renderTPIPane renders the TPI line pane with Y-axis labels.

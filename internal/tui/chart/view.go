@@ -171,27 +171,42 @@ func renderPricePane(bars []indicators.OHLCV, minPrice, maxPrice, currentPrice f
 		return fmt.Sprintf("Width %d too small for price pane", width)
 	}
 
-	// Render the candlestick chart
-	chart := renderCandles(bars, chartWidth, height, "default")
+	// Calculate quartile prices for reference lines
+	priceRange := maxPrice - minPrice
+	if priceRange == 0 {
+		priceRange = 1
+	}
+	upperQuartilePrice := maxPrice - (priceRange * 0.25)
+	lowerQuartilePrice := maxPrice - (priceRange * 0.75)
+
+	// Render the candlestick chart with reference lines
+	references := []float64{upperQuartilePrice, lowerQuartilePrice}
+	chart := renderCandlesWithReferences(bars, chartWidth, height, "default", references)
 
 	// Split chart into lines
 	chartLines := strings.Split(chart, "\n")
 
-	// Prepare Y-axis labels (max, min)
+	// Prepare Y-axis labels (max, upper Q, lower Q, min)
 	maxLabel := fmt.Sprintf("%9.2f", maxPrice)
+	upperQuartileLabel := fmt.Sprintf("%9.2f", upperQuartilePrice)
+	lowerQuartileLabel := fmt.Sprintf("%9.2f", lowerQuartilePrice)
 	minLabel := fmt.Sprintf("%9.2f", minPrice)
 
-	// Prepare current price label
+	// Prepare current price label (top-right)
 	currentLabel := fmt.Sprintf("%9.2f", currentPrice)
 
 	// Build result with Y-axis gutter, chart, and current value
 	var result strings.Builder
 	for i := 0; i < height; i++ {
-		// Y-axis label on left
+		// Y-axis label on left (max, upper Q, lower Q, min)
 		//nolint:staticcheck // QF1002: tagged switch not applicable for variable comparisons
 		switch {
 		case i == 0:
 			result.WriteString(maxLabel)
+		case i == height/4:
+			result.WriteString(upperQuartileLabel)
+		case i == (height*3)/4:
+			result.WriteString(lowerQuartileLabel)
 		case i == height-1:
 			result.WriteString(minLabel)
 		default:
@@ -206,8 +221,8 @@ func renderPricePane(bars []indicators.OHLCV, minPrice, maxPrice, currentPrice f
 			result.WriteString(strings.Repeat(" ", chartWidth))
 		}
 
-		// Current value label on right
-		if i == height/2 {
+		// Current value label on right (top row only)
+		if i == 0 {
 			result.WriteString(" ")
 			result.WriteString(currentLabel)
 		}

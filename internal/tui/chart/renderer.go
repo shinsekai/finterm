@@ -11,6 +11,12 @@ import (
 
 // renderCandles renders cell-based candlesticks for the price pane.
 func renderCandles(bars []indicators.OHLCV, width, height int, _ string) string {
+	return renderCandlesWithReferences(bars, width, height, "", nil)
+}
+
+// renderCandlesWithReferences renders cell-based candlesticks with optional reference lines.
+// Reference lines are drawn first, then candles overwrite them where they overlap.
+func renderCandlesWithReferences(bars []indicators.OHLCV, width, height int, _ string, references []float64) string {
 	if len(bars) == 0 || height <= 0 {
 		return ""
 	}
@@ -28,6 +34,19 @@ func renderCandles(bars []indicators.OHLCV, width, height int, _ string) string 
 		grid[i] = make([]string, width)
 		for j := range grid[i] {
 			grid[i][j] = " "
+		}
+	}
+
+	// Render reference lines first (so candles overwrite them where they overlap)
+	mutedColor := lipgloss.Color("#6272A4")
+	for _, refPrice := range references {
+		refPos := int(float64(height-1) * (1 - (refPrice-minPrice)/priceRange))
+		refPos = clamp(refPos, 0, height-1)
+		// Draw dashed reference line: · · · · · pattern
+		for x := 0; x < width; x++ {
+			if x%2 == 0 {
+				grid[refPos][x] = lipgloss.NewStyle().Foreground(mutedColor).Render("·")
+			}
 		}
 	}
 

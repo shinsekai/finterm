@@ -219,15 +219,15 @@ func renderPricePane(bars []indicators.OHLCV, minPrice, maxPrice, currentPrice f
 }
 
 // renderTPIPane renders the TPI line pane with Y-axis labels.
-func renderTPIPane(bars []indicators.OHLCV, tpi []float64, currentTPI float64, offset int, width, height int) string {
+func renderTPIPane(bars []indicators.OHLCV, tpi []float64, _ float64, offset int, width, height int) string {
 	if height <= 0 {
 		return ""
 	}
 
 	// Calculate chart width (subtract space for Y-axis labels)
-	gutterWidth := 5  // 4 for TPI labels + 1 space
-	currentWidth := 6 // 5 for current TPI + 1 space
-	chartWidth := width - gutterWidth - currentWidth
+	gutterWidth := 5 // 4 for TPI labels + 1 space
+	rightWidth := 5  // 4 for axis bound + 1 space
+	chartWidth := width - gutterWidth - rightWidth
 	if chartWidth <= 0 {
 		return fmt.Sprintf("Width %d too small for TPI pane", width)
 	}
@@ -246,18 +246,25 @@ func renderTPIPane(bars []indicators.OHLCV, tpi []float64, currentTPI float64, o
 	// Render the TPI chart
 	chart := renderTPI(visibleTPI, chartWidth, height, "default")
 
-	// Split chart into lines
+	// Split chart into lines and validate count
 	chartLines := strings.Split(chart, "\n")
+	// Defensive: ensure chartLines has exactly height lines
+	if len(chartLines) < height {
+		// Pad with empty lines if too few
+		for len(chartLines) < height {
+			chartLines = append(chartLines, "")
+		}
+	} else if len(chartLines) > height {
+		// Truncate if too many (shouldn't happen, but defensive)
+		chartLines = chartLines[:height]
+	}
 
 	// Prepare Y-axis labels (+1.0, 0.0, -1.0)
 	topLabel := "+1.0"
 	midLabel := " 0.0"
 	bottomLabel := "-1.0"
 
-	// Prepare current TPI label
-	currentLabel := fmt.Sprintf("%+5.2f", currentTPI)
-
-	// Build result with Y-axis gutter, chart, and current value
+	// Build result with Y-axis gutter, chart, and right-axis bound
 	var result strings.Builder
 	for i := 0; i < height; i++ {
 		// Y-axis label on left
@@ -275,16 +282,12 @@ func renderTPIPane(bars []indicators.OHLCV, tpi []float64, currentTPI float64, o
 		result.WriteString(" ")
 
 		// Chart content
-		if i < len(chartLines) {
-			result.WriteString(chartLines[i])
-		} else {
-			result.WriteString(strings.Repeat(" ", chartWidth))
-		}
+		result.WriteString(chartLines[i])
 
-		// Current value label on right
-		if i == height/2 {
+		// Right-axis bound label (symmetric with left edge)
+		if i == 0 {
 			result.WriteString(" ")
-			result.WriteString(currentLabel)
+			result.WriteString(topLabel)
 		}
 
 		result.WriteString("\n")

@@ -46,28 +46,48 @@ func renderView(m *Model) string {
 
 // renderHeader renders the status chip at the top.
 // clippedCount is the number of bars clipped from the visible range.
+//
+// Chosen format (Option A): Simple cleanup with plain text.
+// Format: "SYMBOL  timeframe · window N · YYYY-MM-DD"
+// Example: "AAPL  daily · window 110 · 2026-04-27"
+//
+// This format:
+// - Removes leading/trailing dashes that were visually noisy
+// - Drops the "bar-close:" prefix (the date format is self-explanatory)
+// - Uses "(no symbol selected)" instead of "N/A" for empty symbols
+// - Keeps the clean two-space separator between symbol and timeframe
+// - Maintains consistent visual weight across all theme modes
+// Note: Theme styling support can be added in the future by passing
+// *tui.Theme and using lipgloss.Style() for colors.
 func (m *Model) renderHeader(clippedCount int) string {
 	symbol := m.symbol
 	if symbol == "" {
-		symbol = "N/A"
+		symbol = "(no symbol selected)"
 	}
 
 	timeframeStr := m.timeframe.String()
-	barCloseStr := "N/A"
+	barCloseStr := ""
 	if !m.barClose.IsZero() {
 		barCloseStr = m.barClose.Format("2006-01-02")
 	}
 
-	chip := fmt.Sprintf("─ %s · %s · window %d · bar-close: %s",
-		symbol, timeframeStr, m.window, barCloseStr)
+	var builder strings.Builder
+	builder.WriteString(symbol)
+	builder.WriteString("  ")
+	builder.WriteString(timeframeStr)
+	fmt.Fprintf(&builder, " · window %d", m.window)
+
+	if barCloseStr != "" {
+		builder.WriteString(" · ")
+		builder.WriteString(barCloseStr)
+	}
 
 	// Add clip chip if any bars were clipped
 	if clippedCount > 0 {
-		chip += fmt.Sprintf(" · (%d bars clipped)", clippedCount)
+		fmt.Fprintf(&builder, " · (%d bars clipped)", clippedCount)
 	}
-	chip += " ─"
 
-	return chip
+	return builder.String()
 }
 
 // renderLoading renders a loading indicator.

@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Loading state: `⋯` spinner; API failure: `markets: offline` in muted color
   - Colorblind theme uses glyph differentiation (`●` vs `○`) rather than hue
 
+## [0.8.1] — 2026-05-01
+
+### Fixed
+- TPI pane axis labels and bounds — fixed bottom label visibility and axis number formatting
+- Price pane consistent Y-axis grammar — unified axis label format across all panes
+- Outlier-resilient price range — added robust range calculation with outlier clipping and clip indicators
+- Candle width consistency at all zoom levels — fixed doji detection and ensured uniform candle widths
+- Header chip cleanup — cleaned up and standardized header chip formatting
+
 ## [0.7.1] — 2026-04-23
 
 ### Fixed

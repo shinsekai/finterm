@@ -401,7 +401,7 @@ func TestPricePane_QuartileLabelsCorrectlyComputed(t *testing.T) {
 	}
 }
 
-// TestPricePane_CurrentPriceTopRight tests that current price label appears
+// TestPricePane_CurrentPriceTopRight tests that the current price label appears
 // at the top-right of the pane (row 0), not in the middle.
 func TestPricePane_CurrentPriceTopRight(t *testing.T) {
 	bars := []indicators.OHLCV{
@@ -460,7 +460,7 @@ func TestPricePane_CandlesWinOverReferenceLines(t *testing.T) {
 	}
 }
 
-// TestPricePane_LayoutIdenticalAcrossTickers tests that price pane layout is
+// TestPricePane_LayoutIdenticalAcrossTickers tests that the price pane layout is
 // identical across all five test tickers (QQQ, SPY, BTC, ETH, AAPL).
 func TestPricePane_LayoutIdenticalAcrossTickers(t *testing.T) {
 	testCases := []struct {
@@ -576,7 +576,7 @@ func TestPriceRangeRobust_OneTopOutlier(t *testing.T) {
 	if max > 200 {
 		t.Errorf("Expected max < 200 (clipped), got %f", max)
 	}
-	// Min should be around the normal bars' low
+	// Min should be around normal bars' low
 	if min < 90 || min > 110 {
 		t.Errorf("Expected min around 90-110, got %f", min)
 	}
@@ -610,7 +610,7 @@ func TestPriceRangeRobust_OneBottomOutlier(t *testing.T) {
 	if min < 50 {
 		t.Errorf("Expected min > 50 (clipped), got %f", min)
 	}
-	// Max should be around the normal bars' high
+	// Max should be around normal bars' high
 	if max < 145 || max > 155 {
 		t.Errorf("Expected max around 145-155, got %f", max)
 	}
@@ -667,7 +667,7 @@ func TestPriceRangeRobust_AllSameValueDegenerate(t *testing.T) {
 	}
 }
 
-// TestPriceRangeRobust_TwoBarsOnly tests edge case with only two bars.
+// TestPriceRangeRobust_TwoBarsOnly tests the edge case with only two bars.
 func TestPriceRangeRobust_TwoBarsOnly(t *testing.T) {
 	bars := []indicators.OHLCV{
 		{Date: now(), Open: 100, High: 110, Low: 95, Close: 105, Volume: 1000},
@@ -687,7 +687,7 @@ func TestPriceRangeRobust_TwoBarsOnly(t *testing.T) {
 	}
 }
 
-// TestPriceRangeRobust_110BarsWithOneOutlier tests the specific case
+// TestPriceRangeRobust_110BarsWithOneOutlier tests a specific case
 // from the issue: 110 bars with one outlier at 5× the median range.
 func TestPriceRangeRobust_110BarsWithOneOutlier(t *testing.T) {
 	bars := make([]indicators.OHLCV, 110)
@@ -732,7 +732,7 @@ func TestPriceRangeRobust_110BarsWithOneOutlier(t *testing.T) {
 	if max > 200 {
 		t.Errorf("Expected max < 200 after clipping outlier, got %f", max)
 	}
-	// Min should be around the normal bars' low
+	// Min should be around normal bars' low
 	if min < 90 || min > 110 {
 		t.Errorf("Expected min around 90-110, got %f", min)
 	}
@@ -876,5 +876,114 @@ func TestBTCFixture_RendersInExpectedRange(t *testing.T) {
 				t.Errorf("Expected Y-axis label with 5+ digits for BTC, got '%s'", maxLabel)
 			}
 		}
+	}
+}
+
+// TestRenderHeader_NoTrailingDash tests that the header does not have
+// a trailing dash character after the date.
+func TestRenderHeader_NoTrailingDash(t *testing.T) {
+	m := &Model{
+		symbol:    "AAPL",
+		timeframe: TimeframeDaily,
+		window:    110,
+		barClose:  time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC),
+	}
+
+	header := m.renderHeader(0)
+
+	// Header should not end with a dash
+	if strings.HasSuffix(header, "─") {
+		t.Errorf("Header should not end with dash, got '%s'", header)
+	}
+}
+
+// TestRenderHeader_NoLeadingDash tests that the header does not have
+// a leading dash character at the beginning.
+func TestRenderHeader_NoLeadingDash(t *testing.T) {
+	m := &Model{
+		symbol:    "AAPL",
+		timeframe: TimeframeDaily,
+		window:    110,
+		barClose:  time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC),
+	}
+
+	header := m.renderHeader(0)
+
+	// Header should not start with a dash
+	if strings.HasPrefix(header, "─") {
+		t.Errorf("Header should not start with dash, got '%s'", header)
+	}
+}
+
+// TestRenderHeader_EmptySymbolFallback tests that empty symbol
+// displays "(no symbol selected)" instead of "N/A".
+func TestRenderHeader_EmptySymbolFallback(t *testing.T) {
+	m := &Model{
+		symbol:    "",
+		timeframe: TimeframeDaily,
+		window:    110,
+		barClose:  time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC),
+	}
+
+	header := m.renderHeader(0)
+
+	// Header should start with "(no symbol selected)"
+	if !strings.HasPrefix(header, "(no symbol selected)") {
+		t.Errorf("Header should start with '(no symbol selected)', got '%s'", header)
+	}
+
+	// Header should not contain "N/A"
+	if strings.Contains(header, "N/A") {
+		t.Errorf("Header should not contain 'N/A', got '%s'", header)
+	}
+}
+
+// TestRenderHeader_DateFormatYYYYMMDD tests that the date is formatted
+// as YYYY-MM-DD (ISO 8601 date format).
+func TestRenderHeader_DateFormatYYYYMMDD(t *testing.T) {
+	m := &Model{
+		symbol:    "AAPL",
+		timeframe: TimeframeDaily,
+		window:    110,
+		barClose:  time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC),
+	}
+
+	header := m.renderHeader(0)
+
+	// Header should contain date in YYYY-MM-DD format
+	if !strings.Contains(header, "2026-04-27") {
+		t.Errorf("Header should contain date '2026-04-27', got '%s'", header)
+	}
+
+	// Header should not contain "bar-close:" prefix
+	if strings.Contains(header, "bar-close:") {
+		t.Errorf("Header should not contain 'bar-close:' prefix, got '%s'", header)
+	}
+}
+
+// TestRenderHeader_FollowsThemeColors tests that the header format
+// is consistent and readable (currently using plain text without
+// lipgloss styling since chart.Model doesn't have theme access).
+// This is a placeholder for future theme integration.
+func TestRenderHeader_FollowsThemeColors(t *testing.T) {
+	m := &Model{
+		symbol:    "AAPL",
+		timeframe: TimeframeDaily,
+		window:    110,
+		barClose:  time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC),
+	}
+
+	header := m.renderHeader(0)
+
+	// Header should not be empty
+	if header == "" {
+		t.Error("Header should not be empty")
+	}
+
+	// Header should have a simple, clean format
+	// Using basic ASCII characters for compatibility
+	expectedPattern := `AAPL  daily · window 110 · 2026-04-27`
+	if header != expectedPattern {
+		t.Errorf("Header format should be '%s', got '%s'", expectedPattern, header)
 	}
 }

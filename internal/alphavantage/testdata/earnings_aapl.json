@@ -1,0 +1,55 @@
+{
+    "symbol": "AAPL",
+    "annualEarnings": [
+        {
+            "fiscalDateEnding": "2023-09-30",
+            "reportedEPS": "6.16"
+        },
+        {
+            "fiscalDateEnding": "2022-09-24",
+            "reportedEPS": "6.05"
+        },
+        {
+            "fiscalDateEnding": "2021-09-25",
+            "reportedEPS": "5.67"
+        },
+        {
+            "fiscalDateEnding": "2020-09-26",
+            "reportedEPS": "3.28"
+        }
+    ],
+    "quarterlyEarnings": [
+        {
+            "fiscalDateEnding": "2023-12-30",
+            "reportedDate": "2024-02-01",
+            "reportedEPS": "2.18",
+            "estimatedEPS": "2.10",
+            "surprise": "0.08",
+            "surprisePercentage": "3.8095"
+        },
+        {
+            "fiscalDateEnding": "2023-09-30",
+            "reportedDate": "2023-11-02",
+            "reportedEPS": "1.46",
+            "estimatedEPS": "1.39",
+            "surprise": "0.07",
+            "surprisePercentage": "5.0359"
+        },
+        {
+            "fiscalDateEnding": "2023-06-30",
+            "reportedDate": "2023-08-03",
+            "reportedEPS": "1.26",
+            "estimatedEPS": "1.19",
+            "surprise": "0.07",
+            "surprisePercentage": "5.8823"
+        },
+        {
+            "fiscalDateEnding": "2023-03-31",
+            "reportedDate": "2023-05-04",
+            "reportedEPS": "1.52",
+            "estimatedEPS": "1.43",
+            "surprise": "0.09",
+            "surprisePercentage": "6.2937"
+        }
+    ]
+}

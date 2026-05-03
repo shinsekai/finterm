@@ -38,6 +38,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Loading state: `⋯` spinner; API failure: `markets: offline` in muted color
   - Colorblind theme uses glyph differentiation (`●` vs `○`) rather than hue
 
+## [0.9.0] — 2026-05-03
+
+### Added
+- Commodities tab (tab `6`) with multi-asset dashboard
+  - Gold (XAU/USD) and Silver (XAG/USD) real-time spot prices
+  - Crude Oil (WTI), Natural Gas, and Copper futures pricing
+  - Dual-panel layout with recent price history and key statistics
+  - Keyboard navigation: `j`/`k` for asset cycle, `r` for refresh
+  - Asset type icons: 🔆 Gold, 🔘 Silver, 🛢️ WTI, ⛽ NatGas, 🔌 Copper
+- Fundamentals panel in Quote view (toggle with `F` key)
+  - Company overview: sector, industry, market cap, P/E ratio, 52-week range
+  - Earnings data: quarterly EPS, annual EPS, fiscal date, report date
+  - Clean card-based layout matching existing Quote view aesthetic
+  - Loading state with spinner, graceful error handling
+- Alpha Vantage OVERVIEW endpoint support
+  - `GetOverview()` client method returning company fundamental data
+  - Comprehensive response covering sector, industry, market cap, valuation ratios, dividend info
+- Alpha Vantage EARNINGS endpoint support
+  - `GetEarnings()` client method returning quarterly and annual earnings
+  - Fisical date, report date, estimated vs actual EPS, and surprise percentage
+- Alpha Vantage commodity endpoints with interval validation
+  - `GetCommodity()` client method for spot prices (Gold, Silver, etc.)
+  - `GetCommodityFutures()` for futures contracts (WTI, Natural Gas, Copper)
+  - Interval validation: commodity futures support 1min, 5min, 15min, 30min, 60min, daily, weekly, monthly
+  - Asset mapping: XAUUSD→Gold, XAGUSD→Silver, WTI→Crude Oil, NATURAL_GAS→Natural Gas, COPPER→Copper
+
 ## [0.8.1] — 2026-05-01
 
 ### Fixed

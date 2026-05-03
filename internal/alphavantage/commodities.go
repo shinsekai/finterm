@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // CommodityFunction represents an Alpha Vantage commodity data function.
@@ -54,6 +55,38 @@ var validIntervals = map[CommodityFunction][]string{
 
 // ErrUnsupportedInterval is returned when an interval is not supported for a given commodity function.
 var ErrUnsupportedInterval = fmt.Errorf("unsupported interval for this commodity")
+
+// symbolToFunction maps commodity symbols to their corresponding CommodityFunction values.
+// This provides a case-insensitive lookup for commodity symbols.
+var symbolToFunction = map[string]CommodityFunction{
+	"WTI":             CommodityFunctionWTI,
+	"BRENT":           CommodityFunctionBrent,
+	"NATURAL_GAS":     CommodityFunctionNaturalGas,
+	"COPPER":          CommodityFunctionCopper,
+	"ALUMINUM":        CommodityFunctionAluminum,
+	"WHEAT":           CommodityFunctionWheat,
+	"CORN":            CommodityFunctionCorn,
+	"COTTON":          CommodityFunctionCotton,
+	"SUGAR":           CommodityFunctionSugar,
+	"COFFEE":          CommodityFunctionCoffee,
+	"ALL_COMMODITIES": CommodityFunctionAllCommodities,
+}
+
+// CommodityFunctionFromSymbol maps a commodity symbol to its CommodityFunction.
+// Returns the function and true if found, false otherwise.
+// Lookup is case-insensitive (e.g., "wti", "WTI", "Wti" all return CommodityFunctionWTI).
+func CommodityFunctionFromSymbol(symbol string) (CommodityFunction, bool) {
+	upper := strings.ToUpper(symbol)
+	fn, ok := symbolToFunction[upper]
+	return fn, ok
+}
+
+// CommoditySupportedIntervals returns the supported intervals for a given CommodityFunction.
+// Returns the slice of intervals and true if the function is known, false otherwise.
+func CommoditySupportedIntervals(fn CommodityFunction) ([]string, bool) {
+	intervals, ok := validIntervals[fn]
+	return intervals, ok
+}
 
 // GetCommodity fetches commodity price data for the specified function and interval.
 // The interval parameter can be "daily", "weekly", "monthly", "quarterly", or "annual",

@@ -371,8 +371,19 @@ func (v *View) renderQuoteCards() string {
 
 	priceCard := v.renderPriceCard(quote)
 
-	// No indicators available — render the price card alone.
+	// No indicators available
 	if indicators == nil {
+		// Show muted message for commodities
+		if v.model.IsCommodity() {
+			indicatorsCard := v.renderCommodityIndicatorsMessage()
+			// Prefer side-by-side with a 2-char gutter.
+			cards := lipgloss.JoinHorizontal(lipgloss.Top, priceCard, "  ", indicatorsCard)
+			// Fallback: if the joined width exceeds the terminal width, stack vertically.
+			if lipgloss.Width(cards) > v.model.GetWidth() {
+				return lipgloss.JoinVertical(lipgloss.Left, priceCard, "", indicatorsCard)
+			}
+			return cards
+		}
 		return priceCard
 	}
 
@@ -501,6 +512,27 @@ func (v *View) renderDayRangeBar(price float64, lowStr, highStr string) string {
 	content.WriteString(v.theme.Muted().Render(fmt.Sprintf("High $%.2f", highVal)))
 
 	return content.String()
+}
+
+// renderCommodityIndicatorsMessage renders a muted message for commodities
+// indicating that trend signals are not available.
+func (v *View) renderCommodityIndicatorsMessage() string {
+	var content strings.Builder
+
+	// Header
+	content.WriteString(v.theme.CardHeader().Render("Technical Indicators"))
+	content.WriteString("\n")
+
+	// Divider
+	boxWidth := v.calculateBoxWidth()
+	content.WriteString(v.theme.Divider().Render(strings.Repeat("─", boxWidth)))
+	content.WriteString("\n\n")
+
+	// Muted message
+	content.WriteString(v.theme.Muted().Render("signals unavailable for commodities"))
+	content.WriteString("\n")
+
+	return v.theme.Card().Render(content.String())
 }
 
 // renderIndicatorsCard renders the technical indicators in a card.

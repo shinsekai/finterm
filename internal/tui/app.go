@@ -15,6 +15,7 @@ import (
 	"github.com/shinsekai/finterm/internal/config"
 	"github.com/shinsekai/finterm/internal/domain/trend/indicators"
 	"github.com/shinsekai/finterm/internal/tui/chart"
+	"github.com/shinsekai/finterm/internal/tui/commodities"
 	"github.com/shinsekai/finterm/internal/tui/components"
 	"github.com/shinsekai/finterm/internal/tui/macro"
 	"github.com/shinsekai/finterm/internal/tui/news"
@@ -29,6 +30,7 @@ const (
 	tabMacro
 	tabNews
 	tabChart
+	tabCommodities
 	numTabs
 
 	// cacheKeyMarketStatus is the cache key for market status data.
@@ -37,7 +39,7 @@ const (
 
 // globalBindings are keyboard bindings available in all views.
 var globalBindings = []components.Binding{
-	{Key: "1-5", Description: "Switch tab"},
+	{Key: "1-6", Description: "Switch tab"},
 	{Key: "Tab", Description: "Cycle tabs"},
 	{Key: "r", Description: "Refresh"},
 	{Key: "Ctrl+P", Description: "Command palette"},
@@ -148,6 +150,10 @@ func NewApp(
 	}
 	chartModel = chartModel.Configure(context.Background(), trendEngine, avClient, cacheStore, watchlist, detector, cfg, cryptoFetcher)
 
+	// Create and configure commodities model
+	commoditiesModel := commodities.NewModel()
+	commoditiesModel.Configure(context.Background(), avClient, cfg.Commodities.Watchlist, cfg.Commodities.Interval, cacheStore)
+
 	// Create command palette with default commands
 	cmdPalette := palettepkg.New(palettepkg.BuildDefaultCommands(watchlist))
 	// Apply theme colors to palette
@@ -168,6 +174,7 @@ func NewApp(
 			{name: "Macro", model: macroModel},
 			{name: "News", model: newsModel},
 			{name: "Chart", model: chartModel},
+			{name: "Commodities", model: commoditiesModel},
 		},
 		activeTab:           tabTrend,
 		helpOverlay:         nil,
@@ -501,6 +508,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "5":
 			m.setActiveTab(tabChart)
 			return m, m.refreshActiveTab()
+
+		case "6":
+			m.setActiveTab(tabCommodities)
+			return m, m.refreshActiveTab()
 		}
 
 	case tea.KeyTab:
@@ -514,7 +525,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // renderTabBar renders the tab navigation bar.
 func (m Model) renderTabBar() string {
-	tabIcons := []string{"◆", "◈", "◇", "◉", "⬡"}
+	tabIcons := []string{"◆", "◈", "◇", "◉", "⬡", "◈"}
 	var tabs []string
 	for i, tab := range m.tabs {
 		style := m.theme.Tab()
@@ -527,7 +538,7 @@ func (m Model) renderTabBar() string {
 
 	// Join tabs with subtle separator
 	divider := m.theme.Divider().Render("│")
-	tabRow := lipgloss.JoinHorizontal(lipgloss.Top, tabs[0], divider, tabs[1], divider, tabs[2], divider, tabs[3], divider, tabs[4])
+	tabRow := lipgloss.JoinHorizontal(lipgloss.Top, tabs[0], divider, tabs[1], divider, tabs[2], divider, tabs[3], divider, tabs[4], divider, tabs[5])
 
 	// Add full-width bottom accent line
 	accentLine := m.theme.Divider().Render(strings.Repeat("━", m.width))
@@ -662,6 +673,8 @@ func (m Model) refreshActiveTab() tea.Cmd {
 		return func() tea.Msg { return news.RefreshMsg{} }
 	case tabChart:
 		return func() tea.Msg { return chart.RefreshMsg{} }
+	case tabCommodities:
+		return func() tea.Msg { return commodities.RefreshMsg{} }
 	default:
 		return nil
 	}

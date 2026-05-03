@@ -205,36 +205,39 @@ type CommodityDataPoint struct {
 	Value float64
 }
 
+// rawDataPoint is an auxiliary type for unmarshaling commodity data points.
+// Alpha Vantage returns data points as objects with string date and value fields.
+type rawDataPoint struct {
+	Date  string `json:"date"`
+	Value string `json:"value"`
+}
+
 // UnmarshalJSON implements custom JSON unmarshaling for CommodityDataPoint.
-// Alpha Vantage returns data points as arrays: ["2024-01-01", "75.50"].
+// Alpha Vantage returns data points as objects: {"date": "2024-01-01", "value": "75.50"}.
 // The "." sentinel value is skipped (not included in the output).
 func (c *CommodityDataPoint) UnmarshalJSON(data []byte) error {
-	var arr []string
-	if err := json.Unmarshal(data, &arr); err != nil {
-		return fmt.Errorf("parsing commodity data point: %w", err)
-	}
-
-	if len(arr) != 2 {
-		return fmt.Errorf("expected 2 elements in commodity data point, got %d", len(arr))
+	var raw rawDataPoint
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("unexpected commodity data point shape — has the API changed? %w", err)
 	}
 
 	// Parse date
-	t, err := ParseDate(arr[0])
+	t, err := ParseDate(raw.Date)
 	if err != nil {
-		return fmt.Errorf("parsing date %q: %w", arr[0], err)
+		return fmt.Errorf("parsing date %q: %w", raw.Date, err)
 	}
 	c.Date = t
 
 	// Parse value, handling "." sentinel
-	if arr[1] == "." {
+	if raw.Value == "." {
 		// Sentinel value - set to zero, caller should skip if needed
 		c.Value = 0
 		return nil
 	}
 
-	f, err := ParseFloat(arr[1])
+	f, err := ParseFloat(raw.Value)
 	if err != nil {
-		return fmt.Errorf("parsing value %q: %w", arr[1], err)
+		return fmt.Errorf("parsing value %q: %w", raw.Value, err)
 	}
 	c.Value = f
 
@@ -252,12 +255,12 @@ type CommoditySeries struct {
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for CommoditySeries.
-// Alpha Vantage returns commodity data as: {"name": "...", "data": [["2024-01-01", "75.50"], ...]}.
+// Alpha Vantage returns commodity data as: {"name": "...", "data": [{"date": "2024-01-01", "value": "75.50"}, ...]}.
 // The "." sentinel values in the data array are skipped (not included in the slice).
 func (cs *CommoditySeries) UnmarshalJSON(data []byte) error {
 	type Alias CommoditySeries
 	aux := &struct {
-		RawData [][]string `json:"data"`
+		RawData []json.RawMessage `json:"data"`
 		*Alias
 	}{
 		Alias: (*Alias)(cs),
@@ -267,30 +270,21 @@ func (cs *CommoditySeries) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("parsing commodity series: %w", err)
 	}
 
-	// Convert raw data to CommodityDataPoint, skipping "." values
+	// Parse each data point using CommodityDataPoint's custom unmarshaler
+	// This automatically handles the "." sentinel values
 	cs.Data = make([]CommodityDataPoint, 0, len(aux.RawData))
-	for _, raw := range aux.RawData {
-		// Skip entries with "." sentinel value
-		if len(raw) == 2 && raw[1] == "." {
+	for _, rawPoint := range aux.RawData {
+		var point CommodityDataPoint
+		if err := json.Unmarshal(rawPoint, &point); err != nil {
+			return fmt.Errorf("parsing data point in commodity series: %w", err)
+		}
+
+		// Skip sentinel values (Value == 0 indicates "." was parsed)
+		if point.Value == 0 {
 			continue
 		}
 
-		// Parse date
-		t, err := ParseDate(raw[0])
-		if err != nil {
-			return fmt.Errorf("parsing date %q in commodity series: %w", raw[0], err)
-		}
-
-		// Parse value
-		f, err := ParseFloat(raw[1])
-		if err != nil {
-			return fmt.Errorf("parsing value %q in commodity series: %w", raw[1], err)
-		}
-
-		cs.Data = append(cs.Data, CommodityDataPoint{
-			Date:  t,
-			Value: f,
-		})
+		cs.Data = append(cs.Data, point)
 	}
 
 	return nil

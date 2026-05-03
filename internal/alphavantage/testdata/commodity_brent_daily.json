@@ -1,47 +1,47 @@
 {
-  "name": "Henry Hub Natural Gas Spot Price",
+  "name": "Crude Oil Prices Brent",
   "interval": "daily",
-  "unit": "dollars per million BTU",
+  "unit": "dollars per barrel",
   "data": [
     {
       "date": "2026-04-27",
-      "value": "2.72"
+      "value": "113.89"
     },
     {
       "date": "2026-04-24",
-      "value": "2.54"
+      "value": "111.86"
     },
     {
       "date": "2026-04-23",
-      "value": "2.65"
+      "value": "113.25"
     },
     {
       "date": "2026-04-22",
-      "value": "2.75"
+      "value": "113.44"
     },
     {
       "date": "2026-04-21",
-      "value": "2.76"
+      "value": "106.14"
     },
     {
       "date": "2026-04-20",
-      "value": "2.81"
+      "value": "103.4"
     },
     {
       "date": "2026-04-17",
-      "value": "2.71"
+      "value": "98.63"
     },
     {
       "date": "2026-04-16",
-      "value": "2.78"
+      "value": "116.63"
     },
     {
       "date": "2026-04-15",
-      "value": "2.78"
+      "value": "114.93"
     },
     {
       "date": "2026-04-14",
-      "value": "2.79"
+      "value": "118.69"
     }
   ]
 }

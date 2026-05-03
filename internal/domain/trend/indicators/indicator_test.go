@@ -8,7 +8,7 @@ import (
 
 func TestDetectAssetClass_Equity(t *testing.T) {
 	cryptoSymbols := []string{"BTC", "ETH", "SOL"}
-	detector := NewAssetClassDetector(cryptoSymbols)
+	detector := NewAssetClassDetector(cryptoSymbols, nil)
 
 	tests := []struct {
 		name   string
@@ -68,7 +68,7 @@ func TestDetectAssetClass_Equity(t *testing.T) {
 
 func TestDetectAssetClass_Crypto(t *testing.T) {
 	cryptoSymbols := []string{"BTC", "ETH", "SOL", "ADA", "DOT"}
-	detector := NewAssetClassDetector(cryptoSymbols)
+	detector := NewAssetClassDetector(cryptoSymbols, nil)
 
 	tests := []struct {
 		name   string
@@ -123,7 +123,7 @@ func TestDetectAssetClass_Crypto(t *testing.T) {
 
 func TestDetectAssetClass_Unknown_DefaultsEquity(t *testing.T) {
 	cryptoSymbols := []string{"BTC", "ETH"}
-	detector := NewAssetClassDetector(cryptoSymbols)
+	detector := NewAssetClassDetector(cryptoSymbols, nil)
 
 	tests := []struct {
 		name   string
@@ -162,7 +162,7 @@ func TestDetectAssetClass_Unknown_DefaultsEquity(t *testing.T) {
 }
 
 func TestAssetClassDetector_SetCryptoSymbols(t *testing.T) {
-	detector := NewAssetClassDetector([]string{"BTC", "ETH"})
+	detector := NewAssetClassDetector([]string{"BTC", "ETH"}, nil)
 
 	// Initial state
 	if got := detector.DetectAssetClass("BTC"); got != Crypto {
@@ -188,7 +188,7 @@ func TestAssetClassDetector_SetCryptoSymbols(t *testing.T) {
 }
 
 func TestAssetClassDetector_AddCryptoSymbol(t *testing.T) {
-	detector := NewAssetClassDetector([]string{"BTC"})
+	detector := NewAssetClassDetector([]string{"BTC"}, nil)
 
 	// Initial state
 	if got := detector.DetectAssetClass("ETH"); got != Equity {
@@ -205,7 +205,7 @@ func TestAssetClassDetector_AddCryptoSymbol(t *testing.T) {
 }
 
 func TestAssetClassDetector_RemoveCryptoSymbol(t *testing.T) {
-	detector := NewAssetClassDetector([]string{"BTC", "ETH", "SOL"})
+	detector := NewAssetClassDetector([]string{"BTC", "ETH", "SOL"}, nil)
 
 	// Initial state
 	if got := detector.DetectAssetClass("ETH"); got != Crypto {
@@ -236,6 +236,11 @@ func TestAssetClassString(t *testing.T) {
 			name: "Crypto string representation",
 			a:    Crypto,
 			want: "Crypto",
+		},
+		{
+			name: "Commodity string representation",
+			a:    Commodity,
+			want: "Commodity",
 		},
 		{
 			name: "Unknown asset class",
@@ -308,7 +313,7 @@ func TestOptions(t *testing.T) {
 
 func TestAssetClassDetector_CaseInsensitive(t *testing.T) {
 	cryptoSymbols := []string{"btc", "eth", "sol"} // Input in lowercase
-	detector := NewAssetClassDetector(cryptoSymbols)
+	detector := NewAssetClassDetector(cryptoSymbols, nil)
 
 	tests := []string{
 		"BTC",
@@ -335,7 +340,7 @@ func TestAssetClassDetector_CaseInsensitive(t *testing.T) {
 
 func TestAssetClassDetector_Concurrent(t *testing.T) {
 	cryptoSymbols := []string{"BTC", "ETH", "SOL"}
-	detector := NewAssetClassDetector(cryptoSymbols)
+	detector := NewAssetClassDetector(cryptoSymbols, nil)
 
 	// Run concurrent reads and writes
 	done := make(chan bool)
@@ -365,5 +370,256 @@ func TestAssetClassDetector_Concurrent(t *testing.T) {
 	// Verify final state
 	if got := detector.DetectAssetClass("BTC"); got != Crypto {
 		t.Errorf("After concurrent ops: DetectAssetClass(BTC) = %v, want Crypto", got)
+	}
+}
+
+func TestDetectAssetClass_CommodityWTI(t *testing.T) {
+	detector := NewAssetClassDetector([]string{}, DefaultCommoditySymbols)
+
+	tests := []struct {
+		name   string
+		symbol string
+		want   AssetClass
+	}{
+		{
+			name:   "WTI classified as Commodity",
+			symbol: "WTI",
+			want:   Commodity,
+		},
+		{
+			name:   "lowercase wti classified as Commodity",
+			symbol: "wti",
+			want:   Commodity,
+		},
+		{
+			name:   "mixed case Wti classified as Commodity",
+			symbol: "Wti",
+			want:   Commodity,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := detector.DetectAssetClass(tt.symbol); got != tt.want {
+				t.Errorf("DetectAssetClass(%q) = %v, want %v", tt.symbol, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectAssetClass_CommodityBrent(t *testing.T) {
+	detector := NewAssetClassDetector([]string{}, DefaultCommoditySymbols)
+
+	tests := []struct {
+		name   string
+		symbol string
+		want   AssetClass
+	}{
+		{
+			name:   "BRENT classified as Commodity",
+			symbol: "BRENT",
+			want:   Commodity,
+		},
+		{
+			name:   "lowercase brent classified as Commodity",
+			symbol: "brent",
+			want:   Commodity,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := detector.DetectAssetClass(tt.symbol); got != tt.want {
+				t.Errorf("DetectAssetClass(%q) = %v, want %v", tt.symbol, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectAssetClass_CommodityAllDefaults(t *testing.T) {
+	detector := NewAssetClassDetector([]string{}, DefaultCommoditySymbols)
+
+	tests := []struct {
+		name   string
+		symbol string
+		want   AssetClass
+	}{
+		{"WTI", "WTI", Commodity},
+		{"BRENT", "BRENT", Commodity},
+		{"NATURAL_GAS", "NATURAL_GAS", Commodity},
+		{"COPPER", "COPPER", Commodity},
+		{"ALUMINUM", "ALUMINUM", Commodity},
+		{"WHEAT", "WHEAT", Commodity},
+		{"CORN", "CORN", Commodity},
+		{"COTTON", "COTTON", Commodity},
+		{"SUGAR", "SUGAR", Commodity},
+		{"COFFEE", "COFFEE", Commodity},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := detector.DetectAssetClass(tt.symbol); got != tt.want {
+				t.Errorf("DetectAssetClass(%q) = %v, want %v", tt.symbol, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectAssetClass_CryptoStillWorks(t *testing.T) {
+	detector := NewAssetClassDetector([]string{"BTC", "ETH"}, DefaultCommoditySymbols)
+
+	tests := []struct {
+		name   string
+		symbol string
+		want   AssetClass
+	}{
+		{
+			name:   "BTC classified as Crypto",
+			symbol: "BTC",
+			want:   Crypto,
+		},
+		{
+			name:   "ETH classified as Crypto",
+			symbol: "ETH",
+			want:   Crypto,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := detector.DetectAssetClass(tt.symbol); got != tt.want {
+				t.Errorf("DetectAssetClass(%q) = %v, want %v", tt.symbol, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectAssetClass_EquityFallback(t *testing.T) {
+	detector := NewAssetClassDetector([]string{}, DefaultCommoditySymbols)
+
+	tests := []struct {
+		name   string
+		symbol string
+		want   AssetClass
+	}{
+		{
+			name:   "AAPL defaults to Equity",
+			symbol: "AAPL",
+			want:   Equity,
+		},
+		{
+			name:   "UNKNOWN defaults to Equity",
+			symbol: "UNKNOWN",
+			want:   Equity,
+		},
+		{
+			name:   "Random ticker defaults to Equity",
+			symbol: "XYZ123",
+			want:   Equity,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := detector.DetectAssetClass(tt.symbol); got != tt.want {
+				t.Errorf("DetectAssetClass(%q) = %v, want %v", tt.symbol, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectAssetClass_CommodityPriority(t *testing.T) {
+	// Test that commodity is checked before crypto
+	// This matters if there's a symbol overlap
+	detector := NewAssetClassDetector([]string{"CORN"}, DefaultCommoditySymbols)
+
+	// CORN should be detected as Commodity (from DefaultCommoditySymbols)
+	// even though it's also in the crypto list
+	if got := detector.DetectAssetClass("CORN"); got != Commodity {
+		t.Errorf("DetectAssetClass(CORN) = %v, want Commodity (commodity checked before crypto)", got)
+	}
+}
+
+func TestDefaultCommoditySymbols_MatchesAlphaVantageConstants(t *testing.T) {
+	// Verify DefaultCommoditySymbols contains the expected commodity symbols
+	expected := []string{
+		"WTI", "BRENT", "NATURAL_GAS", "COPPER", "ALUMINUM",
+		"WHEAT", "CORN", "COTTON", "SUGAR", "COFFEE",
+	}
+
+	if len(DefaultCommoditySymbols) != len(expected) {
+		t.Errorf("DefaultCommoditySymbols length = %d, want %d", len(DefaultCommoditySymbols), len(expected))
+	}
+
+	for _, want := range expected {
+		found := false
+		for _, got := range DefaultCommoditySymbols {
+			if got == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("DefaultCommoditySymbols missing expected symbol %q", want)
+		}
+	}
+}
+
+func TestAssetClassDetector_AddCommoditySymbol(t *testing.T) {
+	detector := NewAssetClassDetector([]string{}, []string{"WTI"})
+
+	// Initial state
+	if got := detector.DetectAssetClass("GOLD"); got != Equity {
+		t.Errorf("Initial: DetectAssetClass(GOLD) = %v, want Equity", got)
+	}
+
+	// Add GOLD as commodity
+	detector.AddCommoditySymbol("GOLD")
+
+	// Verify GOLD is now detected as Commodity
+	if got := detector.DetectAssetClass("GOLD"); got != Commodity {
+		t.Errorf("After add: DetectAssetClass(GOLD) = %v, want Commodity", got)
+	}
+}
+
+func TestAssetClassDetector_RemoveCommoditySymbol(t *testing.T) {
+	detector := NewAssetClassDetector([]string{}, []string{"WTI", "BRENT", "WHEAT"})
+
+	// Initial state
+	if got := detector.DetectAssetClass("BRENT"); got != Commodity {
+		t.Errorf("Initial: DetectAssetClass(BRENT) = %v, want Commodity", got)
+	}
+
+	// Remove BRENT
+	detector.RemoveCommoditySymbol("BRENT")
+
+	// Verify BRENT is now detected as Equity
+	if got := detector.DetectAssetClass("BRENT"); got != Equity {
+		t.Errorf("After remove: DetectAssetClass(BRENT) = %v, want Equity", got)
+	}
+}
+
+func TestAssetClassDetector_SetCommoditySymbols(t *testing.T) {
+	detector := NewAssetClassDetector([]string{}, DefaultCommoditySymbols)
+
+	// Initial state
+	if got := detector.DetectAssetClass("WTI"); got != Commodity {
+		t.Errorf("Initial: DetectAssetClass(WTI) = %v, want Commodity", got)
+	}
+
+	// Update to custom commodity list
+	detector.SetCommoditySymbols([]string{"GOLD", "SILVER"})
+
+	// Verify WTI is no longer detected as Commodity
+	if got := detector.DetectAssetClass("WTI"); got != Equity {
+		t.Errorf("After update: DetectAssetClass(WTI) = %v, want Equity", got)
+	}
+
+	// Verify new commodities are detected
+	if got := detector.DetectAssetClass("GOLD"); got != Commodity {
+		t.Errorf("After update: DetectAssetClass(GOLD) = %v, want Commodity", got)
+	}
+	if got := detector.DetectAssetClass("SILVER"); got != Commodity {
+		t.Errorf("After update: DetectAssetClass(SILVER) = %v, want Commodity", got)
 	}
 }

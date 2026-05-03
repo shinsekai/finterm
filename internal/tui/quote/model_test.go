@@ -77,7 +77,7 @@ func TestQuoteModel_Configure(t *testing.T) {
 	client := &mockClient{}
 	engine := &mockEngine{}
 
-	configured := model.Configure(ctx, client, engine, indicators.NewAssetClassDetector(nil))
+	configured := model.Configure(ctx, client, engine, indicators.NewAssetClassDetector(nil, nil))
 
 	if configured.client != client {
 		t.Error("Client not configured")
@@ -99,7 +99,7 @@ func TestQuoteModel_Configure(t *testing.T) {
 // TestQuoteModel_Update_KeyMsg_Enter_SubmitTicker verifies pressing Enter with a valid ticker submits fetch command.
 func TestQuoteModel_Update_KeyMsg_Enter_SubmitTicker(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	// Set a ticker in input
 	ti := model.textInput
@@ -123,7 +123,7 @@ func TestQuoteModel_Update_KeyMsg_Enter_SubmitTicker(t *testing.T) {
 // TestQuoteModel_Update_KeyMsg_Enter_EmptyTicker verifies pressing Enter with empty ticker does nothing.
 func TestQuoteModel_Update_KeyMsg_Enter_EmptyTicker(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	// Press Enter with empty input
 	msg := tea.KeyMsg{Type: tea.KeyEnter}
@@ -141,7 +141,7 @@ func TestQuoteModel_Update_KeyMsg_Enter_EmptyTicker(t *testing.T) {
 // TestQuoteModel_Update_KeyMsg_Enter_InvalidTicker verifies pressing Enter with invalid ticker shows error.
 func TestQuoteModel_Update_KeyMsg_Enter_InvalidTicker(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	// Set an invalid ticker
 	ti := model.textInput
@@ -168,7 +168,7 @@ func TestQuoteModel_Update_KeyMsg_Enter_InvalidTicker(t *testing.T) {
 // TestQuoteModel_Update_KeyMsg_Up_Navigation verifies Up arrow navigates backward through history.
 func TestQuoteModel_Update_KeyMsg_Up_Navigation(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	// Add some history entries
 	model.lookupHistory = []string{"AAPL", "MSFT", "GOOGL"}
@@ -190,7 +190,7 @@ func TestQuoteModel_Update_KeyMsg_Up_Navigation(t *testing.T) {
 // TestQuoteModel_Update_KeyMsg_Down_Navigation verifies Down arrow navigates forward through history.
 func TestQuoteModel_Update_KeyMsg_Down_Navigation(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	// Add some history and navigate back
 	model.lookupHistory = []string{"AAPL", "MSFT"}
@@ -213,7 +213,7 @@ func TestQuoteModel_Update_KeyMsg_Down_Navigation(t *testing.T) {
 // TestQuoteModel_Update_KeyMsg_Esc_ClearInput verifies pressing Esc clears input and resets history.
 func TestQuoteModel_Update_KeyMsg_Esc_ClearInput(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	// Set some text and navigate history
 	ti := model.textInput
@@ -321,7 +321,7 @@ func TestQuoteModel_Update_QuoteErrorMsg(t *testing.T) {
 // TestQuoteModel_Update_RefreshMsg verifies refreshing current ticker.
 func TestQuoteModel_Update_RefreshMsg(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	// Set up existing quote data
 	quote := &alphavantage.GlobalQuote{Symbol: "AAPL"}
@@ -479,7 +479,7 @@ func TestQuoteModel_LookupHistory_CaseNormalization(t *testing.T) {
 // TestQuoteModel_View renders view without errors.
 func TestQuoteModel_View(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	// Should not panic
 	view := model.View()
@@ -562,7 +562,7 @@ func TestQuoteModel_Getters(t *testing.T) {
 // TestQuoteModel_ResultDisplay_CanRetryInErrorState verifies that Enter works in error state.
 func TestQuoteModel_ResultDisplay_CanRetryInErrorState(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	// First submit
 	ti := model.textInput
@@ -606,7 +606,7 @@ func TestQuoteModel_StateTransitions(t *testing.T) {
 				ti := m.textInput
 				ti.SetValue("AAPL")
 				m.textInput = ti
-				m.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+				m.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 				return m
 			},
 			input:    tea.KeyMsg{Type: tea.KeyEnter},
@@ -668,7 +668,7 @@ func TestQuoteModel_InputMaxLength(t *testing.T) {
 // TestQuoteModel_FetchQuoteCmd_CreatesCommand verifies fetch command is created.
 func TestQuoteModel_FetchQuoteCmd_CreatesCommand(t *testing.T) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	cmd := model.fetchQuoteCmd("AAPL")
 	if cmd == nil {
@@ -679,7 +679,7 @@ func TestQuoteModel_FetchQuoteCmd_CreatesCommand(t *testing.T) {
 // BenchmarkQuoteModel_Update benchmarks Update method.
 func BenchmarkQuoteModel_Update(b *testing.B) {
 	model := NewModel()
-	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil))
+	model.Configure(context.Background(), &mockClient{}, &mockEngine{}, indicators.NewAssetClassDetector(nil, nil))
 
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'A', 'A', 'P', 'L'}}
 

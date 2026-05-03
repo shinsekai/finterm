@@ -34,7 +34,7 @@ func TestChartModel_InitLoadsDefaultSymbol(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Watchlist.Equities = []string{"AAPL", "MSFT"}
 	cfg.Watchlist.Crypto = []string{"BTC"}
-	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
+	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto, nil)
 	cacheStore := cache.New()
 
 	engine := trenddomain.New(nil, nil, nil, nil, cfg, detector, nil, nil, cacheStore)
@@ -61,7 +61,7 @@ func TestChartModel_SwitchTickerJK(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Watchlist.Equities = []string{"AAPL", "MSFT"}
 	cfg.Watchlist.Crypto = []string{"BTC"}
-	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
+	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto, nil)
 	cacheStore := cache.New()
 
 	engine := trenddomain.New(nil, nil, nil, nil, cfg, detector, nil, nil, cacheStore)
@@ -117,7 +117,7 @@ func TestChartModel_SwitchTickerWrapsAtEnds(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Watchlist.Equities = []string{"AAPL"}
 	cfg.Watchlist.Crypto = []string{"BTC"}
-	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
+	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto, nil)
 	cacheStore := cache.New()
 
 	engine := trenddomain.New(nil, nil, nil, nil, cfg, detector, nil, nil, cacheStore)
@@ -175,7 +175,7 @@ func TestChartModel_TimeframeCycle1234(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Watchlist.Equities = []string{"AAPL"}
 	cfg.Watchlist.Crypto = []string{}
-	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
+	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto, nil)
 	cacheStore := cache.New()
 
 	engine := trenddomain.New(nil, nil, nil, nil, cfg, detector, nil, nil, cacheStore)
@@ -228,7 +228,7 @@ func TestChartModel_TimeframeCycle1234(t *testing.T) {
 	m.symbol = "BTC" // Switch to crypto
 	cfg.Watchlist.Equities = []string{}
 	cfg.Watchlist.Crypto = []string{"BTC"}
-	detector = indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
+	detector = indicators.NewAssetClassDetector(cfg.Watchlist.Crypto, nil)
 	m.Configure(ctx, engine, avClient, cacheStore, &cfg.Watchlist, detector, cfg, cryptoFetcher)
 
 	// Test 1 (intraday) on crypto - should be rejected
@@ -346,7 +346,7 @@ func TestChartModel_RefreshReissuesFetch(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.DefaultConfig()
 	cfg.Watchlist.Equities = []string{"AAPL"}
-	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
+	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto, nil)
 	cacheStore := cache.New()
 
 	engine := trenddomain.New(nil, nil, nil, nil, cfg, detector, nil, nil, cacheStore)

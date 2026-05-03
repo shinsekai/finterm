@@ -56,7 +56,7 @@ func newTestModel(t *testing.T, engine Engine, symbols ...string) *Model {
 		context.Background(),
 		engine,
 		&config.WatchlistConfig{Equities: equities, Crypto: crypto},
-		indicators.NewAssetClassDetector([]string{}),
+		indicators.NewAssetClassDetector([]string{}, nil),
 	)
 	return model
 }
@@ -231,7 +231,7 @@ func TestTrendModel_Configure(t *testing.T) {
 		Equities: []string{"AAPL", "MSFT"},
 		Crypto:   []string{"BTC", "ETH"},
 	}
-	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"}, nil)
 	engine := &mockEngine{}
 
 	model.Configure(context.Background(), engine, watchlist, detector)
@@ -348,7 +348,7 @@ func TestTrendModel_GetCryptoStartIndex_MixedWatchlist(t *testing.T) {
 		Crypto:   []string{"BTC", "ETH"},
 	}
 
-	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}))
+	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}, nil))
 
 	assert.Equal(t, 3, model.GetCryptoStartIndex(), "Crypto should start at index 3 (after 3 equities)")
 }
@@ -363,7 +363,7 @@ func TestTrendModel_GetCryptoStartIndex_EquitiesOnly(t *testing.T) {
 		Crypto:   []string{},
 	}
 
-	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}))
+	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}, nil))
 
 	assert.Equal(t, 2, model.GetCryptoStartIndex(), "Crypto start index should equal number of equities")
 }
@@ -378,7 +378,7 @@ func TestTrendModel_GetCryptoStartIndex_CryptoOnly(t *testing.T) {
 		Crypto:   []string{"BTC", "ETH", "SOL"},
 	}
 
-	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}))
+	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}, nil))
 
 	assert.Equal(t, 0, model.GetCryptoStartIndex(), "Crypto should start at index 0 (no equities)")
 }
@@ -393,7 +393,7 @@ func TestTrendModel_GetCryptoStartIndex_EmptyWatchlist(t *testing.T) {
 		Crypto:   []string{},
 	}
 
-	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}))
+	model.Configure(context.Background(), &mockEngine{}, watchlist, indicators.NewAssetClassDetector([]string{}, nil))
 
 	assert.Equal(t, 0, model.GetCryptoStartIndex(), "Crypto start index should be 0 for empty watchlist")
 }

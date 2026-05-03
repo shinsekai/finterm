@@ -153,7 +153,7 @@ func newTestModelForView(width, height int) *Model {
 		context.Background(),
 		&mockQuoteClient{},
 		&viewMockEngine{},
-		indicators.NewAssetClassDetector([]string{}),
+		indicators.NewAssetClassDetector([]string{}, nil),
 	)
 }
 

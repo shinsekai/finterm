@@ -119,7 +119,7 @@ func newTestModelForView(symbols ...string) *Model {
 		context.Background(),
 		&viewMockEngine{},
 		&config.WatchlistConfig{Equities: equities, Crypto: crypto},
-		indicators.NewAssetClassDetector([]string{}),
+		indicators.NewAssetClassDetector([]string{}, nil),
 	)
 	return model
 }
@@ -211,7 +211,7 @@ func TestTrendModel_View_EmptyWatchlist(t *testing.T) {
 		context.Background(),
 		&viewMockEngine{},
 		&config.WatchlistConfig{Equities: []string{}, Crypto: []string{}},
-		indicators.NewAssetClassDetector([]string{}),
+		indicators.NewAssetClassDetector([]string{}, nil),
 	)
 
 	view := NewView(model).SetTheme(&mockTheme{})
@@ -580,7 +580,7 @@ func TestTrendView_SummaryBar_HiddenWhenEmpty(t *testing.T) {
 		context.Background(),
 		&viewMockEngine{},
 		&config.WatchlistConfig{Equities: []string{}, Crypto: []string{}},
-		indicators.NewAssetClassDetector([]string{}),
+		indicators.NewAssetClassDetector([]string{}, nil),
 	)
 
 	view := NewView(model).SetTheme(&mockTheme{})
@@ -719,7 +719,7 @@ func TestTrendView_SectionSeparator_MixedWatchlist(t *testing.T) {
 		context.Background(),
 		&viewMockEngine{},
 		&config.WatchlistConfig{Equities: []string{"AAPL", "MSFT"}, Crypto: []string{"BTC", "ETH"}},
-		indicators.NewAssetClassDetector([]string{}),
+		indicators.NewAssetClassDetector([]string{}, nil),
 	)
 
 	for i := range model.rows {
@@ -771,7 +771,7 @@ func TestTrendView_SectionSeparator_CryptoOnly(t *testing.T) {
 		context.Background(),
 		&viewMockEngine{},
 		&config.WatchlistConfig{Equities: []string{}, Crypto: []string{"BTC", "ETH"}},
-		indicators.NewAssetClassDetector([]string{}),
+		indicators.NewAssetClassDetector([]string{}, nil),
 	)
 
 	for i := range model.rows {
@@ -1293,7 +1293,7 @@ func TestTrendView_DestinySummary_Empty(t *testing.T) {
 		context.Background(),
 		&viewMockEngine{},
 		&config.WatchlistConfig{Equities: []string{}, Crypto: []string{}},
-		indicators.NewAssetClassDetector([]string{}),
+		indicators.NewAssetClassDetector([]string{}, nil),
 	)
 
 	view := NewView(model).SetTheme(&mockTheme{})
@@ -1507,7 +1507,7 @@ func TestTrendView_HeaderShowsProgressChip_EmptyWatchlist(t *testing.T) {
 		context.Background(),
 		&viewMockEngine{},
 		&config.WatchlistConfig{Equities: []string{}, Crypto: []string{}},
-		indicators.NewAssetClassDetector([]string{}),
+		indicators.NewAssetClassDetector([]string{}, nil),
 	)
 
 	view := NewView(model).SetTheme(&mockTheme{})

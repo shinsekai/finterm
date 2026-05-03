@@ -294,6 +294,19 @@ func (v *View) renderLoaded() string {
 
 	// Quote data cards
 	content += v.renderQuoteCards()
+	content += "\n\n"
+
+	// Crypto warning chip
+	if v.model.cryptoChipShown {
+		content += v.theme.Muted().Render("ℹ Fundamentals unavailable for crypto")
+		v.model.cryptoChipShown = false // Reset after showing
+		content += "\n\n"
+	}
+
+	// Fundamentals panel
+	if v.model.fundamentalsVisible && v.model.fundamentalsLoading == StateLoaded && v.model.fundamentalsData != nil {
+		content += v.renderFundamentalsPanel(v.model.fundamentalsData)
+	}
 
 	return content
 }

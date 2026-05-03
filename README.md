@@ -49,7 +49,7 @@ BTC     ░░░░░▓▓░░░ +0.25 LONG  ▲  LONG    ▲  LONG    ▼
 ETH     ░░░░░▓░░░░ +0.00 CASH  ▲  LONG    ▲  LONG    ▼ SHORT   ▼ SHORT              $2,323   64.11  ◇ Overval
 SOL     ░░▓▓▓▓░░░░░ -1.00 CASH  ▼ SHORT    ▼ SHORT    ▼ SHORT   ▼ SHORT   ▼ SHORT     $83.76  53.55  ○ Fair val
 
-**Quote Lookup** — Type any ticker to get real-time price, volume, change, RSI gauge, and signal system analysis (FTEMA, BLITZ, DESTINY, FLOW, VORTEX, TPI composite with gauge).
+**Quote Lookup** — Type any ticker to get real-time price, volume, change, RSI gauge, signal system analysis (FTEMA, BLITZ, DESTINY, FLOW, VORTEX, TPI composite with gauge), and company fundamentals (press `F` to toggle for equities).
 
 **Macro Dashboard** — Paneled view of GDP, CPI, inflation, federal funds rate, treasury yields, unemployment, and nonfarm payroll.
 
@@ -275,6 +275,7 @@ theme:
 | `Tab` | Cycle to next tab |
 | `j` / `k` or `↑` / `↓` | Navigate rows (Trend, News) / Cycle ticker (Chart) |
 | `Enter` | Submit ticker (Quote view) / Open article (News view) |
+| `F` | Toggle fundamentals panel (Quote view) |
 | `r` | Refresh current view |
 | `1` / `2` / `3` / `4` | Chart: Set timeframe (intraday/daily/weekly/monthly) |
 | `+` / `-` | Chart: Zoom in/out (window: 30/60/110 bars) |

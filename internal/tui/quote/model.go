@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -71,6 +72,12 @@ type CryptoQuoteClient interface {
 	GetCryptoDaily(ctx context.Context, symbol, market string) (*alphavantage.CryptoDaily, error)
 }
 
+// FundamentalsClient defines the interface for fetching fundamentals data.
+type FundamentalsClient interface {
+	GetCompanyOverview(ctx context.Context, symbol string) (*alphavantage.CompanyOverview, error)
+	GetEarnings(ctx context.Context, symbol string) (*alphavantage.Earnings, error)
+}
+
 // QuoteData contains all the data to display for a quote.
 //
 //nolint:revive // type name stuttering is acceptable for package-scoped types
@@ -110,6 +117,15 @@ type Model struct {
 
 	// width and height are the terminal dimensions.
 	width, height int
+
+	// fundamentalsVisible indicates if the fundamentals panel is shown.
+	fundamentalsVisible bool
+	// fundamentalsData contains the loaded fundamentals data.
+	fundamentalsData *FundamentalsData
+	// fundamentalsLoading indicates the state of fundamentals loading.
+	fundamentalsLoading State
+	// cryptoChipShown indicates if the crypto warning chip has been shown.
+	cryptoChipShown bool
 }
 
 // NewModel creates a new quote model.
@@ -189,12 +205,56 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = StateError
 		m.err = msg.Err
 		return m, nil
+
+	case FundamentalsResultMsg:
+		m.fundamentalsLoading = StateLoaded
+		m.fundamentalsData = msg.Data
+		return m, nil
+
+	case FundamentalsErrorMsg:
+		m.fundamentalsLoading = StateError
+		m.err = msg.Err
+		return m, nil
 	}
 
 	// Delegate text input updates - always allow typing regardless of state
 	var cmd tea.Cmd
 	m.textInput, cmd = m.textInput.Update(msg)
 	return m, cmd
+}
+
+// handleFToggle handles the F key toggle for fundamentals panel.
+func (m Model) handleFToggle() (tea.Model, tea.Cmd) {
+	// Check if this is crypto - fundamentals are not available for crypto
+	if m.quoteData != nil && m.quoteData.Quote != nil && m.detector != nil {
+		symbol := m.quoteData.Quote.Symbol
+		if m.detector.DetectAssetClass(symbol) == indicators.Crypto {
+			// Show warning chip for crypto
+			if !m.cryptoChipShown {
+				m.cryptoChipShown = true
+				return m, nil
+			}
+			return m, nil
+		}
+	}
+
+	// Toggle visibility
+	m.fundamentalsVisible = !m.fundamentalsVisible
+
+	// If turning on and no data, fetch it
+	if m.fundamentalsVisible && m.fundamentalsData == nil && m.quoteData != nil && m.quoteData.Quote != nil {
+		symbol := m.quoteData.Quote.Symbol
+		m.fundamentalsLoading = StateLoading
+		return m, tea.Batch(m.fetchFundamentalsCmd(symbol))
+	}
+
+	// If turning off, hide the panel
+	if !m.fundamentalsVisible {
+		m.fundamentalsData = nil
+		m.fundamentalsLoading = StateIdle
+	}
+
+	return m, nil
 }
 
 // handleKeyMsg handles keyboard input messages.
@@ -260,6 +320,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.state == StateIdle && len(msg.Runes) > 0 {
 			m.historyIndex = -1
 		}
+
+	case 'f', 'F':
+		// Toggle fundamentals panel
+		return m.handleFToggle()
 	}
 
 	// Delegate to text input
@@ -488,6 +552,62 @@ func (m Model) GetLookupHistory() []string {
 	return m.lookupHistory
 }
 
+// fetchFundamentalsCmd returns a command to fetch fundamentals data for a symbol.
+func (m Model) fetchFundamentalsCmd(symbol string) tea.Cmd {
+	return func() tea.Msg {
+		symbol = strings.ToUpper(symbol)
+
+		// Check if client supports fundamentals
+		client, ok := m.client.(FundamentalsClient)
+		if !ok {
+			return FundamentalsErrorMsg{Err: fmt.Errorf("fundamentals not supported")}
+		}
+
+		// Fetch overview and earnings in parallel
+		type result struct {
+			overview *alphavantage.CompanyOverview
+			earnings *alphavantage.Earnings
+			err      error
+		}
+		resultCh := make(chan result, 1)
+
+		go func() {
+			var r result
+			var wg sync.WaitGroup
+			wg.Add(2)
+
+			// Fetch overview
+			go func() {
+				defer wg.Done()
+				r.overview, r.err = client.GetCompanyOverview(m.ctx, symbol)
+			}()
+
+			// Fetch earnings
+			go func() {
+				defer wg.Done()
+				if r.err == nil {
+					r.earnings, r.err = client.GetEarnings(m.ctx, symbol)
+				}
+			}()
+
+			wg.Wait()
+			resultCh <- r
+		}()
+
+		r := <-resultCh
+		if r.err != nil {
+			return FundamentalsErrorMsg{Err: fmt.Errorf("fetching fundamentals for %s: %w", symbol, r.err)}
+		}
+
+		return FundamentalsResultMsg{
+			Data: &FundamentalsData{
+				Overview: r.overview,
+				Earnings: r.earnings,
+			},
+		}
+	}
+}
+
 // KeyBindings returns the keyboard bindings for the quote view.
 func (m Model) KeyBindings() []components.KeyBinding {
 	return []components.KeyBinding{
@@ -496,6 +616,7 @@ func (m Model) KeyBindings() []components.KeyBinding {
 		{Key: "↓", Description: "Next in history"},
 		{Key: "Esc", Description: "Clear input"},
 		{Key: "r", Description: "Refresh ticker"},
+		{Key: "F", Description: "Toggle fundamentals"},
 	}
 }
 
@@ -509,8 +630,20 @@ type QuoteResultMsg struct {
 	Data *QuoteData
 }
 
-// QuoteErrorMsg is a message when an error occurs.
+// FundamentalsResultMsg is a message when fundamentals data is loaded.
 //
+//nolint:revive // type name stuttering is acceptable for package-scoped types
+type FundamentalsResultMsg struct {
+	Data *FundamentalsData
+}
+
+// FundamentalsErrorMsg is a message when a fundamentals error occurs.
+//
+//nolint:revive // type name stuttering is acceptable for package-scoped types
+type FundamentalsErrorMsg struct {
+	Err error
+}
+
 //nolint:revive // type name stuttering is acceptable for package-scoped types
 type QuoteErrorMsg struct {
 	Err error

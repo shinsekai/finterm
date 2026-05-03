@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -28,9 +29,9 @@ func TestClient_GetCommodity_WTI_Daily(t *testing.T) {
 			"interval": "daily",
 			"unit": "dollars per barrel",
 			"data": [
-				["2024-04-01", "82.50"],
-				["2024-03-31", "83.12"],
-				["2024-03-30", "82.75"]
+				{"date": "2024-04-01", "value": "82.50"},
+				{"date": "2024-03-31", "value": "83.12"},
+				{"date": "2024-03-30", "value": "82.75"}
 			]
 		}`)
 	}))
@@ -79,8 +80,8 @@ func TestClient_GetCommodity_Brent_Daily(t *testing.T) {
 			"interval": "daily",
 			"unit": "dollars per barrel",
 			"data": [
-				["2024-04-01", "87.25"],
-				["2024-03-31", "86.80"]
+				{"date": "2024-04-01", "value": "87.25"},
+				{"date": "2024-03-31", "value": "86.80"}
 			]
 		}`)
 	}))
@@ -122,9 +123,9 @@ func TestClient_GetCommodity_Copper_Monthly(t *testing.T) {
 			"interval": "monthly",
 			"unit": "dollars per ton",
 			"data": [
-				["2024-04-01", "9125.50"],
-				["2024-03-01", "8890.25"],
-				["2024-02-01", "8565.00"]
+				{"date": "2024-04-01", "value": "9125.50"},
+				{"date": "2024-03-01", "value": "8890.25"},
+				{"date": "2024-02-01", "value": "8565.00"}
 			]
 		}`)
 	}))
@@ -167,9 +168,9 @@ func TestClient_GetCommodity_NaturalGas_Daily(t *testing.T) {
 			"interval": "daily",
 			"unit": "dollars per million btu",
 			"data": [
-				["2024-04-01", "1.85"],
-				["2024-03-31", "1.78"],
-				["2024-03-30", "1.82"]
+				{"date": "2024-04-01", "value": "1.85"},
+				{"date": "2024-03-31", "value": "1.78"},
+				{"date": "2024-03-30", "value": "1.82"}
 			]
 		}`)
 	}))
@@ -211,8 +212,8 @@ func TestClient_GetCommodity_AllCommodities_Quarterly(t *testing.T) {
 			"interval": "quarterly",
 			"unit": "index",
 			"data": [
-				["2024-04-01", "125.50"],
-				["2024-01-01", "122.30"]
+				{"date": "2024-04-01", "value": "125.50"},
+				{"date": "2024-01-01", "value": "122.30"}
 			]
 		}`)
 	}))
@@ -304,10 +305,10 @@ func TestClient_GetCommodity_SentinelValuesSkipped(t *testing.T) {
 			"interval": "daily",
 			"unit": "test unit",
 			"data": [
-				["2024-04-01", "100.00"],
-				["2024-03-31", "."],
-				["2024-03-30", "98.50"],
-				["2024-03-29", "."]
+				{"date": "2024-04-01", "value": "100.00"},
+				{"date": "2024-03-31", "value": "."},
+				{"date": "2024-03-30", "value": "98.50"},
+				{"date": "2024-03-29", "value": "."}
 			]
 		}`)
 	}))
@@ -343,7 +344,7 @@ func TestClient_GetCommodity_MalformedResponseWrappedError(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Malformed JSON - missing closing brace
-		_, _ = fmt.Fprint(w, `{"name": "Test", "data": [[`)
+		_, _ = fmt.Fprint(w, `{"name": "Test", "data": [{"date": "2024-01-01", "value": "100"}`)
 	}))
 	defer server.Close()
 
@@ -373,7 +374,7 @@ func TestClient_GetCommodity_MissingDateValueWrappedError(t *testing.T) {
 			"name": "Test",
 			"interval": "daily",
 			"unit": "test",
-			"data": [["invalid-date", "100.00"]]
+			"data": [{"date": "invalid-date", "value": "100.00"}]
 		}`)
 	}))
 	defer server.Close()
@@ -468,7 +469,7 @@ func TestCommoditySeries_UnmarshalJSON_ParsesFloat(t *testing.T) {
 				"name": "Test",
 				"interval": "daily",
 				"unit": "test",
-				"data": [["2024-01-01", "100.50"], ["2024-01-02", "99.75"]]
+				"data": [{"date": "2024-01-01", "value": "100.50"}, {"date": "2024-01-02", "value": "99.75"}]
 			}`,
 			wantValues: []float64{100.50, 99.75},
 		},
@@ -478,7 +479,7 @@ func TestCommoditySeries_UnmarshalJSON_ParsesFloat(t *testing.T) {
 				"name": "Test",
 				"interval": "daily",
 				"unit": "test",
-				"data": [["2024-01-01", "100"], ["2024-01-02", "99"]]
+				"data": [{"date": "2024-01-01", "value": "100"}, {"date": "2024-01-02", "value": "99"}]
 			}`,
 			wantValues: []float64{100, 99},
 		},
@@ -488,7 +489,7 @@ func TestCommoditySeries_UnmarshalJSON_ParsesFloat(t *testing.T) {
 				"name": "Test",
 				"interval": "daily",
 				"unit": "test",
-				"data": [["2024-01-01", "0.85"], ["2024-01-02", "1.23"]]
+				"data": [{"date": "2024-01-01", "value": "0.85"}, {"date": "2024-01-02", "value": "1.23"}]
 			}`,
 			wantValues: []float64{0.85, 1.23},
 		},
@@ -526,7 +527,7 @@ func TestCommoditySeries_UnmarshalJSON_ParsesDate(t *testing.T) {
 				"name": "Test",
 				"interval": "daily",
 				"unit": "test",
-				"data": [["2024-01-01", "100"], ["2024-01-02", "99"]]
+				"data": [{"date": "2024-01-01", "value": "100"}, {"date": "2024-01-02", "value": "99"}]
 			}`,
 			wantDates: []time.Time{
 				time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -539,7 +540,7 @@ func TestCommoditySeries_UnmarshalJSON_ParsesDate(t *testing.T) {
 				"name": "Test",
 				"interval": "monthly",
 				"unit": "test",
-				"data": [["2023-12-01", "100"], ["2024-01-01", "99"]]
+				"data": [{"date": "2023-12-01", "value": "100"}, {"date": "2024-01-01", "value": "99"}]
 			}`,
 			wantDates: []time.Time{
 				time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC),
@@ -579,7 +580,7 @@ func TestClient_GetCommodity_AllFunctions(t *testing.T) {
 		{"Natural Gas monthly", CommodityFunctionNaturalGas, "monthly"},
 		{"Copper monthly", CommodityFunctionCopper, "monthly"},
 		{"Aluminum quarterly", CommodityFunctionAluminum, "quarterly"},
-		{"Wheat daily", CommodityFunctionWheat, "daily"},
+		{"Wheat monthly", CommodityFunctionWheat, "monthly"},
 		{"Corn weekly", CommodityFunctionCorn, "weekly"},
 		{"Cotton monthly", CommodityFunctionCotton, "monthly"},
 		{"Sugar quarterly", CommodityFunctionSugar, "quarterly"},
@@ -603,7 +604,7 @@ func TestClient_GetCommodity_AllFunctions(t *testing.T) {
 					"name": "%s",
 					"interval": "%s",
 					"unit": "test unit",
-					"data": [["2024-01-01", "100.00"]]
+					"data": [{"date": "2024-01-01", "value": "100.00"}]
 				}`, tt.fn, tt.interval)
 			}))
 			defer server.Close()
@@ -632,9 +633,9 @@ func TestCommoditySeries_SortAscending(t *testing.T) {
 		"interval": "daily",
 		"unit": "test",
 		"data": [
-			["2024-03-01", "90"],
-			["2024-02-01", "95"],
-			["2024-01-01", "100"]
+			{"date": "2024-03-01", "value": "90"},
+			{"date": "2024-02-01", "value": "95"},
+			{"date": "2024-01-01", "value": "100"}
 		]
 	}`
 
@@ -663,4 +664,256 @@ func TestCommoditySeries_SortAscending_NilSeries(_ *testing.T) {
 	var series *CommoditySeries
 	// Should not panic
 	series.SortAscending()
+}
+
+// TestCommoditySeries_UnmarshalRealShapeWTI tests that we can unmarshal a real WTI daily response.
+func TestCommoditySeries_UnmarshalRealShapeWTI(t *testing.T) {
+	data, err := os.ReadFile("testdata/commodity_wti_daily.json")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+
+	var series CommoditySeries
+	if err := json.Unmarshal(data, &series); err != nil {
+		t.Fatalf("failed to unmarshal fixture: %v", err)
+	}
+
+	if series.Name != "Crude Oil Prices WTI" {
+		t.Errorf("expected name 'Crude Oil Prices WTI', got %s", series.Name)
+	}
+	if series.Interval != "daily" {
+		t.Errorf("expected interval 'daily', got %s", series.Interval)
+	}
+	if len(series.Data) == 0 {
+		t.Error("expected at least one data point")
+	}
+
+	// Verify the first data point has correct date
+	firstDate := time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC)
+	if !series.Data[0].Date.Equal(firstDate) {
+		t.Errorf("expected first date %s, got %s", firstDate, series.Data[0].Date)
+	}
+}
+
+// TestCommoditySeries_UnmarshalRealShapeBrent tests that we can unmarshal a real Brent daily response.
+func TestCommoditySeries_UnmarshalRealShapeBrent(t *testing.T) {
+	data, err := os.ReadFile("testdata/commodity_brent_daily.json")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+
+	var series CommoditySeries
+	if err := json.Unmarshal(data, &series); err != nil {
+		t.Fatalf("failed to unmarshal fixture: %v", err)
+	}
+
+	if len(series.Data) == 0 {
+		t.Error("expected at least one data point")
+	}
+}
+
+// TestCommoditySeries_UnmarshalRealShapeMonthly tests that we can unmarshal a real monthly response.
+func TestCommoditySeries_UnmarshalRealShapeMonthly(t *testing.T) {
+	tests := []struct {
+		name    string
+		fixture string
+	}{
+		{"Copper monthly", "testdata/commodity_copper_monthly.json"},
+		{"Wheat monthly", "testdata/commodity_wheat_monthly.json"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := os.ReadFile(tt.fixture)
+			if err != nil {
+				t.Fatalf("failed to read fixture: %v", err)
+			}
+
+			var series CommoditySeries
+			if err := json.Unmarshal(data, &series); err != nil {
+				t.Fatalf("failed to unmarshal fixture: %v", err)
+			}
+
+			if series.Interval != "monthly" {
+				t.Errorf("expected interval 'monthly', got %s", series.Interval)
+			}
+			if len(series.Data) == 0 {
+				t.Error("expected at least one data point")
+			}
+		})
+	}
+}
+
+// TestCommoditySeries_SkipsSentinelValues tests that "." sentinel values are properly skipped.
+func TestCommoditySeries_SkipsSentinelValues(t *testing.T) {
+	jsonData := `{
+		"name": "Test",
+		"interval": "daily",
+		"unit": "test",
+		"data": [
+			{"date": "2024-04-01", "value": "100.00"},
+			{"date": "2024-03-31", "value": "."},
+			{"date": "2024-03-30", "value": "98.50"}
+		]
+	}`
+
+	var series CommoditySeries
+	if err := json.Unmarshal([]byte(jsonData), &series); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if len(series.Data) != 2 {
+		t.Errorf("expected 2 data points (sentinel skipped), got %d", len(series.Data))
+	}
+	if series.Data[0].Value != 100.00 {
+		t.Errorf("expected first value 100.00, got %f", series.Data[0].Value)
+	}
+	if series.Data[1].Value != 98.50 {
+		t.Errorf("expected second value 98.50, got %f", series.Data[1].Value)
+	}
+}
+
+// TestCommoditySeries_RejectsArrayShapeWithClearError tests that the old array-shaped data
+// is rejected with a clear error message indicating the API may have changed.
+func TestCommoditySeries_RejectsArrayShapeWithClearError(t *testing.T) {
+	// Old-style array format that should fail
+	jsonData := `{
+		"name": "Test",
+		"interval": "daily",
+		"unit": "test",
+		"data": [["2024-04-01", "100.00"], ["2024-03-31", "99.50"]]
+	}`
+
+	var series CommoditySeries
+	err := json.Unmarshal([]byte(jsonData), &series)
+	if err == nil {
+		t.Fatal("expected error for array-shaped data, got nil")
+	}
+
+	// Check that the error message hints at the API shape change
+	if !strings.Contains(err.Error(), "unexpected commodity data point shape") {
+		t.Errorf("expected error message about unexpected shape, got: %v", err)
+	}
+}
+
+// TestCommoditySeries_PreservesNewestFirstOrdering tests that data is kept in
+// the order returned by the API (newest first).
+func TestCommoditySeries_PreservesNewestFirstOrdering(t *testing.T) {
+	jsonData := `{
+		"name": "Test",
+		"interval": "daily",
+		"unit": "test",
+		"data": [
+			{"date": "2024-04-05", "value": "105"},
+			{"date": "2024-04-04", "value": "104"},
+			{"date": "2024-04-03", "value": "103"},
+			{"date": "2024-04-02", "value": "102"},
+			{"date": "2024-04-01", "value": "101"}
+		]
+	}`
+
+	var series CommoditySeries
+	if err := json.Unmarshal([]byte(jsonData), &series); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// Verify order is preserved (newest first)
+	if !series.Data[0].Date.Equal(time.Date(2024, 4, 5, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("expected first date 2024-04-05, got %s", series.Data[0].Date)
+	}
+	if !series.Data[4].Date.Equal(time.Date(2024, 4, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("expected last date 2024-04-01, got %s", series.Data[4].Date)
+	}
+}
+
+// TestCommoditySeries_FixtureShapeRegression tests that fixture files contain
+// the correct object-shaped data, not the old array-shaped data.
+func TestCommoditySeries_FixtureShapeRegression(t *testing.T) {
+	fixtures := []string{
+		"testdata/commodity_wti_daily.json",
+		"testdata/commodity_brent_daily.json",
+		"testdata/commodity_natural_gas_daily.json",
+		"testdata/commodity_copper_monthly.json",
+		"testdata/commodity_wheat_monthly.json",
+	}
+
+	for _, fixture := range fixtures {
+		t.Run(fixture, func(t *testing.T) {
+			data, err := os.ReadFile(fixture)
+			if err != nil {
+				t.Fatalf("failed to read fixture: %v", err)
+			}
+
+			var raw map[string]interface{}
+			if err := json.Unmarshal(data, &raw); err != nil {
+				t.Fatalf("failed to parse fixture as raw JSON: %v", err)
+			}
+
+			dataField, ok := raw["data"]
+			if !ok {
+				t.Fatal("fixture missing 'data' field")
+			}
+
+			dataArray, ok := dataField.([]interface{})
+			if !ok {
+				t.Fatal("'data' field is not an array")
+			}
+
+			if len(dataArray) == 0 {
+				t.Fatal("fixture has empty data array")
+			}
+
+			// Check the first data point is an object, not an array
+			first, ok := dataArray[0].(map[string]interface{})
+			if !ok {
+				t.Fatalf("fixture data point %d is not an object (it's %T), has the API shape changed?", 0, dataArray[0])
+			}
+
+			// Verify it has the expected keys
+			if _, ok := first["date"]; !ok {
+				t.Error("data point missing 'date' key")
+			}
+			if _, ok := first["value"]; !ok {
+				t.Error("data point missing 'value' key")
+			}
+		})
+	}
+}
+
+// TestGetCommodity_LiveAPI tests against the live Alpha Vantage API.
+// This test is gated by the RUN_LIVE_TESTS environment variable.
+func TestGetCommodity_LiveAPI(t *testing.T) {
+	if os.Getenv("RUN_LIVE_TESTS") != "1" {
+		t.Skip("skipping live API test (set RUN_LIVE_TESTS=1 to run)")
+	}
+
+	apiKey := os.Getenv("FINTERM_AV_API_KEY")
+	if apiKey == "" {
+		t.Skip("skipping live API test (FINTERM_AV_API_KEY not set)")
+	}
+
+	client := New(Config{
+		Key:        apiKey,
+		BaseURL:    "https://www.alphavantage.co/query",
+		HTTPClient: &http.Client{},
+	})
+
+	series, err := client.GetCommodity(context.Background(), CommodityFunctionWTI, "daily")
+	if err != nil {
+		t.Fatalf("live API call failed: %v", err)
+	}
+
+	if len(series.Data) == 0 {
+		t.Error("live API returned empty data")
+	}
+
+	// Verify we got a reasonable response
+	if series.Name == "" {
+		t.Error("live API returned empty name")
+	}
+	if series.Unit == "" {
+		t.Error("live API returned empty unit")
+	}
+
+	t.Logf("Live API test passed: got %d data points from %s", len(series.Data), series.Name)
 }

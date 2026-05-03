@@ -54,10 +54,11 @@ type CommodityInfo struct {
 // RowData represents the data for a single commodity row in the table.
 type RowData struct {
 	CommodityInfo
-	State      State
-	Series     *alphavantage.CommoditySeries
-	Error      error
-	LastUpdate time.Time
+	State          State
+	Series         *alphavantage.CommoditySeries
+	Error          error
+	LastUpdate     time.Time
+	ActualInterval string
 }
 
 // Model represents the commodities dashboard view model.
@@ -308,6 +309,7 @@ func (m Model) handleCommodityData(msg CommodityDataMsg) Model {
 			m.rows[i].Series = msg.Series
 			m.rows[i].Error = nil
 			m.rows[i].LastUpdate = time.Now()
+			m.rows[i].ActualInterval = msg.ActualInterval
 
 			if msg.FromCache {
 				m.rows[i].State = StateCached
@@ -362,22 +364,32 @@ func (m Model) fetchCommodityCmd(index int) tea.Cmd {
 	commodity := m.watchlist[index]
 	return func() tea.Msg {
 
+		// Determine the best supported interval for this commodity
+		actualInterval := alphavantage.BestSupportedInterval(commodity.Function, m.interval)
+		if actualInterval == "" {
+			return CommodityErrorMsg{
+				Symbol: commodity.Symbol,
+				Err:    fmt.Errorf("no supported interval for %s", commodity.Symbol),
+				Index:  index,
+			}
+		}
+
 		// Check cache first
-		cacheKey := m.cacheKey(commodity.Symbol, m.interval)
+		cacheKey := m.cacheKey(commodity.Symbol, actualInterval)
 		if m.cacheStore != nil {
 			if cached, exists := m.cacheStore.Get(cacheKey); exists {
 				if series, ok := cached.(*alphavantage.CommoditySeries); ok {
 					return CommodityDataMsg{
-						Symbol:    commodity.Symbol,
-						Series:    series,
-						Index:     index,
-						FromCache: true,
+						Symbol:         commodity.Symbol,
+						Series:         series,
+						Index:          index,
+						FromCache:      true,
+						ActualInterval: actualInterval,
 					}
 				}
 			}
 		}
 
-		// Fetch from API
 		// Fetch from API
 		if m.client == nil {
 			return CommodityErrorMsg{
@@ -386,7 +398,7 @@ func (m Model) fetchCommodityCmd(index int) tea.Cmd {
 				Index:  index,
 			}
 		}
-		series, err := m.client.GetCommodity(m.ctx, commodity.Function, m.interval)
+		series, err := m.client.GetCommodity(m.ctx, commodity.Function, actualInterval)
 		if err != nil {
 			return CommodityErrorMsg{
 				Symbol: commodity.Symbol,
@@ -402,10 +414,11 @@ func (m Model) fetchCommodityCmd(index int) tea.Cmd {
 		}
 
 		return CommodityDataMsg{
-			Symbol:    commodity.Symbol,
-			Series:    series,
-			Index:     index,
-			FromCache: false,
+			Symbol:         commodity.Symbol,
+			Series:         series,
+			Index:          index,
+			FromCache:      false,
+			ActualInterval: actualInterval,
 		}
 	}
 }
@@ -511,10 +524,11 @@ type RefreshMsg struct{}
 
 // CommodityDataMsg is a message when commodity data is loaded.
 type CommodityDataMsg struct {
-	Symbol    string
-	Series    *alphavantage.CommoditySeries
-	Index     int
-	FromCache bool
+	Symbol         string
+	Series         *alphavantage.CommoditySeries
+	Index          int
+	FromCache      bool
+	ActualInterval string
 }
 
 // CommodityErrorMsg is a message when an error occurs fetching commodity data.

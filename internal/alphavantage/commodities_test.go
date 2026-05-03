@@ -1073,3 +1073,347 @@ func TestCommoditySupportedIntervals(t *testing.T) {
 		})
 	}
 }
+
+// TestBestSupportedInterval_ExactMatch tests that exact matches are returned unchanged.
+func TestBestSupportedInterval_ExactMatch(t *testing.T) {
+	tests := []struct {
+		name      string
+		fn        CommodityFunction
+		requested string
+		want      string
+	}{
+		{
+			name:      "WTI daily - exact match",
+			fn:        CommodityFunctionWTI,
+			requested: "daily",
+			want:      "daily",
+		},
+		{
+			name:      "WTI weekly - exact match",
+			fn:        CommodityFunctionWTI,
+			requested: "weekly",
+			want:      "weekly",
+		},
+		{
+			name:      "WTI monthly - exact match",
+			fn:        CommodityFunctionWTI,
+			requested: "monthly",
+			want:      "monthly",
+		},
+		{
+			name:      "WTI quarterly - exact match",
+			fn:        CommodityFunctionWTI,
+			requested: "quarterly",
+			want:      "quarterly",
+		},
+		{
+			name:      "Copper monthly - exact match",
+			fn:        CommodityFunctionCopper,
+			requested: "monthly",
+			want:      "monthly",
+		},
+		{
+			name:      "Copper quarterly - exact match",
+			fn:        CommodityFunctionCopper,
+			requested: "quarterly",
+			want:      "quarterly",
+		},
+		{
+			name:      "Copper annual - exact match",
+			fn:        CommodityFunctionCopper,
+			requested: "annual",
+			want:      "annual",
+		},
+		{
+			name:      "AllCommodities annual - exact match",
+			fn:        CommodityFunctionAllCommodities,
+			requested: "annual",
+			want:      "annual",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BestSupportedInterval(tt.fn, tt.requested)
+			if got != tt.want {
+				t.Errorf("BestSupportedInterval(%v, %q) = %q, want %q", tt.fn, tt.requested, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestBestSupportedInterval_FallbackToCoarser tests fallback to next coarser interval.
+func TestBestSupportedInterval_FallbackToCoarser(t *testing.T) {
+	tests := []struct {
+		name      string
+		fn        CommodityFunction
+		requested string
+		want      string
+	}{
+		{
+			name:      "Copper daily to monthly",
+			fn:        CommodityFunctionCopper,
+			requested: "daily",
+			want:      "monthly",
+		},
+		{
+			name:      "Copper weekly to monthly",
+			fn:        CommodityFunctionCopper,
+			requested: "weekly",
+			want:      "monthly",
+		},
+		{
+			name:      "Aluminum daily to monthly",
+			fn:        CommodityFunctionAluminum,
+			requested: "daily",
+			want:      "monthly",
+		},
+		{
+			name:      "Aluminum weekly to monthly",
+			fn:        CommodityFunctionAluminum,
+			requested: "weekly",
+			want:      "monthly",
+		},
+		{
+			name:      "AllCommodities daily to monthly",
+			fn:        CommodityFunctionAllCommodities,
+			requested: "daily",
+			want:      "monthly",
+		},
+		{
+			name:      "AllCommodities weekly to monthly",
+			fn:        CommodityFunctionAllCommodities,
+			requested: "weekly",
+			want:      "monthly",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BestSupportedInterval(tt.fn, tt.requested)
+			if got != tt.want {
+				t.Errorf("BestSupportedInterval(%v, %q) = %q, want %q", tt.fn, tt.requested, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestBestSupportedInterval_AllSupportedIntervalsPerFunction tests all intervals per function.
+func TestBestSupportedInterval_AllSupportedIntervalsPerFunction(t *testing.T) {
+	tests := []struct {
+		name          string
+		fn            CommodityFunction
+		requested     string
+		expected      string
+		explainReason string
+	}{
+		// WTI - supports daily, weekly, monthly, quarterly
+		{
+			name:          "WTI: exact match - daily",
+			fn:            CommodityFunctionWTI,
+			requested:     "daily",
+			expected:      "daily",
+			explainReason: "WTI supports daily, so exact match",
+		},
+		{
+			name:          "WTI: exact match - weekly",
+			fn:            CommodityFunctionWTI,
+			requested:     "weekly",
+			expected:      "weekly",
+			explainReason: "WTI supports weekly, so exact match",
+		},
+		{
+			name:          "WTI: exact match - monthly",
+			fn:            CommodityFunctionWTI,
+			requested:     "monthly",
+			expected:      "monthly",
+			explainReason: "WTI supports monthly, so exact match",
+		},
+		{
+			name:          "WTI: exact match - quarterly",
+			fn:            CommodityFunctionWTI,
+			requested:     "quarterly",
+			expected:      "quarterly",
+			explainReason: "WTI supports quarterly, so exact match",
+		},
+		{
+			name:          "WTI: requested annual, fallback to quarterly",
+			fn:            CommodityFunctionWTI,
+			requested:     "annual",
+			expected:      "quarterly",
+			explainReason: "WTI doesn't support annual, falls back to quarterly (next coarser)",
+		},
+		// Copper - supports monthly, quarterly, annual
+		{
+			name:          "Copper: daily falls back to monthly",
+			fn:            CommodityFunctionCopper,
+			requested:     "daily",
+			expected:      "monthly",
+			explainReason: "Copper doesn't support daily or weekly, falls back to monthly",
+		},
+		{
+			name:          "Copper: weekly falls back to monthly",
+			fn:            CommodityFunctionCopper,
+			requested:     "weekly",
+			expected:      "monthly",
+			explainReason: "Copper doesn't support daily or weekly, falls back to monthly",
+		},
+		{
+			name:          "Copper: exact match - monthly",
+			fn:            CommodityFunctionCopper,
+			requested:     "monthly",
+			expected:      "monthly",
+			explainReason: "Copper supports monthly, so exact match",
+		},
+		{
+			name:          "Copper: exact match - quarterly",
+			fn:            CommodityFunctionCopper,
+			requested:     "quarterly",
+			expected:      "quarterly",
+			explainReason: "Copper supports quarterly, so exact match",
+		},
+		{
+			name:          "Copper: exact match - annual",
+			fn:            CommodityFunctionCopper,
+			requested:     "annual",
+			expected:      "annual",
+			explainReason: "Copper supports annual, so exact match",
+		},
+		// Aluminum - supports monthly, quarterly, annual (same as Copper)
+		{
+			name:          "Aluminum: daily falls back to monthly",
+			fn:            CommodityFunctionAluminum,
+			requested:     "daily",
+			expected:      "monthly",
+			explainReason: "Aluminum doesn't support daily or weekly, falls back to monthly",
+		},
+		{
+			name:          "Aluminum: weekly falls back to monthly",
+			fn:            CommodityFunctionAluminum,
+			requested:     "weekly",
+			expected:      "monthly",
+			explainReason: "Aluminum doesn't support daily or weekly, falls back to monthly",
+		},
+		{
+			name:          "Aluminum: exact match - monthly",
+			fn:            CommodityFunctionAluminum,
+			requested:     "monthly",
+			expected:      "monthly",
+			explainReason: "Aluminum supports monthly, so exact match",
+		},
+		{
+			name:          "Aluminum: exact match - quarterly",
+			fn:            CommodityFunctionAluminum,
+			requested:     "quarterly",
+			expected:      "quarterly",
+			explainReason: "Aluminum supports quarterly, so exact match",
+		},
+		{
+			name:          "Aluminum: exact match - annual",
+			fn:            CommodityFunctionAluminum,
+			requested:     "annual",
+			expected:      "annual",
+			explainReason: "Aluminum supports annual, so exact match",
+		},
+		// Wheat - supports daily, weekly, monthly, quarterly, annual
+		{
+			name:          "Wheat: exact match - daily",
+			fn:            CommodityFunctionWheat,
+			requested:     "daily",
+			expected:      "daily",
+			explainReason: "Wheat supports daily, so exact match",
+		},
+		{
+			name:          "Wheat: exact match - weekly",
+			fn:            CommodityFunctionWheat,
+			requested:     "weekly",
+			expected:      "weekly",
+			explainReason: "Wheat supports weekly, so exact match",
+		},
+		{
+			name:          "Wheat: exact match - monthly",
+			fn:            CommodityFunctionWheat,
+			requested:     "monthly",
+			expected:      "monthly",
+			explainReason: "Wheat supports monthly, so exact match",
+		},
+		{
+			name:          "Wheat: exact match - quarterly",
+			fn:            CommodityFunctionWheat,
+			requested:     "quarterly",
+			expected:      "quarterly",
+			explainReason: "Wheat supports quarterly, so exact match",
+		},
+		{
+			name:          "Wheat: exact match - annual",
+			fn:            CommodityFunctionWheat,
+			requested:     "annual",
+			expected:      "annual",
+			explainReason: "Wheat supports annual, so exact match",
+		},
+		// AllCommodities - supports monthly, quarterly, annual
+		{
+			name:          "AllCommodities: daily falls back to monthly",
+			fn:            CommodityFunctionAllCommodities,
+			requested:     "daily",
+			expected:      "monthly",
+			explainReason: "AllCommodities doesn't support daily or weekly, falls back to monthly",
+		},
+		{
+			name:          "AllCommodities: weekly falls back to monthly",
+			fn:            CommodityFunctionAllCommodities,
+			requested:     "weekly",
+			expected:      "monthly",
+			explainReason: "AllCommodities doesn't support daily or weekly, falls back to monthly",
+		},
+		{
+			name:          "AllCommodities: exact match - monthly",
+			fn:            CommodityFunctionAllCommodities,
+			requested:     "monthly",
+			expected:      "monthly",
+			explainReason: "AllCommodities supports monthly, so exact match",
+		},
+		{
+			name:          "AllCommodities: exact match - quarterly",
+			fn:            CommodityFunctionAllCommodities,
+			requested:     "quarterly",
+			expected:      "quarterly",
+			explainReason: "AllCommodities supports quarterly, so exact match",
+		},
+		{
+			name:          "AllCommodities: exact match - annual",
+			fn:            CommodityFunctionAllCommodities,
+			requested:     "annual",
+			expected:      "annual",
+			explainReason: "AllCommodities supports annual, so exact match",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BestSupportedInterval(tt.fn, tt.requested)
+			if got != tt.expected {
+				t.Errorf("BestSupportedInterval(%v, %q) = %q, want %q (%s)",
+					tt.fn, tt.requested, got, tt.expected, tt.explainReason)
+			}
+		})
+	}
+}
+
+// TestBestSupportedInterval_UnknownFunction tests that unknown functions return empty string.
+func TestBestSupportedInterval_UnknownFunction(t *testing.T) {
+	got := BestSupportedInterval(CommodityFunction("UNKNOWN"), "daily")
+	if got != "" {
+		t.Errorf("BestSupportedInterval(UNKNOWN, daily) = %q, want empty string", got)
+	}
+}
+
+// TestBestSupportedInterval_InvalidInterval tests that invalid intervals return the coarsest supported.
+func TestBestSupportedInterval_InvalidInterval(t *testing.T) {
+	// For truly invalid intervals (not in precedence), return the coarsest supported interval
+	got := BestSupportedInterval(CommodityFunctionWTI, "invalid")
+	expected := "quarterly" // Coarsest supported for WTI
+	if got != expected {
+		t.Errorf("BestSupportedInterval(WTI, invalid) = %q, want %q (coarsest supported)", got, expected)
+	}
+}

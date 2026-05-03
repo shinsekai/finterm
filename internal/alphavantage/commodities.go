@@ -88,6 +88,76 @@ func CommoditySupportedIntervals(fn CommodityFunction) ([]string, bool) {
 	return intervals, ok
 }
 
+// BestSupportedInterval returns the best supported interval for a given commodity function.
+// If the requested interval is supported, it is returned unchanged.
+// Otherwise, returns the next-coarser supported interval following the precedence:
+// daily → weekly → monthly → quarterly → annual.
+// If the requested interval is unknown but valid intervals exist, returns the coarsest supported.
+// If no overlap exists (defensive), returns an empty string.
+func BestSupportedInterval(fn CommodityFunction, requested string) string {
+	valid, ok := validIntervals[fn]
+	if !ok {
+		return ""
+	}
+
+	// Check exact match first
+	for _, iv := range valid {
+		if iv == requested {
+			return requested
+		}
+	}
+
+	// Fallback precedence: daily → weekly → monthly → quarterly → annual
+	precedence := []string{"daily", "weekly", "monthly", "quarterly", "annual"}
+
+	// Find the requested interval in precedence
+	requestedIndex := -1
+	for i, iv := range precedence {
+		if iv == requested {
+			requestedIndex = i
+			break
+		}
+	}
+
+	// If requested interval is unknown (not in precedence), return the coarsest supported interval
+	if requestedIndex == -1 {
+		for i := len(precedence) - 1; i >= 0; i-- {
+			if contains(valid, precedence[i]) {
+				return precedence[i]
+			}
+		}
+		return ""
+	}
+
+	// Find next coarser supported interval (after requested in precedence)
+	for i := requestedIndex + 1; i < len(precedence); i++ {
+		if contains(valid, precedence[i]) {
+			return precedence[i]
+		}
+	}
+
+	// No coarser interval found - requested is finer than any supported
+	// Return the coarsest supported interval as fallback
+	for i := len(precedence) - 1; i >= 0; i-- {
+		if contains(valid, precedence[i]) {
+			return precedence[i]
+		}
+	}
+
+	// Should not reach here
+	return ""
+}
+
+// contains checks if a string slice contains a specific string.
+func contains(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
 // GetCommodity fetches commodity price data for the specified function and interval.
 // The interval parameter can be "daily", "weekly", "monthly", "quarterly", or "annual",
 // depending on the commodity function. Valid intervals per function are documented

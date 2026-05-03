@@ -490,3 +490,83 @@ func TestModel_GetInterval(t *testing.T) {
 		t.Errorf("expected default interval 'daily' for invalid, got %s", model.GetInterval())
 	}
 }
+
+// TestModel_CommodityDataMsg_WithActualInterval tests that ActualInterval is properly set.
+func TestModel_CommodityDataMsg_WithActualInterval(t *testing.T) {
+	model := NewModel()
+	mockCache := &mockCacheStore{}
+	model.Configure(context.Background(), nil, []string{"COPPER"}, "daily", mockCache)
+
+	dataMsg := CommodityDataMsg{
+		Symbol: "COPPER",
+		Series: &alphavantage.CommoditySeries{
+			Name: "Copper",
+			Unit: "dollars per ton",
+			Data: []alphavantage.CommodityDataPoint{
+				{Date: time.Now(), Value: 9125.50},
+			},
+		},
+		Index:          0,
+		FromCache:      false,
+		ActualInterval: "monthly", // Fallback interval for Copper
+	}
+
+	updatedM, _ := model.Update(dataMsg)
+	model = asModel(t, updatedM)
+
+	if model.GetRows()[0].ActualInterval != "monthly" {
+		t.Errorf("expected ActualInterval 'monthly', got %s", model.GetRows()[0].ActualInterval)
+	}
+
+	if model.GetRows()[0].State != StateLoaded {
+		t.Errorf("expected row to be in Loaded state, got %v", model.GetRows()[0].State)
+	}
+}
+
+// TestModel_IntervalFallback_SendsCorrectInterval tests that fallback interval is used.
+func TestModel_IntervalFallback_SendsCorrectInterval(t *testing.T) {
+	tests := []struct {
+		name              string
+		requestedInterval string
+		expectedActual    string
+	}{
+		{
+			name:              "Copper daily falls back to monthly",
+			requestedInterval: "daily",
+			expectedActual:    "monthly",
+		},
+		{
+			name:              "Aluminum daily falls back to monthly",
+			requestedInterval: "daily",
+			expectedActual:    "monthly",
+		},
+		{
+			name:              "AllCommodities weekly falls back to monthly",
+			requestedInterval: "weekly",
+			expectedActual:    "monthly",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := NewModel()
+			mockCache := &mockCacheStore{}
+			model.Configure(context.Background(), nil, []string{"COPPER"}, tt.requestedInterval, mockCache)
+
+			dataMsg := CommodityDataMsg{
+				Symbol:         "COPPER",
+				Series:         &alphavantage.CommoditySeries{},
+				Index:          0,
+				FromCache:      false,
+				ActualInterval: tt.expectedActual,
+			}
+
+			updatedM, _ := model.Update(dataMsg)
+			model = asModel(t, updatedM)
+
+			if model.GetRows()[0].ActualInterval != tt.expectedActual {
+				t.Errorf("expected ActualInterval %q, got %q", tt.expectedActual, model.GetRows()[0].ActualInterval)
+			}
+		})
+	}
+}

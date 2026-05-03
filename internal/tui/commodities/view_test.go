@@ -177,3 +177,142 @@ func containsString(s, substr string) bool {
 	}
 	return false
 }
+
+// TestView_FallbackChipShownOnMismatch tests that fallback chip is shown when intervals differ.
+func TestView_FallbackChipShownOnMismatch(t *testing.T) {
+	model := NewModel()
+	mockCache := &mockCacheStore{}
+	model.Configure(context.Background(), nil, []string{"COPPER"}, "daily", mockCache)
+
+	series := &alphavantage.CommoditySeries{
+		Name: "Copper",
+		Unit: "dollars per ton",
+		Data: []alphavantage.CommodityDataPoint{
+			{Date: time.Now(), Value: 9125.50},
+		},
+	}
+
+	model.rows[0].State = StateLoaded
+	model.rows[0].Series = series
+	model.rows[0].ActualInterval = "monthly" // Fallback interval
+
+	view := NewView(model)
+	view.SetTheme(&defaultTheme{})
+	row := view.buildRow(model.rows[0])
+
+	if len(row) != 6 {
+		t.Errorf("expected 6 columns, got %d", len(row))
+	}
+
+	// The PERIOD column is index 5
+	periodColumn := row[5]
+	if !containsString(periodColumn, "monthly") {
+		t.Errorf("expected fallback chip to show '→ monthly', got %s", periodColumn)
+	}
+}
+
+// TestView_FallbackChipHiddenOnExactMatch tests that fallback chip is hidden when intervals match.
+func TestView_FallbackChipHiddenOnExactMatch(t *testing.T) {
+	model := NewModel()
+	mockCache := &mockCacheStore{}
+	model.Configure(context.Background(), nil, []string{"WTI"}, "daily", mockCache)
+
+	series := &alphavantage.CommoditySeries{
+		Name: "WTI",
+		Unit: "dollars per barrel",
+		Data: []alphavantage.CommodityDataPoint{
+			{Date: time.Now(), Value: 75.50},
+		},
+	}
+
+	model.rows[0].State = StateLoaded
+	model.rows[0].Series = series
+	model.rows[0].ActualInterval = "daily" // Exact match
+
+	view := NewView(model)
+	view.SetTheme(&defaultTheme{})
+	row := view.buildRow(model.rows[0])
+
+	if len(row) != 6 {
+		t.Errorf("expected 6 columns, got %d", len(row))
+	}
+
+	// The PERIOD column is index 5
+	periodColumn := row[5]
+	if containsString(periodColumn, "→") {
+		t.Errorf("expected no fallback chip when intervals match, got %s", periodColumn)
+	}
+}
+
+// TestView_FallbackChipWithDifferentIntervals tests various interval mismatch scenarios.
+func TestView_FallbackChipWithDifferentIntervals(t *testing.T) {
+	tests := []struct {
+		name           string
+		requested      string
+		actualInterval string
+		expectChip     bool
+	}{
+		{
+			name:           "daily to monthly - show chip",
+			requested:      "daily",
+			actualInterval: "monthly",
+			expectChip:     true,
+		},
+		{
+			name:           "daily to weekly - show chip",
+			requested:      "daily",
+			actualInterval: "weekly",
+			expectChip:     true,
+		},
+		{
+			name:           "daily to daily - no chip",
+			requested:      "daily",
+			actualInterval: "daily",
+			expectChip:     false,
+		},
+		{
+			name:           "weekly to weekly - no chip",
+			requested:      "weekly",
+			actualInterval: "weekly",
+			expectChip:     false,
+		},
+		{
+			name:           "monthly to quarterly - show chip",
+			requested:      "monthly",
+			actualInterval: "quarterly",
+			expectChip:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := NewModel()
+			mockCache := &mockCacheStore{}
+			model.Configure(context.Background(), nil, []string{"WTI"}, tt.requested, mockCache)
+
+			series := &alphavantage.CommoditySeries{
+				Name: "WTI",
+				Unit: "dollars per barrel",
+				Data: []alphavantage.CommodityDataPoint{
+					{Date: time.Now(), Value: 75.50},
+				},
+			}
+
+			model.rows[0].State = StateLoaded
+			model.rows[0].Series = series
+			model.rows[0].ActualInterval = tt.actualInterval
+
+			view := NewView(model)
+			view.SetTheme(&defaultTheme{})
+			row := view.buildRow(model.rows[0])
+
+			// The PERIOD column is index 5
+			periodColumn := row[5]
+			hasChip := containsString(periodColumn, "→")
+
+			if hasChip != tt.expectChip {
+				t.Errorf("expected chip=%v, got chip=%v (period column: %s)", tt.expectChip, hasChip, periodColumn)
+			}
+		})
+	}
+}

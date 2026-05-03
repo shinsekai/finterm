@@ -218,8 +218,12 @@ func (v *View) buildRow(row RowData) []string {
 		// Change calculation (compare with previous period)
 		changeStr, changeStyle := v.calculateChange(data)
 
-		// Period (last date in series)
+		// Period (last date in series) with fallback chip if applicable
 		periodStr := latest.Date.Format("2006-01-02")
+		if row.ActualInterval != "" && row.ActualInterval != v.model.GetInterval() {
+			fallbackChip := v.theme.Muted().Render(fmt.Sprintf(" → %s", row.ActualInterval))
+			periodStr += fallbackChip
+		}
 
 		return []string{
 			row.Symbol,

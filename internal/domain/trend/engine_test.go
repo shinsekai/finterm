@@ -82,7 +82,7 @@ func TestEngine_EquityRoutesToRemote(t *testing.T) {
 	cfg.Trend.EMAFast = 10
 	cfg.Trend.EMASlow = 20
 
-	detector := indicators.NewAssetClassDetector(nil) // No crypto symbols → all equities
+	detector := indicators.NewAssetClassDetector(nil, nil) // No crypto symbols → all equities
 
 	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -120,7 +120,7 @@ func TestEngine_CryptoRoutesToLocal(t *testing.T) {
 	cfg.Trend.EMAFast = 10
 	cfg.Trend.EMASlow = 20
 
-	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"}, nil)
 
 	cryptoFetcher := &mockCryptoFetcher{data: testData}
 
@@ -160,7 +160,7 @@ func TestEngine_IndicatorError_Propagated(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -197,7 +197,7 @@ func TestEngine_FullAnalysis_Equity(t *testing.T) {
 	cfg.Trend.EMAFast = 10
 	cfg.Trend.EMASlow = 20
 
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -247,7 +247,7 @@ func TestEngine_FullAnalysis_Crypto(t *testing.T) {
 	cfg.Trend.EMAFast = 10
 	cfg.Trend.EMASlow = 20
 
-	detector := indicators.NewAssetClassDetector([]string{"BTC"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC"}, nil)
 
 	cryptoFetcher := &mockCryptoFetcher{data: testData}
 
@@ -309,7 +309,7 @@ func TestEngine_UsesClosedBarOnly(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -384,7 +384,7 @@ func TestEngine_RSINotUsedInTrendSignal(t *testing.T) {
 			localEMA := &indicators.LocalEMA{}
 
 			cfg := config.DefaultConfig()
-			detector := indicators.NewAssetClassDetector(nil)
+			detector := indicators.NewAssetClassDetector(nil, nil)
 
 			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -411,7 +411,7 @@ func TestEngine_EmptySymbol(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -431,7 +431,7 @@ func TestEngine_UnsupportedAssetClass(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -455,7 +455,7 @@ func TestEngine_NoDataPoints(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -481,7 +481,7 @@ func TestEngine_AnalyzeWithSymbolDetection(t *testing.T) {
 	localEMA := indicators.NewLocalEMA(nil)
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector([]string{"BTC"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC"}, nil)
 
 	cryptoFetcher := &mockCryptoFetcher{data: testData}
 
@@ -518,7 +518,7 @@ func TestEngine_SetLocalData(t *testing.T) {
 	localEMA := indicators.NewLocalEMA(initialData)
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -591,7 +591,7 @@ func TestEngine_ValuationMapping(t *testing.T) {
 			localEMA := &indicators.LocalEMA{}
 
 			cfg := config.DefaultConfig()
-			detector := indicators.NewAssetClassDetector(nil)
+			detector := indicators.NewAssetClassDetector(nil, nil)
 
 			engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
 
@@ -654,7 +654,7 @@ func TestEngine_BlitzScore_Crypto(t *testing.T) {
 	cfg.Trend.EMAFast = 10
 	cfg.Trend.EMASlow = 20
 
-	detector := indicators.NewAssetClassDetector([]string{"BTC"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC"}, nil)
 
 	cryptoFetcher := &mockCryptoFetcher{data: testData}
 
@@ -697,7 +697,7 @@ func TestEngine_BlitzScore_Equity(t *testing.T) {
 	cfg.Trend.EMAFast = 10
 	cfg.Trend.EMASlow = 20
 
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// Create mock time series data for BLITZ
 	timeSeries := &alphavantage.TimeSeriesDaily{
@@ -758,7 +758,7 @@ func TestEngine_BlitzScore_InsufficientData(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// Create empty time series data
 	timeSeries := &alphavantage.TimeSeriesDaily{
@@ -800,7 +800,7 @@ func TestEngine_BlitzScore_DoesNotBlockExisting(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// Create a time series client that returns an error
 	timeSeriesClient := &mockTimeSeriesClient{err: errors.New("API error")}
@@ -850,7 +850,7 @@ func TestEngine_BlitzScore_NoTimeSeriesClient(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// No time series client provided
 	engine := New(remoteRSI, remoteEMA, localRSI, localEMA, cfg, detector, nil, nil, nil)
@@ -886,7 +886,7 @@ func TestEngine_DestinyScore_Crypto(t *testing.T) {
 	localEMA := indicators.NewLocalEMA(testData)
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector([]string{"BTC"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC"}, nil)
 
 	cryptoFetcher := &mockCryptoFetcher{data: testData}
 
@@ -928,7 +928,7 @@ func TestEngine_DestinyScore_Equity(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// Create mock time series data for DESTINY
 	timeSeries := &alphavantage.TimeSeriesDaily{
@@ -987,7 +987,7 @@ func TestEngine_DestinyFailure_DoesNotBlockOthers(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// Create empty time series data (will cause DESTINY to fail)
 	timeSeries := &alphavantage.TimeSeriesDaily{
@@ -1041,7 +1041,7 @@ func TestEngine_TPIPopulated(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// Create mock time series data for BLITZ/DESTINY
 	timeSeries := &alphavantage.TimeSeriesDaily{
@@ -1123,7 +1123,7 @@ func TestEngine_VortexScore_Equity(t *testing.T) {
 	cfg.Trend.EMAFast = 10
 	cfg.Trend.EMASlow = 20
 
-	detector := indicators.NewAssetClassDetector(nil) // No crypto symbols → all equities
+	detector := indicators.NewAssetClassDetector(nil, nil) // No crypto symbols → all equities
 
 	// Create mock time series data with enough data for VORTEX
 	timeSeries := &alphavantage.TimeSeriesDaily{
@@ -1195,7 +1195,7 @@ func TestEngine_VortexScore_Crypto(t *testing.T) {
 	cfg.Trend.EMAFast = 10
 	cfg.Trend.EMASlow = 20
 
-	detector := indicators.NewAssetClassDetector([]string{"BTC"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC"}, nil)
 
 	cryptoFetcher := &mockCryptoFetcher{data: testData}
 
@@ -1240,7 +1240,7 @@ func TestEngine_VortexScore_FailureDefaults(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// Use a time series client that returns empty data (insufficient for VORTEX)
 	timeSeries := &alphavantage.TimeSeriesDaily{
@@ -1294,7 +1294,7 @@ func TestTrendEngine_ResultIncludesPriceHistory(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// Create time series data with 10 close prices
 	timeSeries := &alphavantage.TimeSeriesDaily{
@@ -1356,7 +1356,7 @@ func TestTrendEngine_ResultPriceHistoryCappedAt30(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector(nil)
+	detector := indicators.NewAssetClassDetector(nil, nil)
 
 	// Create time series data with 50 close prices (more than the 30 limit)
 	timeSeries := &alphavantage.TimeSeriesDaily{
@@ -1425,7 +1425,7 @@ func TestTrendEngine_CryptoPriceHistory(t *testing.T) {
 	localEMA := &indicators.LocalEMA{}
 
 	cfg := config.DefaultConfig()
-	detector := indicators.NewAssetClassDetector([]string{"BTC"}) // BTC is crypto
+	detector := indicators.NewAssetClassDetector([]string{"BTC"}, nil) // BTC is crypto
 
 	// Create crypto OHLCV data with 20 bars
 	cryptoData := make([]indicators.OHLCV, 20)

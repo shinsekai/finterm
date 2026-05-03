@@ -70,8 +70,8 @@ func main() {
 		cacheStore = cache.New()
 	}
 
-	// Create asset class detector with crypto symbols
-	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto)
+	// Create asset class detector with crypto symbols and default commodities
+	detector := indicators.NewAssetClassDetector(cfg.Watchlist.Crypto, nil)
 
 	// Create remote indicators (for equities)
 	remoteRSI := indicators.NewRemoteRSI(avClient)

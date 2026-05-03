@@ -50,6 +50,8 @@ const (
 	Equity AssetClass = iota
 	// Crypto represents cryptocurrencies.
 	Crypto
+	// Commodity represents commodities (e.g., WTI, BRENT, WHEAT).
+	Commodity
 )
 
 // String returns the string representation of the AssetClass.
@@ -59,36 +61,59 @@ func (a AssetClass) String() string {
 		return "Equity"
 	case Crypto:
 		return "Crypto"
+	case Commodity:
+		return "Commodity"
 	default:
 		return "Unknown"
 	}
 }
 
-// AssetClassDetector provides configurable asset class detection.
-// The crypto list is thread-safe and can be updated at runtime.
-type AssetClassDetector struct {
-	mu            sync.RWMutex
-	cryptoSymbols map[string]bool
+// DefaultCommoditySymbols is the list of supported commodity symbols.
+// These match the CommodityFunction constants in internal/alphavantage/commodities.go.
+var DefaultCommoditySymbols = []string{
+	"WTI", "BRENT", "NATURAL_GAS", "COPPER", "ALUMINUM",
+	"WHEAT", "CORN", "COTTON", "SUGAR", "COFFEE",
 }
 
-// NewAssetClassDetector creates a new detector with the provided list of crypto symbols.
+// AssetClassDetector provides configurable asset class detection.
+// The crypto and commodity lists are thread-safe and can be updated at runtime.
+type AssetClassDetector struct {
+	mu               sync.RWMutex
+	cryptoSymbols    map[string]bool
+	commoditySymbols map[string]bool
+}
+
+// NewAssetClassDetector creates a new detector with the provided lists of crypto and commodity symbols.
 // The symbols are stored in uppercase for case-insensitive matching.
-func NewAssetClassDetector(cryptoSymbols []string) *AssetClassDetector {
+// If commoditySymbols is nil, DefaultCommoditySymbols is used.
+func NewAssetClassDetector(cryptoSymbols, commoditySymbols []string) *AssetClassDetector {
 	d := &AssetClassDetector{
-		cryptoSymbols: make(map[string]bool),
+		cryptoSymbols:    make(map[string]bool),
+		commoditySymbols: make(map[string]bool),
 	}
 	for _, symbol := range cryptoSymbols {
 		d.cryptoSymbols[strings.ToUpper(symbol)] = true
+	}
+	if commoditySymbols == nil {
+		commoditySymbols = DefaultCommoditySymbols
+	}
+	for _, symbol := range commoditySymbols {
+		d.commoditySymbols[strings.ToUpper(symbol)] = true
 	}
 	return d
 }
 
 // DetectAssetClass returns the asset class for the given symbol.
-// Returns Crypto if the symbol matches any known crypto symbol, otherwise Equity.
+// Returns Commodity if the symbol matches any known commodity symbol,
+// Crypto if the symbol matches any known crypto symbol,
+// otherwise Equity (the default fallback).
 func (d *AssetClassDetector) DetectAssetClass(symbol string) AssetClass {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	upper := strings.ToUpper(symbol)
+	if d.commoditySymbols[upper] {
+		return Commodity
+	}
 	if d.cryptoSymbols[upper] {
 		return Crypto
 	}
@@ -120,4 +145,31 @@ func (d *AssetClassDetector) RemoveCryptoSymbol(symbol string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	delete(d.cryptoSymbols, strings.ToUpper(symbol))
+}
+
+// SetCommoditySymbols updates the list of known commodity symbols.
+// This is thread-safe and can be called at runtime.
+func (d *AssetClassDetector) SetCommoditySymbols(commoditySymbols []string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.commoditySymbols = make(map[string]bool)
+	for _, symbol := range commoditySymbols {
+		d.commoditySymbols[strings.ToUpper(symbol)] = true
+	}
+}
+
+// AddCommoditySymbol adds a single commodity symbol to the detector.
+// Thread-safe operation.
+func (d *AssetClassDetector) AddCommoditySymbol(symbol string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.commoditySymbols[strings.ToUpper(symbol)] = true
+}
+
+// RemoveCommoditySymbol removes a commodity symbol from the detector.
+// Thread-safe operation.
+func (d *AssetClassDetector) RemoveCommoditySymbol(symbol string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	delete(d.commoditySymbols, strings.ToUpper(symbol))
 }

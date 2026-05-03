@@ -263,7 +263,7 @@ func TestFormatPercentFundamentals(t *testing.T) {
 // TestQuoteModel_FToggleOnEquityFetches tests that F on equity fetches fundamentals.
 func TestQuoteModel_FToggleOnEquityFetches(t *testing.T) {
 	model := NewModel()
-	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"}, nil)
 	model.Configure(context.Background(), nil, nil, detector)
 
 	// Set up quote data for equity
@@ -289,7 +289,7 @@ func TestQuoteModel_FToggleOnEquityFetches(t *testing.T) {
 // TestQuoteModel_FToggleOnCryptoNoOp tests that F on crypto shows chip but doesn't fetch.
 func TestQuoteModel_FToggleOnCryptoNoOp(t *testing.T) {
 	model := NewModel()
-	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"}, nil)
 	model.Configure(context.Background(), nil, nil, detector)
 
 	// Set up quote data for crypto
@@ -319,7 +319,7 @@ func TestQuoteModel_FToggleOnCryptoNoOp(t *testing.T) {
 // TestQuoteModel_FSecondPressUsesCache tests that second F press uses cached data.
 func TestQuoteModel_FSecondPressUsesCache(t *testing.T) {
 	model := NewModel()
-	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"}, nil)
 	model.Configure(context.Background(), nil, nil, detector)
 
 	// Set up quote data and cached fundamentals
@@ -363,7 +363,7 @@ func TestQuoteModel_FundamentalsHiddenByDefault(t *testing.T) {
 // TestQuoteModel_CryptoChipShownOnce tests that crypto chip is only shown once.
 func TestQuoteModel_CryptoChipShownOnce(t *testing.T) {
 	model := NewModel()
-	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"})
+	detector := indicators.NewAssetClassDetector([]string{"BTC", "ETH"}, nil)
 	model.Configure(context.Background(), nil, nil, detector)
 
 	// Set up quote data for crypto

@@ -64,9 +64,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - Interval validation: commodity futures support 1min, 5min, 15min, 30min, 60min, daily, weekly, monthly
   - Asset mapping: XAUUSD→Gold, XAGUSD→Silver, WTI→Crude Oil, NATURAL_GAS→Natural Gas, COPPER→Copper
 
-## [0.8.1] — 2026-05-01
+## [0.9.1] — 2026-05-03
 
 ### Fixed
+- Commodities smart interval fallback — added intelligent fallback logic for unsupported commodity interval combinations
+  - When a commodity ticker requests an interval not supported by its endpoint, automatically falls back to the nearest valid interval
+  - Prevents API errors and provides the best available data instead of failing
 - TPI pane axis labels and bounds — fixed bottom label visibility and axis number formatting
 - Price pane consistent Y-axis grammar — unified axis label format across all panes
 - Outlier-resilient price range — added robust range calculation with outlier clipping and clip indicators

@@ -87,6 +87,28 @@ valuation:
   # RSI above this value is considered overbought.
   overbought: 70
 
+# Commodities dashboard configuration.
+commodities:
+  # Commodity symbols to monitor. Available: WTI, BRENT, NATURAL_GAS, COPPER,
+  # ALUMINUM, WHEAT, CORN, COFFEE, SUGAR, COTTON.
+  # If empty, all available commodities are shown.
+  watchlist:
+    - WTI
+    - BRENT
+    - NATURAL_GAS
+    - COPPER
+    - ALUMINUM
+    - WHEAT
+    - CORN
+    - COFFEE
+    - SUGAR
+    - COTTON
+
+  # Data interval: "daily", "weekly", "monthly", "quarterly", or "annual".
+  # Daily for WTI, BRENT, NATURAL_GAS, WHEAT, CORN, COTTON, COFFEE, SUGAR.
+  # Monthly/quarterly/annual for COPPER and ALUMINUM (daily not available).
+  interval: daily
+
 # BLITZ trend following system configuration.
 blitz:
   # Lookback period for dynamic RSI calculation.

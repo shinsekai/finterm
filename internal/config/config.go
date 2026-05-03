@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -16,12 +17,13 @@ const (
 
 // Config holds the complete application configuration.
 type Config struct {
-	API       APIConfig       `yaml:"api"`
-	Watchlist WatchlistConfig `yaml:"watchlist"`
-	Trend     TrendConfig     `yaml:"trend"`
-	Valuation ValuationConfig `yaml:"valuation"`
-	Cache     CacheConfig     `yaml:"cache"`
-	Theme     ThemeConfig     `yaml:"theme"`
+	API         APIConfig         `yaml:"api"`
+	Watchlist   WatchlistConfig   `yaml:"watchlist"`
+	Trend       TrendConfig       `yaml:"trend"`
+	Valuation   ValuationConfig   `yaml:"valuation"`
+	Commodities CommoditiesConfig `yaml:"commodities"`
+	Cache       CacheConfig       `yaml:"cache"`
+	Theme       ThemeConfig       `yaml:"theme"`
 }
 
 // APIConfig holds Alpha Vantage API configuration.
@@ -72,6 +74,12 @@ type ThemeConfig struct {
 	Style string `yaml:"style"`
 }
 
+// CommoditiesConfig holds commodities dashboard configuration.
+type CommoditiesConfig struct {
+	Watchlist []string `yaml:"watchlist"`
+	Interval  string   `yaml:"interval"`
+}
+
 // DefaultConfig returns a Config with default values applied.
 func DefaultConfig() *Config {
 	return &Config{
@@ -109,6 +117,14 @@ func DefaultConfig() *Config {
 		},
 		Theme: ThemeConfig{
 			Style: "default",
+		},
+
+		Commodities: CommoditiesConfig{
+			Watchlist: []string{
+				"WTI", "BRENT", "NATURAL_GAS", "COPPER", "ALUMINUM",
+				"WHEAT", "CORN", "COFFEE", "SUGAR", "COTTON",
+			},
+			Interval: "daily",
 		},
 	}
 }
@@ -154,6 +170,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := validateValuationConfig(c.Valuation); err != nil {
+		return err
+	}
+	if err := validateCommoditiesConfig(c.Commodities); err != nil {
 		return err
 	}
 	if err := validateCacheConfig(c.Cache); err != nil {
@@ -242,6 +261,26 @@ func validateValuationConfig(valuation ValuationConfig) error {
 	for _, threshold := range rsiThresholds {
 		if threshold.value < 0 || threshold.value > 100 {
 			return fmt.Errorf("%s must be between 0 and 100, got %d", threshold.name, threshold.value)
+		}
+	}
+
+	return nil
+}
+
+// validateCommoditiesConfig validates the commodities configuration section.
+func validateCommoditiesConfig(commodities CommoditiesConfig) error {
+	// Interval validation (optional field, defaults to "daily" if empty)
+	if commodities.Interval != "" {
+		normalizedInterval := strings.ToLower(commodities.Interval)
+		validIntervals := map[string]bool{
+			"daily":     true,
+			"weekly":    true,
+			"monthly":   true,
+			"quarterly": true,
+			"annual":    true,
+		}
+		if !validIntervals[normalizedInterval] {
+			return fmt.Errorf("commodities.interval must be one of: daily, weekly, monthly, quarterly, annual, got %q", commodities.Interval)
 		}
 	}
 

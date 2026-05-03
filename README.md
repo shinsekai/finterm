@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  Trend-following signals · Real-time quotes · Macro dashboard · Sentiment-scored news
+  Trend-following signals · Real-time quotes · Macro dashboard · Sentiment-scored news · Commodities dashboard
 </p>
 
 ---
@@ -57,7 +57,9 @@ SOL     ░░▓▓▓▓░░░░░ -1.00 CASH  ▼ SHORT    ▼ SHORT    
 
 **Chart View** — Candlestick chart with TPI overlay showing price action (~70% height) and composite TPI trajectory (~30% height). Supports multiple timeframes (intraday, daily, weekly, monthly), zoom (+/-), pan (h/l), and ticker cycling (j/k). Uses cell-based OHLC rendering and braille canvas for 2×4 subpixel TPI resolution.
 
-**Navigation** — Fully keyboard-driven: `1-5` for tabs, `j/k` or arrows for rows, `r` to refresh, `?` for help, `q` to quit.
+**Commodities Dashboard** — Table-based view of commodity prices with sparklines, latest values, and period-over-period change. Supports WTI, BRENT, NATURAL_GAS, COPPER, ALUMINUM, WHEAT, CORN, COFFEE, SUGAR, and COTTON. Configurable intervals (daily, weekly, monthly, quarterly, annual).
+
+**Navigation** — Fully keyboard-driven: `1-6` for tabs, `j/k` or arrows for rows, `r` to refresh, `?` for help, `q` to quit.
 
 ## Architecture
 
@@ -225,6 +227,10 @@ valuation:
   overvalued: 70
   overbought: 70
 
+commodities:
+  watchlist: [WTI, BRENT, NATURAL_GAS, COPPER, ALUMINUM, WHEAT, CORN, COFFEE, SUGAR, COTTON]
+  interval: daily                     # daily | weekly | monthly | quarterly | annual
+
 blitz:
   rsi_length: 12                   # Dynamic RSI lookback period
   tsi_period: 14                   # Pearson correlation lookback period
@@ -265,7 +271,7 @@ theme:
 
 | Key | Action |
 |---|---|
-| `1` / `2` / `3` / `4` / `5` | Switch to Trend / Quote / Macro / News / Chart tab |
+| `1` / `2` / `3` / `4` / `5` / `6` | Switch to Trend / Quote / Macro / News / Chart / Commodities tab |
 | `Tab` | Cycle to next tab |
 | `j` / `k` or `↑` / `↓` | Navigate rows (Trend, News) / Cycle ticker (Chart) |
 | `Enter` | Submit ticker (Quote view) / Open article (News view) |
@@ -334,6 +340,7 @@ finterm/
 │   │   ├── quote/                   # Quote lookup view
 │   │   ├── macro/                   # Macro dashboard view
 │   │   ├── news/                    # News feed view
+│   │   ├── commodities/             # Commodities dashboard view
 │   │   └── components/              # Shared UI (spinner, table, help)
 │   ├── domain/                      # Pure business logic
 │   │   ├── trend/                   # Trend engine + scoring

@@ -4,6 +4,7 @@ package alphavantage
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 )
@@ -194,6 +195,118 @@ func ParseFloat(s string) (float64, error) {
 		return 0, nil
 	}
 	return strconv.ParseFloat(s, 64)
+}
+
+// CommodityDataPoint represents a single commodity price data point.
+// The date and value fields use custom unmarshaling to handle
+// Alpha Vantage's string-encoded numbers and "." sentinel values.
+type CommodityDataPoint struct {
+	Date  time.Time
+	Value float64
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for CommodityDataPoint.
+// Alpha Vantage returns data points as arrays: ["2024-01-01", "75.50"].
+// The "." sentinel value is skipped (not included in the output).
+func (c *CommodityDataPoint) UnmarshalJSON(data []byte) error {
+	var arr []string
+	if err := json.Unmarshal(data, &arr); err != nil {
+		return fmt.Errorf("parsing commodity data point: %w", err)
+	}
+
+	if len(arr) != 2 {
+		return fmt.Errorf("expected 2 elements in commodity data point, got %d", len(arr))
+	}
+
+	// Parse date
+	t, err := ParseDate(arr[0])
+	if err != nil {
+		return fmt.Errorf("parsing date %q: %w", arr[0], err)
+	}
+	c.Date = t
+
+	// Parse value, handling "." sentinel
+	if arr[1] == "." {
+		// Sentinel value - set to zero, caller should skip if needed
+		c.Value = 0
+		return nil
+	}
+
+	f, err := ParseFloat(arr[1])
+	if err != nil {
+		return fmt.Errorf("parsing value %q: %w", arr[1], err)
+	}
+	c.Value = f
+
+	return nil
+}
+
+// CommoditySeries represents the response from a commodity data endpoint.
+// It contains metadata about the commodity and a slice of data points.
+// Custom unmarshaling handles the array-based data format and skips "." values.
+type CommoditySeries struct {
+	Name     string               `json:"name"`
+	Interval string               `json:"interval"`
+	Unit     string               `json:"unit"`
+	Data     []CommodityDataPoint `json:"data"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for CommoditySeries.
+// Alpha Vantage returns commodity data as: {"name": "...", "data": [["2024-01-01", "75.50"], ...]}.
+// The "." sentinel values in the data array are skipped (not included in the slice).
+func (cs *CommoditySeries) UnmarshalJSON(data []byte) error {
+	type Alias CommoditySeries
+	aux := &struct {
+		RawData [][]string `json:"data"`
+		*Alias
+	}{
+		Alias: (*Alias)(cs),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return fmt.Errorf("parsing commodity series: %w", err)
+	}
+
+	// Convert raw data to CommodityDataPoint, skipping "." values
+	cs.Data = make([]CommodityDataPoint, 0, len(aux.RawData))
+	for _, raw := range aux.RawData {
+		// Skip entries with "." sentinel value
+		if len(raw) == 2 && raw[1] == "." {
+			continue
+		}
+
+		// Parse date
+		t, err := ParseDate(raw[0])
+		if err != nil {
+			return fmt.Errorf("parsing date %q in commodity series: %w", raw[0], err)
+		}
+
+		// Parse value
+		f, err := ParseFloat(raw[1])
+		if err != nil {
+			return fmt.Errorf("parsing value %q in commodity series: %w", raw[1], err)
+		}
+
+		cs.Data = append(cs.Data, CommodityDataPoint{
+			Date:  t,
+			Value: f,
+		})
+	}
+
+	return nil
+}
+
+// SortAscending sorts the data points in ascending order (oldest first).
+// By default, Alpha Vantage returns data in descending order (newest first).
+func (cs *CommoditySeries) SortAscending() {
+	if cs == nil {
+		return
+	}
+	slice := cs.Data
+	for i := 0; i < len(slice)/2; i++ {
+		j := len(slice) - 1 - i
+		slice[i], slice[j] = slice[j], slice[i]
+	}
 }
 
 // ParseDate parses an Alpha Vantage date string in YYYY-MM-DD format.

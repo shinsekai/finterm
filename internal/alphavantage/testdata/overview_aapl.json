@@ -1,0 +1,22 @@
+{
+    "Symbol": "AAPL",
+    "Name": "Apple Inc.",
+    "Description": "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide. The company offers iPhone, Mac, iPad, and wearables, home, and accessories comprising AirPods, Apple TV, Apple Watch, Beats products, and HomePod.",
+    "Exchange": "NASDAQ",
+    "Currency": "USD",
+    "Country": "USA",
+    "Sector": "Technology",
+    "Industry": "Consumer Electronics",
+    "MarketCapitalization": "2848000000000",
+    "PERatio": "29.42",
+    "PEGRatio": "2.68",
+    "BookValue": "4.19",
+    "DividendPerShare": "0.96",
+    "DividendYield": "0.56",
+    "EPS": "6.16",
+    "Beta": "1.28",
+    "52WeekHigh": "199.62",
+    "52WeekLow": "124.17",
+    "SharesOutstanding": "15555300000",
+    "FiscalYearEnd": "September"
+}

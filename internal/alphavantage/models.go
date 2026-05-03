@@ -322,3 +322,165 @@ func ParseDate(s string) (time.Time, error) {
 	}
 	return time.Time{}, &time.ParseError{Layout: "2006-01-02", Value: s}
 }
+
+// CompanyOverview represents the OVERVIEW response from Alpha Vantage.
+// It contains comprehensive company fundamentals including valuation metrics,
+// financial ratios, and other fundamental data for equities.
+type CompanyOverview struct {
+	Symbol               string `json:"Symbol"`
+	Name                 string `json:"Name"`
+	Description          string `json:"Description"`
+	Exchange             string `json:"Exchange"`
+	Currency             string `json:"Currency"`
+	Country              string `json:"Country"`
+	Sector               string `json:"Sector"`
+	Industry             string `json:"Industry"`
+	MarketCapitalization string `json:"MarketCapitalization"`
+	PERatio              string `json:"PERatio"`
+	PEGRatio             string `json:"PEGRatio"`
+	BookValue            string `json:"BookValue"`
+	DividendPerShare     string `json:"DividendPerShare"`
+	DividendYield        string `json:"DividendYield"`
+	EPS                  string `json:"EPS"`
+	Beta                 string `json:"Beta"`
+	FiftyTwoWeekHigh     string `json:"52WeekHigh"`
+	FiftyTwoWeekLow      string `json:"52WeekLow"`
+	SharesOutstanding    string `json:"SharesOutstanding"`
+	FiscalYearEnd        string `json:"FiscalYearEnd"`
+}
+
+// MarketCapitalizationValue returns the market capitalization as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) MarketCapitalizationValue() float64 {
+	val, _ := ParseFloat(c.MarketCapitalization)
+	return val
+}
+
+// PERatioValue returns the P/E ratio as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) PERatioValue() float64 {
+	val, _ := ParseFloat(c.PERatio)
+	return val
+}
+
+// PEGRatioValue returns the PEG ratio as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) PEGRatioValue() float64 {
+	val, _ := ParseFloat(c.PEGRatio)
+	return val
+}
+
+// BookValueValue returns the book value as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) BookValueValue() float64 {
+	val, _ := ParseFloat(c.BookValue)
+	return val
+}
+
+// DividendPerShareValue returns the dividend per share as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) DividendPerShareValue() float64 {
+	val, _ := ParseFloat(c.DividendPerShare)
+	return val
+}
+
+// DividendYieldValue returns the dividend yield as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) DividendYieldValue() float64 {
+	val, _ := ParseFloat(c.DividendYield)
+	return val
+}
+
+// EPSValue returns the earnings per share as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) EPSValue() float64 {
+	val, _ := ParseFloat(c.EPS)
+	return val
+}
+
+// BetaValue returns the beta as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) BetaValue() float64 {
+	val, _ := ParseFloat(c.Beta)
+	return val
+}
+
+// FiftyTwoWeekHighValue returns the 52-week high as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) FiftyTwoWeekHighValue() float64 {
+	val, _ := ParseFloat(c.FiftyTwoWeekHigh)
+	return val
+}
+
+// FiftyTwoWeekLowValue returns the 52-week low as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) FiftyTwoWeekLowValue() float64 {
+	val, _ := ParseFloat(c.FiftyTwoWeekLow)
+	return val
+}
+
+// SharesOutstandingValue returns the shares outstanding as a float64.
+// Handles "None" sentinel values by returning 0.
+func (c *CompanyOverview) SharesOutstandingValue() float64 {
+	val, _ := ParseFloat(c.SharesOutstanding)
+	return val
+}
+
+// AnnualEarnings represents a single annual earnings entry.
+type AnnualEarnings struct {
+	FiscalDateEnding string `json:"fiscalDateEnding"`
+	ReportedEPS      string `json:"reportedEPS"`
+}
+
+// ReportedEPSValue returns the reported EPS as a float64.
+// Handles "None" sentinel values by returning 0.
+func (a *AnnualEarnings) ReportedEPSValue() float64 {
+	val, _ := ParseFloat(a.ReportedEPS)
+	return val
+}
+
+// QuarterlyEarnings represents a single quarterly earnings entry.
+type QuarterlyEarnings struct {
+	FiscalDateEnding   string `json:"fiscalDateEnding"`
+	ReportedDate       string `json:"reportedDate"`
+	ReportedEPS        string `json:"reportedEPS"`
+	EstimatedEPS       string `json:"estimatedEPS"`
+	Surprise           string `json:"surprise"`
+	SurprisePercentage string `json:"surprisePercentage"`
+}
+
+// ReportedEPSValue returns the reported EPS as a float64.
+// Handles "None" sentinel values by returning 0.
+func (q *QuarterlyEarnings) ReportedEPSValue() float64 {
+	val, _ := ParseFloat(q.ReportedEPS)
+	return val
+}
+
+// EstimatedEPSValue returns the estimated EPS as a float64.
+// Handles "None" sentinel values by returning 0.
+func (q *QuarterlyEarnings) EstimatedEPSValue() float64 {
+	val, _ := ParseFloat(q.EstimatedEPS)
+	return val
+}
+
+// SurpriseValue returns the earnings surprise as a float64.
+// Handles "None" sentinel values by returning 0.
+func (q *QuarterlyEarnings) SurpriseValue() float64 {
+	val, _ := ParseFloat(q.Surprise)
+	return val
+}
+
+// SurprisePercentageValue returns the earnings surprise percentage as a float64.
+// Handles "None" sentinel values by returning 0.
+func (q *QuarterlyEarnings) SurprisePercentageValue() float64 {
+	val, _ := ParseFloat(q.SurprisePercentage)
+	return val
+}
+
+// Earnings represents the EARNINGS response from Alpha Vantage.
+// It contains both annual and quarterly earnings history.
+type Earnings struct {
+	Symbol    string              `json:"symbol"`
+	Annual    []AnnualEarnings    `json:"annualEarnings"`
+	Quarterly []QuarterlyEarnings `json:"quarterlyEarnings"`
+}

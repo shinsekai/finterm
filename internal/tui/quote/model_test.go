@@ -4,8 +4,10 @@ package quote
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -27,12 +29,36 @@ func (m *mockEngine) AnalyzeWithSymbolDetection(_ context.Context, _ string) (*t
 
 // mockClient is a mock implementation of QuoteClient for testing.
 type mockClient struct {
-	quote *alphavantage.GlobalQuote
-	err   error
+	quote       *alphavantage.GlobalQuote
+	cryptoDaily *alphavantage.CryptoDaily
+	err         error
 }
 
 func (m *mockClient) GetGlobalQuote(_ context.Context, _ string) (*alphavantage.GlobalQuote, error) {
 	return m.quote, m.err
+}
+
+// GetCryptoDaily implements CryptoQuoteClient for crypto testing.
+func (m *mockClient) GetCryptoDaily(_ context.Context, symbol, market string) (*alphavantage.CryptoDaily, error) {
+	if m.cryptoDaily != nil {
+		return m.cryptoDaily, m.err
+	}
+	// If no cryptoDaily is set, return error
+	return nil, fmt.Errorf("no crypto data configured for %s/%s", symbol, market)
+}
+
+// mockCommodityClient is a mock implementation of CommodityQuoteClient for testing.
+type mockCommodityClient struct {
+	series *alphavantage.CommoditySeries
+	err    error
+}
+
+func (m *mockCommodityClient) GetGlobalQuote(_ context.Context, _ string) (*alphavantage.GlobalQuote, error) {
+	return nil, nil
+}
+
+func (m *mockCommodityClient) GetCommodity(_ context.Context, _ alphavantage.CommodityFunction, _ string) (*alphavantage.CommoditySeries, error) {
+	return m.series, m.err
 }
 
 // TestNewModel verifies model is initialized correctly.
@@ -1345,4 +1371,411 @@ func TestQuoteView_ErrorRetryHint(t *testing.T) {
 	assert.Contains(t, rendered, "clear", "Should show 'clear' hint")
 	assert.Contains(t, rendered, "Enter", "Should show Enter key hint")
 	assert.Contains(t, rendered, "Esc", "Should show Esc key hint")
+}
+
+// TestFetchQuoteCmd_RoutesCommodityToCommodityEndpoint verifies that commodity symbols
+// are routed to the commodity quote endpoint.
+func TestFetchQuoteCmd_RoutesCommodityToCommodityEndpoint(t *testing.T) {
+	model := NewModel()
+	ctx := context.Background()
+
+	// Create mock commodity client with test data
+	mockCommodity := &mockCommodityClient{
+		series: &alphavantage.CommoditySeries{
+			Name:     "West Texas Intermediate Crude Oil",
+			Interval: "daily",
+			Unit:     "USD per Barrel",
+			Data: []alphavantage.CommodityDataPoint{
+				{Value: 75.50, Date: mustParseTime("2024-01-15")},
+				{Value: 74.00, Date: mustParseTime("2024-01-14")},
+			},
+		},
+	}
+
+	// Configure with commodity detector and mock client
+	detector := indicators.NewAssetClassDetector(nil, indicators.DefaultCommoditySymbols)
+	model.Configure(ctx, mockCommodity, &mockEngine{}, detector)
+
+	// Execute the command
+	cmd := model.fetchQuoteCmd("WTI")
+	msg := cmd()
+
+	resultMsg, ok := msg.(QuoteResultMsg)
+	if !ok {
+		t.Fatalf("Expected QuoteResultMsg, got %T", msg)
+	}
+
+	// Verify quote was created with commodity data
+	if resultMsg.Data.Quote == nil {
+		t.Fatal("Expected quote to be populated")
+	}
+
+	if resultMsg.Data.Quote.Symbol != "WTI" {
+		t.Errorf("Expected symbol WTI, got %s", resultMsg.Data.Quote.Symbol)
+	}
+
+	// Verify price from commodity data
+	price, err := alphavantage.ParseFloat(resultMsg.Data.Quote.Price)
+	if err != nil {
+		t.Fatalf("Failed to parse price: %v", err)
+	}
+	if price != 75.50 {
+		t.Errorf("Expected price 75.50, got %.2f", price)
+	}
+
+	// Verify change calculation
+	change, err := alphavantage.ParseFloat(resultMsg.Data.Quote.Change)
+	if err != nil {
+		t.Fatalf("Failed to parse change: %v", err)
+	}
+	expectedChange := 75.50 - 74.00
+	if change != expectedChange {
+		t.Errorf("Expected change %.2f, got %.2f", expectedChange, change)
+	}
+
+	// Verify indicators are nil for commodities
+	if resultMsg.Data.Indicators != nil {
+		t.Error("Expected indicators to be nil for commodities")
+	}
+}
+
+// TestFetchQuoteCmd_RoutesCryptoUnchanged verifies that crypto symbols
+// are still routed to the crypto quote endpoint (regression test).
+func TestFetchQuoteCmd_RoutesCryptoUnchanged(t *testing.T) {
+	model := NewModel()
+	ctx := context.Background()
+
+	// Create mock crypto client with cryptoDaily data
+	mockCrypto := &mockClient{
+		cryptoDaily: &alphavantage.CryptoDaily{
+			TimeSeries: map[string]alphavantage.CryptoEntry{
+				"2024-01-15": {
+					Open:   "49500.00",
+					High:   "51000.00",
+					Low:    "49000.00",
+					Close:  "50000.00",
+					Volume: "1000.0",
+				},
+				"2024-01-14": {
+					Open:   "49200.00",
+					High:   "49800.00",
+					Low:    "49000.00",
+					Close:  "49500.00",
+					Volume: "950.0",
+				},
+			},
+		},
+	}
+
+	// Create mock engine with a result
+	mockEngine := &mockEngine{
+		result: &trenddomain.Result{
+			RSI:          50.0,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1,
+			FlowScore:    1,
+			VortexScore:  1,
+			TPI:          0.75,
+			TPISignal:    "Bullish",
+		},
+	}
+
+	// Configure with crypto detector
+	detector := indicators.NewAssetClassDetector([]string{"BTC"}, nil)
+	model.Configure(ctx, mockCrypto, mockEngine, detector)
+
+	// Execute the command
+	cmd := model.fetchQuoteCmd("BTC")
+	msg := cmd()
+
+	resultMsg, ok := msg.(QuoteResultMsg)
+	if !ok {
+		t.Fatalf("Expected QuoteResultMsg, got %T", msg)
+	}
+
+	if resultMsg.Data.Quote.Symbol != "BTC" {
+		t.Errorf("Expected symbol BTC, got %s", resultMsg.Data.Quote.Symbol)
+	}
+
+	// Verify indicators are fetched for crypto (not nil)
+	if resultMsg.Data.Indicators == nil {
+		t.Error("Expected indicators to be populated for crypto")
+	}
+}
+
+// TestFetchQuoteCmd_RoutesEquityUnchanged verifies that equity symbols
+// are still routed to the equity quote endpoint (regression test).
+func TestFetchQuoteCmd_RoutesEquityUnchanged(t *testing.T) {
+	model := NewModel()
+	ctx := context.Background()
+
+	// Create mock equity client
+	mockEquity := &mockClient{
+		quote: &alphavantage.GlobalQuote{
+			Symbol:         "AAPL",
+			Price:          "185.00",
+			Open:           "183.00",
+			High:           "186.00",
+			Low:            "182.00",
+			Volume:         "50000000",
+			LastTradingDay: "2024-01-15",
+			PreviousClose:  "183.00",
+			Change:         "2.00",
+			ChangePercent:  "1.09%",
+		},
+	}
+
+	// Create mock engine with a result
+	mockEngine := &mockEngine{
+		result: &trenddomain.Result{
+			RSI:          55.0,
+			Signal:       trenddomain.Bullish,
+			BlitzScore:   1,
+			DestinyScore: 1,
+			FlowScore:    1,
+			VortexScore:  1,
+			TPI:          0.50,
+			TPISignal:    "Bullish",
+		},
+	}
+
+	// Configure with default detector (no crypto/commodity symbols)
+	detector := indicators.NewAssetClassDetector(nil, nil)
+	model.Configure(ctx, mockEquity, mockEngine, detector)
+
+	// Execute the command
+	cmd := model.fetchQuoteCmd("AAPL")
+	msg := cmd()
+
+	resultMsg, ok := msg.(QuoteResultMsg)
+	if !ok {
+		t.Fatalf("Expected QuoteResultMsg, got %T", msg)
+	}
+
+	if resultMsg.Data.Quote.Symbol != "AAPL" {
+		t.Errorf("Expected symbol AAPL, got %s", resultMsg.Data.Quote.Symbol)
+	}
+
+	// Verify indicators are fetched for equity (not nil)
+	if resultMsg.Data.Indicators == nil {
+		t.Error("Expected indicators to be populated for equity")
+	}
+}
+
+// TestFetchCommodityAsQuote_BuildsValidGlobalQuote verifies that commodity data
+// is correctly converted to a GlobalQuote structure.
+func TestFetchCommodityAsQuote_BuildsValidGlobalQuote(t *testing.T) {
+	model := NewModel()
+	ctx := context.Background()
+
+	// Create mock commodity client with test data
+	mockCommodity := &mockCommodityClient{
+		series: &alphavantage.CommoditySeries{
+			Name:     "Wheat",
+			Interval: "daily",
+			Unit:     "USD per Bushel",
+			Data: []alphavantage.CommodityDataPoint{
+				{Value: 6.50, Date: mustParseTime("2024-01-15")},
+				{Value: 6.40, Date: mustParseTime("2024-01-14")},
+			},
+		},
+	}
+
+	detector := indicators.NewAssetClassDetector(nil, indicators.DefaultCommoditySymbols)
+	model.Configure(ctx, mockCommodity, &mockEngine{}, detector)
+
+	// Fetch commodity as quote
+	quote, err := model.fetchCommodityAsQuote("WHEAT")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Verify quote structure
+	if quote.Symbol != "WHEAT" {
+		t.Errorf("Expected symbol WHEAT, got %s", quote.Symbol)
+	}
+
+	// Verify OHLC are all the same (commodity API doesn't provide separate values)
+	if quote.Open != quote.High || quote.High != quote.Low || quote.Low != quote.Price {
+		t.Error("Expected Open, High, Low, and Price to be the same for commodities")
+	}
+
+	// Verify volume is empty (commodity API doesn't provide it)
+	if quote.Volume != "" {
+		t.Errorf("Expected empty volume, got %s", quote.Volume)
+	}
+
+	// Verify last trading day
+	if quote.LastTradingDay != "2024-01-15" {
+		t.Errorf("Expected last trading day 2024-01-15, got %s", quote.LastTradingDay)
+	}
+
+	// Verify change calculation
+	change, _ := alphavantage.ParseFloat(quote.Change)
+	expectedChange := 6.50 - 6.40
+	if change != expectedChange {
+		t.Errorf("Expected change %.2f, got %.2f", expectedChange, change)
+	}
+}
+
+// TestFetchCommodityAsQuote_HandlesSinglePointSeries verifies that a single
+// data point is handled gracefully (no change calculation).
+func TestFetchCommodityAsQuote_HandlesSinglePointSeries(t *testing.T) {
+	model := NewModel()
+	ctx := context.Background()
+
+	// Create mock commodity client with single data point
+	mockCommodity := &mockCommodityClient{
+		series: &alphavantage.CommoditySeries{
+			Name:     "Copper",
+			Interval: "monthly",
+			Unit:     "USD per Metric Ton",
+			Data: []alphavantage.CommodityDataPoint{
+				{Value: 8500.00, Date: mustParseTime("2024-01-01")},
+			},
+		},
+	}
+
+	detector := indicators.NewAssetClassDetector(nil, indicators.DefaultCommoditySymbols)
+	model.Configure(ctx, mockCommodity, &mockEngine{}, detector)
+
+	// Fetch commodity as quote
+	quote, err := model.fetchCommodityAsQuote("COPPER")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Verify quote was created
+	if quote == nil {
+		t.Fatal("Expected quote to be created")
+	}
+
+	// Verify no change is calculated (only one data point)
+	if quote.Change != "" {
+		t.Errorf("Expected empty change, got %s", quote.Change)
+	}
+
+	if quote.ChangePercent != "" {
+		t.Errorf("Expected empty change percent, got %s", quote.ChangePercent)
+	}
+}
+
+// TestFetchCommodityAsQuote_PropagatesAPIError verifies that API errors
+// are properly propagated.
+func TestFetchCommodityAsQuote_PropagatesAPIError(t *testing.T) {
+	model := NewModel()
+	ctx := context.Background()
+
+	// Create mock commodity client that returns an error
+	mockCommodity := &mockCommodityClient{
+		err: errors.New("API rate limit exceeded"),
+	}
+
+	detector := indicators.NewAssetClassDetector(nil, indicators.DefaultCommoditySymbols)
+	model.Configure(ctx, mockCommodity, &mockEngine{}, detector)
+
+	// Fetch commodity as quote should fail
+	_, err := model.fetchCommodityAsQuote("WTI")
+	if err == nil {
+		t.Error("Expected error to be returned")
+	}
+
+	if !strings.Contains(err.Error(), "API rate limit exceeded") {
+		t.Errorf("Expected error to contain 'API rate limit exceeded', got %v", err)
+	}
+}
+
+// TestQuoteView_CommoditySuppressesIndicatorsPanel verifies that the indicators
+// panel is suppressed for commodities.
+func TestQuoteView_CommoditySuppressesIndicatorsPanel(t *testing.T) {
+	model := NewModel()
+	model.width = 120
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{
+			Symbol: "WTI",
+			Price:  "75.50",
+		},
+		Indicators: nil,
+	}
+	detector := indicators.NewAssetClassDetector(nil, indicators.DefaultCommoditySymbols)
+	model.detector = detector
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	rendered := view.renderQuoteCards()
+
+	// Verify muted message is shown for commodities
+	assert.Contains(t, rendered, "signals unavailable for commodities", "Should show muted message for commodities")
+
+	// Verify technical indicators header is shown but with muted message
+	assert.Contains(t, rendered, "Technical Indicators", "Should show Technical Indicators header")
+}
+
+// TestQuoteView_CommodityShowsMutedMessage verifies the muted message
+// is displayed for commodities.
+func TestQuoteView_CommodityShowsMutedMessage(t *testing.T) {
+	model := NewModel()
+	model.width = 120
+	model.quoteData = &QuoteData{
+		Quote: &alphavantage.GlobalQuote{
+			Symbol: "WHEAT",
+			Price:  "6.50",
+		},
+		Indicators: nil,
+	}
+	detector := indicators.NewAssetClassDetector(nil, indicators.DefaultCommoditySymbols)
+	model.detector = detector
+
+	view := NewView(model).SetTheme(&defaultTheme{})
+	rendered := view.renderCommodityIndicatorsMessage()
+
+	// Verify the key components are present
+	assert.Contains(t, rendered, "Technical Indicators", "Should show Technical Indicators header")
+	assert.Contains(t, rendered, "signals unavailable for commodities", "Should show muted message")
+}
+
+// TestModel_IsCommodity verifies the IsCommodity method works correctly.
+func TestModel_IsCommodity(t *testing.T) {
+	tests := []struct {
+		name      string
+		symbol    string
+		commodity bool
+	}{
+		{"WTI is commodity", "WTI", true},
+		{"WHEAT is commodity", "WHEAT", true},
+		{"BRENT is commodity", "BRENT", true},
+		{"BTC is not commodity", "BTC", false},
+		{"AAPL is not commodity", "AAPL", false},
+		{"No quote data", "", false},
+		{"Nil quote data", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := NewModel()
+			if tt.symbol != "" {
+				model.quoteData = &QuoteData{
+					Quote: &alphavantage.GlobalQuote{
+						Symbol: tt.symbol,
+					},
+				}
+				detector := indicators.NewAssetClassDetector(nil, indicators.DefaultCommoditySymbols)
+				model.detector = detector
+			}
+
+			result := model.IsCommodity()
+			if result != tt.commodity {
+				t.Errorf("IsCommodity() = %v, want %v", result, tt.commodity)
+			}
+		})
+	}
+}
+
+// mustParseTime is a helper to parse a time string in tests.
+func mustParseTime(s string) time.Time {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }

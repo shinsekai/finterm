@@ -78,6 +78,11 @@ type FundamentalsClient interface {
 	GetEarnings(ctx context.Context, symbol string) (*alphavantage.Earnings, error)
 }
 
+// CommodityQuoteClient defines the interface for fetching commodity quote data.
+type CommodityQuoteClient interface {
+	GetCommodity(ctx context.Context, fn alphavantage.CommodityFunction, interval string) (*alphavantage.CommoditySeries, error)
+}
+
 // QuoteData contains all the data to display for a quote.
 //
 //nolint:revive // type name stuttering is acceptable for package-scoped types
@@ -337,15 +342,21 @@ func (m Model) fetchQuoteCmd(symbol string) tea.Cmd {
 	return func() tea.Msg {
 		symbol = strings.ToUpper(symbol)
 
+		// Detect asset class
+		assetClass := indicators.Equity
+		if m.detector != nil {
+			assetClass = m.detector.DetectAssetClass(symbol)
+		}
+
 		var quote *alphavantage.GlobalQuote
 		var err error
 
-		// Detect asset class and use appropriate endpoint
-		isCrypto := m.detector != nil && m.detector.DetectAssetClass(symbol) == indicators.Crypto
-		if isCrypto {
+		switch assetClass {
+		case indicators.Crypto:
 			quote, err = m.fetchCryptoAsQuote(symbol)
-		} else {
-			// For stocks: use TIME_SERIES_DAILY, get latest closed bar
+		case indicators.Commodity:
+			quote, err = m.fetchCommodityAsQuote(symbol)
+		default:
 			quote, err = m.fetchStockAsQuote(symbol)
 		}
 
@@ -353,14 +364,17 @@ func (m Model) fetchQuoteCmd(symbol string) tea.Cmd {
 			return QuoteErrorMsg{Err: fmt.Errorf("fetching quote for %s: %w", symbol, err)}
 		}
 
-		// Fetch indicators
-		indicators, err := m.engine.AnalyzeWithSymbolDetection(m.ctx, symbol)
-		if err != nil {
-			return QuoteErrorMsg{Err: fmt.Errorf("fetching indicators for %s: %w", symbol, err)}
+		// Fetch indicators - not available for commodities
+		var trendIndicators *trenddomain.Result
+		if assetClass != indicators.Commodity {
+			trendIndicators, err = m.engine.AnalyzeWithSymbolDetection(m.ctx, symbol)
+			if err != nil {
+				return QuoteErrorMsg{Err: fmt.Errorf("fetching indicators for %s: %w", symbol, err)}
+			}
 		}
 
 		return QuoteResultMsg{
-			Data: &QuoteData{Quote: quote, Indicators: indicators},
+			Data: &QuoteData{Quote: quote, Indicators: trendIndicators},
 		}
 	}
 }
@@ -458,6 +472,78 @@ func (m Model) fetchCryptoAsQuote(symbol string) (*alphavantage.GlobalQuote, err
 	return quote, nil
 }
 
+// fetchCommodityAsQuote fetches a commodity quote from the commodity data endpoint.
+// It resolves the symbol to a CommodityFunction, determines the best supported interval,
+// and builds a GlobalQuote from the latest two data points.
+func (m Model) fetchCommodityAsQuote(symbol string) (*alphavantage.GlobalQuote, error) {
+	commodityClient, ok := m.client.(CommodityQuoteClient)
+	if !ok {
+		return nil, fmt.Errorf("client does not support commodity quotes")
+	}
+
+	// Resolve symbol to CommodityFunction
+	fn, ok := alphavantage.CommodityFunctionFromSymbol(symbol)
+	if !ok {
+		return nil, fmt.Errorf("unknown commodity symbol: %s", symbol)
+	}
+
+	// Determine the best supported interval for this function
+	// Default to "daily", fall back to "monthly" if not supported
+	interval := "daily"
+	supportedIntervals, _ := alphavantage.CommoditySupportedIntervals(fn)
+	dailySupported := false
+	for _, iv := range supportedIntervals {
+		if iv == "daily" {
+			dailySupported = true
+			break
+		}
+	}
+	if !dailySupported {
+		interval = "monthly"
+	}
+
+	data, err := commodityClient.GetCommodity(m.ctx, fn, interval)
+	if err != nil {
+		return nil, err
+	}
+
+	// Need at least one data point
+	if len(data.Data) == 0 {
+		return nil, fmt.Errorf("no data for %s", symbol)
+	}
+
+	// Commodity data is returned in descending order (newest first)
+	// Get the latest and previous data points
+	latest := data.Data[0]
+	var prev alphavantage.CommodityDataPoint
+	if len(data.Data) > 1 {
+		prev = data.Data[1]
+	}
+
+	// Format the price string
+	priceStr := fmt.Sprintf("%.2f", latest.Value)
+
+	quote := &alphavantage.GlobalQuote{
+		Symbol:         symbol,
+		Price:          priceStr,
+		Open:           priceStr, // Commodity API doesn't provide OHLC
+		High:           priceStr,
+		Low:            priceStr,
+		Volume:         "", // Commodity API doesn't provide volume
+		LastTradingDay: latest.Date.Format("2006-01-02"),
+	}
+
+	// Calculate change from previous point
+	if prev.Value > 0 {
+		diff := latest.Value - prev.Value
+		pct := (diff / prev.Value) * 100
+		quote.Change = fmt.Sprintf("%.4f", diff)
+		quote.ChangePercent = fmt.Sprintf("%.4f%%", pct)
+	}
+
+	return quote, nil
+}
+
 // findLatestTwoDates finds the two most recent dates from a time series map.
 // Skips today's date to ensure we only use completed (closed) bars.
 func findLatestTwoDates[V any](ts map[string]V) (latest, prev string) {
@@ -550,6 +636,15 @@ func (m Model) GetHeight() int {
 // GetLookupHistory returns the lookup history slice.
 func (m Model) GetLookupHistory() []string {
 	return m.lookupHistory
+}
+
+// IsCommodity returns true if the current quote is for a commodity.
+func (m Model) IsCommodity() bool {
+	if m.quoteData == nil || m.quoteData.Quote == nil || m.detector == nil {
+		return false
+	}
+	symbol := m.quoteData.Quote.Symbol
+	return m.detector.DetectAssetClass(symbol) == indicators.Commodity
 }
 
 // fetchFundamentalsCmd returns a command to fetch fundamentals data for a symbol.

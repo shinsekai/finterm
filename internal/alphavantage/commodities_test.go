@@ -917,3 +917,159 @@ func TestGetCommodity_LiveAPI(t *testing.T) {
 
 	t.Logf("Live API test passed: got %d data points from %s", len(series.Data), series.Name)
 }
+
+// TestCommodityFunctionFromSymbol_ExhaustiveMapping tests that all commodity symbols
+// can be mapped to their CommodityFunction.
+func TestCommodityFunctionFromSymbol_ExhaustiveMapping(t *testing.T) {
+	tests := []struct {
+		name   string
+		symbol string
+		want   CommodityFunction
+	}{
+		{"WTI", "WTI", CommodityFunctionWTI},
+		{"BRENT", "BRENT", CommodityFunctionBrent},
+		{"NATURAL_GAS", "NATURAL_GAS", CommodityFunctionNaturalGas},
+		{"COPPER", "COPPER", CommodityFunctionCopper},
+		{"ALUMINUM", "ALUMINUM", CommodityFunctionAluminum},
+		{"WHEAT", "WHEAT", CommodityFunctionWheat},
+		{"CORN", "CORN", CommodityFunctionCorn},
+		{"COTTON", "COTTON", CommodityFunctionCotton},
+		{"SUGAR", "SUGAR", CommodityFunctionSugar},
+		{"COFFEE", "COFFEE", CommodityFunctionCoffee},
+		{"ALL_COMMODITIES", "ALL_COMMODITIES", CommodityFunctionAllCommodities},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := CommodityFunctionFromSymbol(tt.symbol)
+			if !ok {
+				t.Errorf("CommodityFunctionFromSymbol(%q) returned false, want true", tt.symbol)
+			}
+			if got != tt.want {
+				t.Errorf("CommodityFunctionFromSymbol(%q) = %v, want %v", tt.symbol, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestCommodityFunctionFromSymbol_CaseInsensitive tests that the lookup is
+// case-insensitive.
+func TestCommodityFunctionFromSymbol_CaseInsensitive(t *testing.T) {
+	tests := []struct {
+		name   string
+		symbol string
+		want   CommodityFunction
+	}{
+		{"WTI lowercase", "wti", CommodityFunctionWTI},
+		{"WTI mixed case", "Wti", CommodityFunctionWTI},
+		{"BRENT lowercase", "brent", CommodityFunctionBrent},
+		{"BRENT mixed case", "BrEnT", CommodityFunctionBrent},
+		{"WHEAT lowercase", "wheat", CommodityFunctionWheat},
+		{"WHEAT mixed case", "WhEaT", CommodityFunctionWheat},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := CommodityFunctionFromSymbol(tt.symbol)
+			if !ok {
+				t.Errorf("CommodityFunctionFromSymbol(%q) returned false, want true", tt.symbol)
+			}
+			if got != tt.want {
+				t.Errorf("CommodityFunctionFromSymbol(%q) = %v, want %v", tt.symbol, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestCommodityFunctionFromSymbol_UnknownReturnsFalse tests that unknown symbols
+// return false as the second return value.
+func TestCommodityFunctionFromSymbol_UnknownReturnsFalse(t *testing.T) {
+	tests := []struct {
+		name   string
+		symbol string
+	}{
+		{"UNKNOWN", "UNKNOWN"},
+		{"GOLD", "GOLD"},
+		{"SILVER", "SILVER"},
+		{"PLATINUM", "PLATINUM"},
+		{"empty", ""},
+		{"random", "RANDOM"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ok := CommodityFunctionFromSymbol(tt.symbol)
+			if ok {
+				t.Errorf("CommodityFunctionFromSymbol(%q) returned true, want false", tt.symbol)
+			}
+		})
+	}
+}
+
+// TestCommoditySupportedIntervals tests that the supported intervals
+// are correctly returned for each commodity function.
+func TestCommoditySupportedIntervals(t *testing.T) {
+	tests := []struct {
+		name          string
+		fn            CommodityFunction
+		wantIntervals []string
+		wantOK        bool
+	}{
+		{
+			"WTI",
+			CommodityFunctionWTI,
+			[]string{"daily", "weekly", "monthly", "quarterly"},
+			true,
+		},
+		{
+			"BRENT",
+			CommodityFunctionBrent,
+			[]string{"daily", "weekly", "monthly", "quarterly"},
+			true,
+		},
+		{
+			"COPPER",
+			CommodityFunctionCopper,
+			[]string{"monthly", "quarterly", "annual"},
+			true,
+		},
+		{
+			"ALUMINUM",
+			CommodityFunctionAluminum,
+			[]string{"monthly", "quarterly", "annual"},
+			true,
+		},
+		{
+			"WHEAT",
+			CommodityFunctionWheat,
+			[]string{"daily", "weekly", "monthly", "quarterly", "annual"},
+			true,
+		},
+		{
+			"UNKNOWN",
+			"UNKNOWN",
+			nil,
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := CommoditySupportedIntervals(tt.fn)
+			if ok != tt.wantOK {
+				t.Errorf("CommoditySupportedIntervals(%q) ok = %v, want %v", tt.fn, ok, tt.wantOK)
+			}
+			if !tt.wantOK {
+				return
+			}
+			if len(got) != len(tt.wantIntervals) {
+				t.Errorf("CommoditySupportedIntervals(%q) returned %d intervals, want %d", tt.fn, len(got), len(tt.wantIntervals))
+			}
+			for i, want := range tt.wantIntervals {
+				if got[i] != want {
+					t.Errorf("CommoditySupportedIntervals(%q)[%d] = %q, want %q", tt.fn, i, got[i], want)
+				}
+			}
+		})
+	}
+}
